@@ -492,6 +492,55 @@ export const updateFieldOptions = async (fieldId, options) => {
     }
 };
 
+/**
+ * Copiar campos de um nutricionista para outro (importação)
+ */
+export const copyFieldsBetweenForms = async (sourceNutritionistId, targetNutritionistId) => {
+    try {
+        // Buscar campos do formulário fonte
+        const { data: sourceFields, error: fetchError } = await supabase
+            .from('anamnese_fields')
+            .select('*')
+            .eq('nutritionist_id', sourceNutritionistId);
+
+        if (fetchError) throw fetchError;
+
+        // Copiar para o formulário destino
+        const fieldsToInsert = sourceFields.map(field => ({
+            nutritionist_id: targetNutritionistId,
+            field_label: field.field_label,
+            field_type: field.field_type,
+            category: field.category,
+            is_required: field.is_required
+        }));
+
+        const { data, error } = await supabase
+            .from('anamnese_fields')
+            .insert(fieldsToInsert)
+            .select();
+
+        if (error) throw error;
+
+        // Copiar opções se existirem
+        for (let i = 0; i < sourceFields.length; i++) {
+            const sourceField = sourceFields[i];
+            const newField = data[i];
+
+            if (sourceField.field_type === 'selecao_unica' || sourceField.field_type === 'selecao_multipla') {
+                const { data: options } = await getFieldOptions(sourceField.id);
+                if (options && options.length > 0) {
+                    await createFieldOptions(newField.id, options.map(opt => opt.option_text));
+                }
+            }
+        }
+
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao copiar campos:', error);
+        return { data: null, error };
+    }
+};
+
 // ============================================================
 // ANAMNESE ANSWERS (Sistema Modular)
 // ============================================================
