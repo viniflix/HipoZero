@@ -5,7 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
     ClipboardList, Plus, Calendar, FileText, ChevronRight, Loader2, AlertCircle,
-    Trash2, MoreVertical, Settings, Edit2, ArrowLeft
+    Trash2, MoreVertical, Settings, Edit2, ArrowLeft, FolderCog
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -45,7 +46,13 @@ import {
     getAnamnesisTemplates,
     deleteAnamnesis,
     getCustomTemplates,
-    createCustomFormTemplate
+    createCustomFormTemplate,
+    updateCustomFormTemplate,
+    deleteCustomFormTemplate,
+    getAnamneseFields,
+    createAnamneseField,
+    updateAnamneseField,
+    deleteAnamneseField
 } from '@/lib/supabase/anamnesis-queries';
 import { supabase } from '@/lib/customSupabaseClient';
 
@@ -68,7 +75,7 @@ const PatientAnamnesePage = () => {
     // Modals
     const [showTypeSelectionModal, setShowTypeSelectionModal] = useState(false);
     const [showTemplateSelectionModal, setShowTemplateSelectionModal] = useState(false);
-    const [selectedTemplateType, setSelectedTemplateType] = useState(null); // 'standard' ou 'custom'
+    const [selectedTemplateType, setSelectedTemplateType] = useState(null);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
 
     // Modal de criação de formulário personalizado
@@ -79,10 +86,35 @@ const PatientAnamnesePage = () => {
     });
     const [creating, setCreating] = useState(false);
 
+    // Modal de gerenciamento de formulários personalizados
+    const [showManageCustomModal, setShowManageCustomModal] = useState(false);
+    const [editingCustomTemplate, setEditingCustomTemplate] = useState(null);
+    const [customTemplateFields, setCustomTemplateFields] = useState([]);
+    const [loadingFields, setLoadingFields] = useState(false);
+
+    // Modal de edição de campo
+    const [showFieldModal, setShowFieldModal] = useState(false);
+    const [editingField, setEditingField] = useState(null);
+    const [fieldForm, setFieldForm] = useState({
+        fieldLabel: '',
+        fieldType: 'texto_curto',
+        optionsArray: ''
+    });
+
     // Modal de confirmação de exclusão
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [anamnesisToDelete, setAnamnesisToDelete] = useState(null);
     const [deleting, setDeleting] = useState(false);
+
+    // Modal de exclusão de template customizado
+    const [showDeleteTemplateDialog, setShowDeleteTemplateDialog] = useState(false);
+    const [templateToDelete, setTemplateToDelete] = useState(null);
+    const [deletingTemplate, setDeletingTemplate] = useState(false);
+
+    // Modal de exclusão de campo
+    const [showDeleteFieldDialog, setShowDeleteFieldDialog] = useState(false);
+    const [fieldToDelete, setFieldToDelete] = useState(null);
+    const [deletingField, setDeletingField] = useState(false);
 
     // Carregar dados iniciais
     const loadData = useCallback(async () => {
@@ -114,9 +146,7 @@ const PatientAnamnesePage = () => {
             setStandardTemplates(standard);
 
             // Buscar templates personalizados (templates criados pelo nutricionista)
-            const { data: customData, error: customError } = await getCustomTemplates(user.id);
-            if (customError) throw customError;
-            setCustomTemplates(customData || []);
+            await loadCustomTemplates();
 
         } catch (err) {
             console.error('Erro ao carregar dados:', err);
@@ -125,6 +155,18 @@ const PatientAnamnesePage = () => {
             setLoading(false);
         }
     }, [patientId, user?.id]);
+
+    const loadCustomTemplates = async () => {
+        if (!user?.id) return;
+
+        try {
+            const { data: customData, error: customError } = await getCustomTemplates(user.id);
+            if (customError) throw customError;
+            setCustomTemplates(customData || []);
+        } catch (err) {
+            console.error('Erro ao carregar templates personalizados:', err);
+        }
+    };
 
     useEffect(() => {
         loadData();
@@ -151,26 +193,19 @@ const PatientAnamnesePage = () => {
             }
 
             if (standardTemplates.length === 1) {
-                // Ir direto se só houver um template
                 navigate(`/nutritionist/patients/${patientId}/anamnesis/new?templateId=${standardTemplates[0].id}`);
                 return;
             }
 
-            // Mostrar modal de seleção de template padrão
             setShowTemplateSelectionModal(true);
 
         } else if (type === 'custom') {
             if (customTemplates.length === 0) {
-                // Se não houver templates personalizados, abrir modal de criação
                 setShowCreateCustomModal(true);
                 return;
             }
 
-            // Mostrar modal de seleção de template personalizado
             setShowTemplateSelectionModal(true);
-
-        } else if (type === 'create_new') {
-            setShowCreateCustomModal(true);
         }
     };
 
@@ -216,8 +251,11 @@ const PatientAnamnesePage = () => {
             setShowCreateCustomModal(false);
             setNewCustomTemplate({ title: '', description: '' });
 
-            // Navegar para a página de edição do formulário personalizado
-            navigate(`/nutritionist/patients/${patientId}/anamnesis/new?customTemplateId=${data.id}&edit=true`);
+            // Recarregar templates
+            await loadCustomTemplates();
+
+            // Abrir modal de edição do template criado
+            handleEditCustomTemplate(data);
 
         } catch (err) {
             console.error('Erro ao criar formulário personalizado:', err);
@@ -231,19 +269,199 @@ const PatientAnamnesePage = () => {
         }
     };
 
+    // Handler para editar template customizado
+    const handleEditCustomTemplate = async (template) => {
+        setEditingCustomTemplate(template);
+        setLoadingFields(true);
+
+        try {
+            const { data: fields, error } = await getAnamneseFields(user.id, template.id);
+            if (error) throw error;
+            setCustomTemplateFields(fields || []);
+        } catch (err) {
+            console.error('Erro ao carregar campos:', err);
+            toast({
+                title: 'Erro',
+                description: 'Erro ao carregar campos do formulário.',
+                variant: 'destructive',
+            });
+        } finally {
+            setLoadingFields(false);
+        }
+    };
+
+    // Handler para adicionar novo campo
+    const handleAddField = () => {
+        setEditingField(null);
+        setFieldForm({
+            fieldLabel: '',
+            fieldType: 'texto_curto',
+            optionsArray: ''
+        });
+        setShowFieldModal(true);
+    };
+
+    // Handler para editar campo existente
+    const handleEditField = (field) => {
+        setEditingField(field);
+        setFieldForm({
+            fieldLabel: field.field_label,
+            fieldType: field.field_type,
+            optionsArray: Array.isArray(field.options_array) ? field.options_array.join(', ') : ''
+        });
+        setShowFieldModal(true);
+    };
+
+    // Handler para salvar campo (criar ou atualizar)
+    const handleSaveField = async () => {
+        if (!fieldForm.fieldLabel.trim()) {
+            toast({
+                title: 'Atenção',
+                description: 'Digite o nome da pergunta.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        if ((fieldForm.fieldType === 'selecao_unica' || fieldForm.fieldType === 'selecao_multipla') && !fieldForm.optionsArray.trim()) {
+            toast({
+                title: 'Atenção',
+                description: 'Digite as opções separadas por vírgula.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        try {
+            let optionsArray = null;
+            if (fieldForm.fieldType === 'selecao_unica' || fieldForm.fieldType === 'selecao_multipla') {
+                optionsArray = fieldForm.optionsArray
+                    .split(',')
+                    .map(opt => opt.trim())
+                    .filter(opt => opt.length > 0);
+            }
+
+            if (editingField) {
+                // Atualizar
+                const { data, error } = await updateAnamneseField(editingField.id, {
+                    fieldLabel: fieldForm.fieldLabel,
+                    fieldType: fieldForm.fieldType,
+                    optionsArray: optionsArray
+                });
+
+                if (error) throw error;
+
+                setCustomTemplateFields(prev => prev.map(f => f.id === data.id ? data : f));
+                toast({
+                    title: 'Sucesso!',
+                    description: 'Pergunta atualizada com sucesso.',
+                });
+            } else {
+                // Criar
+                const { data, error } = await createAnamneseField({
+                    nutritionistId: user.id,
+                    customTemplateId: editingCustomTemplate.id,
+                    fieldLabel: fieldForm.fieldLabel,
+                    fieldType: fieldForm.fieldType,
+                    optionsArray: optionsArray,
+                    fieldOrder: customTemplateFields.length
+                });
+
+                if (error) throw error;
+
+                setCustomTemplateFields(prev => [...prev, data]);
+                toast({
+                    title: 'Sucesso!',
+                    description: 'Pergunta adicionada com sucesso.',
+                });
+            }
+
+            setShowFieldModal(false);
+            setEditingField(null);
+            setFieldForm({ fieldLabel: '', fieldType: 'texto_curto', optionsArray: '' });
+
+        } catch (err) {
+            console.error('Erro ao salvar campo:', err);
+            toast({
+                title: 'Erro ao salvar pergunta',
+                description: err.message,
+                variant: 'destructive',
+            });
+        }
+    };
+
+    // Handler para deletar campo
+    const handleDeleteField = async () => {
+        if (!fieldToDelete) return;
+
+        setDeletingField(true);
+        try {
+            const { error } = await deleteAnamneseField(fieldToDelete.id);
+            if (error) throw error;
+
+            setCustomTemplateFields(prev => prev.filter(f => f.id !== fieldToDelete.id));
+            setShowDeleteFieldDialog(false);
+            setFieldToDelete(null);
+
+            toast({
+                title: 'Sucesso!',
+                description: 'Pergunta excluída com sucesso.',
+            });
+        } catch (err) {
+            console.error('Erro ao excluir campo:', err);
+            toast({
+                title: 'Erro',
+                description: 'Erro ao excluir pergunta.',
+                variant: 'destructive',
+            });
+        } finally {
+            setDeletingField(false);
+        }
+    };
+
+    // Handler para deletar template customizado
+    const handleDeleteCustomTemplate = async () => {
+        if (!templateToDelete) return;
+
+        setDeletingTemplate(true);
+        try {
+            const { error } = await deleteCustomFormTemplate(templateToDelete.id);
+            if (error) throw error;
+
+            await loadCustomTemplates();
+            setShowDeleteTemplateDialog(false);
+            setTemplateToDelete(null);
+            setEditingCustomTemplate(null);
+
+            toast({
+                title: 'Sucesso!',
+                description: 'Formulário excluído com sucesso.',
+            });
+        } catch (err) {
+            console.error('Erro ao excluir formulário:', err);
+            toast({
+                title: 'Erro',
+                description: 'Erro ao excluir formulário.',
+                variant: 'destructive',
+            });
+        } finally {
+            setDeletingTemplate(false);
+        }
+    };
+
     // Handler para editar anamnese existente
     const handleEditAnamnesis = (anamnesisId) => {
         navigate(`/nutritionist/patients/${patientId}/anamnesis/${anamnesisId}/edit`);
     };
 
-    // Handler para abrir modal de confirmação de exclusão
+    // Handler para abrir modal de confirmação de exclusão de anamnese
     const handleDeleteClick = (anamnesis, e) => {
         e.stopPropagation();
         setAnamnesisToDelete(anamnesis);
         setShowDeleteDialog(true);
     };
 
-    // Handler para confirmar exclusão
+    // Handler para confirmar exclusão de anamnese
     const handleConfirmDelete = async () => {
         if (!anamnesisToDelete) return;
 
@@ -413,7 +631,6 @@ const PatientAnamnesePage = () => {
                 </DialogHeader>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                    {/* Opção 1: Formulário Padrão */}
                     <button
                         onClick={() => handleSelectType('standard')}
                         className="p-6 rounded-lg border-2 border-gray-200 hover:border-[#5f6f52] hover:bg-[#fefae0]/30 transition-all text-left group"
@@ -427,7 +644,6 @@ const PatientAnamnesePage = () => {
                         </p>
                     </button>
 
-                    {/* Opção 2: Formulários Personalizados */}
                     <button
                         onClick={() => handleSelectType('custom')}
                         className="p-6 rounded-lg border-2 border-gray-200 hover:border-[#5f6f52] hover:bg-[#fefae0]/30 transition-all text-left group"
@@ -510,7 +726,6 @@ const PatientAnamnesePage = () => {
                             </button>
                         ))}
 
-                        {/* Opção de criar novo formulário personalizado */}
                         {selectedTemplateType === 'custom' && (
                             <button
                                 onClick={() => {
@@ -554,71 +769,277 @@ const PatientAnamnesePage = () => {
     };
 
     // Modal de Criação de Formulário Personalizado
-    const CreateCustomModal = () => (
-        <Dialog open={showCreateCustomModal} onOpenChange={setShowCreateCustomModal}>
-            <DialogContent className="max-w-md">
+    const CreateCustomModal = () => {
+        const [localTitle, setLocalTitle] = useState('');
+        const [localDescription, setLocalDescription] = useState('');
+
+        return (
+            <Dialog open={showCreateCustomModal} onOpenChange={setShowCreateCustomModal}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Criar Formulário Personalizado</DialogTitle>
+                        <DialogDescription>
+                            Dê um nome ao seu formulário. Você poderá adicionar perguntas na próxima etapa.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div>
+                            <Label htmlFor="custom-title">Nome do Formulário *</Label>
+                            <Input
+                                id="custom-title"
+                                value={localTitle}
+                                onChange={(e) => setLocalTitle(e.target.value)}
+                                placeholder="Ex: Anamnese para Emagrecimento"
+                                maxLength={100}
+                            />
+                        </div>
+
+                        <div>
+                            <Label htmlFor="custom-description">Descrição (opcional)</Label>
+                            <Textarea
+                                id="custom-description"
+                                value={localDescription}
+                                onChange={(e) => setLocalDescription(e.target.value)}
+                                placeholder="Descreva o objetivo deste formulário..."
+                                rows={3}
+                                maxLength={500}
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowCreateCustomModal(false);
+                                setLocalTitle('');
+                                setLocalDescription('');
+                            }}
+                            disabled={creating}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={async () => {
+                                if (!localTitle.trim()) {
+                                    toast({
+                                        title: 'Atenção',
+                                        description: 'Digite um nome para o formulário personalizado.',
+                                        variant: 'destructive',
+                                    });
+                                    return;
+                                }
+
+                                setCreating(true);
+                                try {
+                                    const { data, error } = await createCustomFormTemplate({
+                                        nutritionistId: user.id,
+                                        title: localTitle,
+                                        description: localDescription
+                                    });
+
+                                    if (error) throw error;
+
+                                    toast({
+                                        title: 'Sucesso!',
+                                        description: 'Formulário personalizado criado. Agora adicione suas perguntas.',
+                                    });
+
+                                    setShowCreateCustomModal(false);
+                                    setLocalTitle('');
+                                    setLocalDescription('');
+
+                                    await loadCustomTemplates();
+                                    handleEditCustomTemplate(data);
+
+                                } catch (err) {
+                                    console.error('Erro ao criar formulário personalizado:', err);
+                                    toast({
+                                        title: 'Erro ao criar formulário',
+                                        description: err.message,
+                                        variant: 'destructive',
+                                    });
+                                } finally {
+                                    setCreating(false);
+                                }
+                            }}
+                            disabled={creating || !localTitle.trim()}
+                        >
+                            {creating ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Criando...
+                                </>
+                            ) : (
+                                'Criar e Adicionar Perguntas'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    };
+
+    // Modal de Edição de Template Customizado (Gerenciar Campos)
+    const EditCustomTemplateModal = () => (
+        <Dialog open={!!editingCustomTemplate} onOpenChange={() => setEditingCustomTemplate(null)}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Criar Formulário Personalizado</DialogTitle>
-                    <DialogDescription>
-                        Dê um nome ao seu formulário. Você poderá adicionar perguntas na próxima etapa.
-                    </DialogDescription>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <DialogTitle>Editar Formulário: {editingCustomTemplate?.title}</DialogTitle>
+                            <DialogDescription>
+                                Adicione, edite ou remova perguntas do formulário
+                            </DialogDescription>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                setTemplateToDelete(editingCustomTemplate);
+                                setShowDeleteTemplateDialog(true);
+                            }}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Excluir Formulário
+                        </Button>
+                    </div>
                 </DialogHeader>
 
-                <div className="space-y-4 py-4">
-                    <div>
-                        <Label htmlFor="custom-title">Nome do Formulário *</Label>
-                        <Input
-                            id="custom-title"
-                            value={newCustomTemplate.title}
-                            onChange={(e) => setNewCustomTemplate({ ...newCustomTemplate, title: e.target.value })}
-                            placeholder="Ex: Anamnese para Emagrecimento"
-                            maxLength={100}
-                        />
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-semibold">Perguntas ({customTemplateFields.length})</h3>
+                        <Button onClick={handleAddField} size="sm">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Adicionar Pergunta
+                        </Button>
                     </div>
 
-                    <div>
-                        <Label htmlFor="custom-description">Descrição (opcional)</Label>
-                        <Textarea
-                            id="custom-description"
-                            value={newCustomTemplate.description}
-                            onChange={(e) => setNewCustomTemplate({ ...newCustomTemplate, description: e.target.value })}
-                            placeholder="Descreva o objetivo deste formulário..."
-                            rows={3}
-                            maxLength={500}
-                        />
-                    </div>
+                    {loadingFields ? (
+                        <div className="flex items-center justify-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin text-[#5f6f52]" />
+                        </div>
+                    ) : customTemplateFields.length === 0 ? (
+                        <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                            <p className="text-muted-foreground">Nenhuma pergunta adicionada ainda.</p>
+                            <Button onClick={handleAddField} size="sm" className="mt-4">
+                                <Plus className="w-4 h-4 mr-2" />
+                                Adicionar Primeira Pergunta
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {customTemplateFields.map((field, index) => (
+                                <div key={field.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-muted-foreground">#{index + 1}</span>
+                                            <p className="font-medium">{field.field_label}</p>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                            Tipo: {field.field_type.replace('_', ' ')}
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleEditField(field)}
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setFieldToDelete(field);
+                                                setShowDeleteFieldDialog(true);
+                                            }}
+                                        >
+                                            <Trash2 className="w-4 h-4 text-destructive" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <DialogFooter>
-                    <Button
-                        variant="outline"
-                        onClick={() => {
-                            setShowCreateCustomModal(false);
-                            setNewCustomTemplate({ title: '', description: '' });
-                        }}
-                        disabled={creating}
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        onClick={handleCreateCustomTemplate}
-                        disabled={creating || !newCustomTemplate.title.trim()}
-                    >
-                        {creating ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Criando...
-                            </>
-                        ) : (
-                            'Criar e Adicionar Perguntas'
-                        )}
+                    <Button onClick={() => setEditingCustomTemplate(null)}>
+                        Concluir
                     </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
     );
 
-    // Modal de Confirmação de Exclusão
+    // Modal de Campo (Adicionar/Editar Pergunta)
+    const FieldModal = () => (
+        <Dialog open={showFieldModal} onOpenChange={setShowFieldModal}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{editingField ? 'Editar Pergunta' : 'Nova Pergunta'}</DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                    <div>
+                        <Label htmlFor="field-label">Nome da Pergunta</Label>
+                        <Input
+                            id="field-label"
+                            value={fieldForm.fieldLabel}
+                            onChange={(e) => setFieldForm({ ...fieldForm, fieldLabel: e.target.value })}
+                            placeholder="Ex: Histórico de Doenças Familiares"
+                        />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="field-type">Tipo de Campo</Label>
+                        <Select
+                            value={fieldForm.fieldType}
+                            onValueChange={(val) => setFieldForm({ ...fieldForm, fieldType: val })}
+                        >
+                            <SelectTrigger id="field-type">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="texto_curto">Texto Curto</SelectItem>
+                                <SelectItem value="texto_longo">Texto Longo</SelectItem>
+                                <SelectItem value="selecao_unica">Seleção Única</SelectItem>
+                                <SelectItem value="selecao_multipla">Seleção Múltipla</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {(fieldForm.fieldType === 'selecao_unica' || fieldForm.fieldType === 'selecao_multipla') && (
+                        <div>
+                            <Label htmlFor="field-options">Opções (separadas por vírgula)</Label>
+                            <Textarea
+                                id="field-options"
+                                value={fieldForm.optionsArray}
+                                onChange={(e) => setFieldForm({ ...fieldForm, optionsArray: e.target.value })}
+                                placeholder="Ex: Sim, Não, Não sei"
+                                rows={2}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowFieldModal(false)}>
+                        Cancelar
+                    </Button>
+                    <Button onClick={handleSaveField}>
+                        {editingField ? 'Salvar' : 'Adicionar'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+
+    // Dialogs de Confirmação
     const DeleteDialog = () => (
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
             <AlertDialogContent>
@@ -646,6 +1067,67 @@ const PatientAnamnesePage = () => {
                         className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
                     >
                         {deleting ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Excluindo...
+                            </>
+                        ) : (
+                            'Excluir'
+                        )}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+
+    const DeleteTemplateDialog = () => (
+        <AlertDialog open={showDeleteTemplateDialog} onOpenChange={setShowDeleteTemplateDialog}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar Exclusão do Formulário</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Tem certeza que deseja excluir o formulário "{templateToDelete?.title}"?
+                        Todas as perguntas associadas serão excluídas permanentemente.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deletingTemplate}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={handleDeleteCustomTemplate}
+                        disabled={deletingTemplate}
+                        className="bg-red-600 hover:bg-red-700"
+                    >
+                        {deletingTemplate ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Excluindo...
+                            </>
+                        ) : (
+                            'Excluir'
+                        )}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+
+    const DeleteFieldDialog = () => (
+        <AlertDialog open={showDeleteFieldDialog} onOpenChange={setShowDeleteFieldDialog}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar Exclusão da Pergunta</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Tem certeza que deseja excluir a pergunta "{fieldToDelete?.field_label}"?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deletingField}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={handleDeleteField}
+                        disabled={deletingField}
+                        className="bg-red-600 hover:bg-red-700"
+                    >
+                        {deletingField ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Excluindo...
@@ -701,17 +1183,30 @@ const PatientAnamnesePage = () => {
                         )}
                     </div>
 
-                    {/* Botão Nova Anamnese (só aparece se já houver anamneses) */}
-                    {anamnesisList.length > 0 && (
-                        <Button
-                            onClick={handleCreateNew}
-                            size="lg"
-                            className="gap-2"
-                        >
-                            <Plus className="w-5 h-5" />
-                            Nova Anamnese
-                        </Button>
-                    )}
+                    <div className="flex gap-2">
+                        {/* Botão Gerenciar Formulários */}
+                        {customTemplates.length > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowManageCustomModal(true)}
+                            >
+                                <FolderCog className="w-4 h-4 mr-2" />
+                                Gerenciar Formulários
+                            </Button>
+                        )}
+
+                        {/* Botão Nova Anamnese */}
+                        {anamnesisList.length > 0 && (
+                            <Button
+                                onClick={handleCreateNew}
+                                size="lg"
+                                className="gap-2"
+                            >
+                                <Plus className="w-5 h-5" />
+                                Nova Anamnese
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Erro */}
@@ -738,7 +1233,81 @@ const PatientAnamnesePage = () => {
             <TypeSelectionModal />
             <TemplateSelectionModal />
             <CreateCustomModal />
+            <EditCustomTemplateModal />
+            <FieldModal />
             <DeleteDialog />
+            <DeleteTemplateDialog />
+            <DeleteFieldDialog />
+
+            {/* Modal de Gerenciamento de Formulários Personalizados */}
+            <Dialog open={showManageCustomModal} onOpenChange={setShowManageCustomModal}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Meus Formulários Personalizados</DialogTitle>
+                        <DialogDescription>
+                            Gerencie seus formulários de anamnese personalizados
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                        {customTemplates.length === 0 ? (
+                            <p className="text-center text-muted-foreground py-8">
+                                Nenhum formulário personalizado criado ainda.
+                            </p>
+                        ) : (
+                            customTemplates.map((template) => (
+                                <div key={template.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                                    <div>
+                                        <h4 className="font-semibold">{template.title}</h4>
+                                        {template.description && (
+                                            <p className="text-sm text-muted-foreground">{template.description}</p>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                setShowManageCustomModal(false);
+                                                handleEditCustomTemplate(template);
+                                            }}
+                                        >
+                                            <Edit2 className="w-4 h-4 mr-2" />
+                                            Editar Campos
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setTemplateToDelete(template);
+                                                setShowDeleteTemplateDialog(true);
+                                            }}
+                                        >
+                                            <Trash2 className="w-4 h-4 text-destructive" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowManageCustomModal(false)}
+                        >
+                            Fechar
+                        </Button>
+                        <Button onClick={() => {
+                            setShowManageCustomModal(false);
+                            setShowCreateCustomModal(true);
+                        }}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Novo Formulário
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
