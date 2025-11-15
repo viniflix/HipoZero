@@ -312,84 +312,6 @@ const PatientAnamnesePage = () => {
         setShowFieldModal(true);
     };
 
-    // Handler para salvar campo (criar ou atualizar)
-    const handleSaveField = async () => {
-        if (!fieldForm.fieldLabel.trim()) {
-            toast({
-                title: 'Atenção',
-                description: 'Digite o nome da pergunta.',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        if ((fieldForm.fieldType === 'selecao_unica' || fieldForm.fieldType === 'selecao_multipla') && !fieldForm.optionsArray.trim()) {
-            toast({
-                title: 'Atenção',
-                description: 'Digite as opções separadas por vírgula.',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        try {
-            let optionsArray = null;
-            if (fieldForm.fieldType === 'selecao_unica' || fieldForm.fieldType === 'selecao_multipla') {
-                optionsArray = fieldForm.optionsArray
-                    .split(',')
-                    .map(opt => opt.trim())
-                    .filter(opt => opt.length > 0);
-            }
-
-            if (editingField) {
-                // Atualizar
-                const { data, error } = await updateAnamneseField(editingField.id, {
-                    fieldLabel: fieldForm.fieldLabel,
-                    fieldType: fieldForm.fieldType,
-                    optionsArray: optionsArray
-                });
-
-                if (error) throw error;
-
-                setCustomTemplateFields(prev => prev.map(f => f.id === data.id ? data : f));
-                toast({
-                    title: 'Sucesso!',
-                    description: 'Pergunta atualizada com sucesso.',
-                });
-            } else {
-                // Criar
-                const { data, error } = await createAnamneseField({
-                    nutritionistId: user.id,
-                    customTemplateId: editingCustomTemplate.id,
-                    fieldLabel: fieldForm.fieldLabel,
-                    fieldType: fieldForm.fieldType,
-                    optionsArray: optionsArray,
-                    fieldOrder: customTemplateFields.length
-                });
-
-                if (error) throw error;
-
-                setCustomTemplateFields(prev => [...prev, data]);
-                toast({
-                    title: 'Sucesso!',
-                    description: 'Pergunta adicionada com sucesso.',
-                });
-            }
-
-            setShowFieldModal(false);
-            setEditingField(null);
-            setFieldForm({ fieldLabel: '', fieldType: 'texto_curto', optionsArray: '' });
-
-        } catch (err) {
-            console.error('Erro ao salvar campo:', err);
-            toast({
-                title: 'Erro ao salvar pergunta',
-                description: err.message,
-                variant: 'destructive',
-            });
-        }
-    };
-
     // Handler para deletar campo
     const handleDeleteField = async () => {
         if (!fieldToDelete) return;
@@ -977,67 +899,148 @@ const PatientAnamnesePage = () => {
     );
 
     // Modal de Campo (Adicionar/Editar Pergunta)
-    const FieldModal = () => (
-        <Dialog open={showFieldModal} onOpenChange={setShowFieldModal}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{editingField ? 'Editar Pergunta' : 'Nova Pergunta'}</DialogTitle>
-                </DialogHeader>
+    const FieldModal = () => {
+        const [localFieldLabel, setLocalFieldLabel] = useState(fieldForm.fieldLabel);
+        const [localFieldType, setLocalFieldType] = useState(fieldForm.fieldType);
+        const [localOptionsArray, setLocalOptionsArray] = useState(fieldForm.optionsArray);
 
-                <div className="space-y-4">
-                    <div>
-                        <Label htmlFor="field-label">Nome da Pergunta</Label>
-                        <Input
-                            id="field-label"
-                            value={fieldForm.fieldLabel}
-                            onChange={(e) => setFieldForm({ ...fieldForm, fieldLabel: e.target.value })}
-                            placeholder="Ex: Histórico de Doenças Familiares"
-                        />
-                    </div>
+        const handleSave = async () => {
+            if (!localFieldLabel.trim()) {
+                toast({
+                    title: 'Atenção',
+                    description: 'Digite o nome da pergunta.',
+                    variant: 'destructive',
+                });
+                return;
+            }
 
-                    <div>
-                        <Label htmlFor="field-type">Tipo de Campo</Label>
-                        <Select
-                            value={fieldForm.fieldType}
-                            onValueChange={(val) => setFieldForm({ ...fieldForm, fieldType: val })}
-                        >
-                            <SelectTrigger id="field-type">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="texto_curto">Texto Curto</SelectItem>
-                                <SelectItem value="texto_longo">Texto Longo</SelectItem>
-                                <SelectItem value="selecao_unica">Seleção Única</SelectItem>
-                                <SelectItem value="selecao_multipla">Seleção Múltipla</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+            if ((localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla') && !localOptionsArray.trim()) {
+                toast({
+                    title: 'Atenção',
+                    description: 'Digite as opções separadas por vírgula.',
+                    variant: 'destructive',
+                });
+                return;
+            }
 
-                    {(fieldForm.fieldType === 'selecao_unica' || fieldForm.fieldType === 'selecao_multipla') && (
+            try {
+                let optionsArray = null;
+                if (localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla') {
+                    optionsArray = localOptionsArray
+                        .split(',')
+                        .map(opt => opt.trim())
+                        .filter(opt => opt.length > 0);
+                }
+
+                if (editingField) {
+                    // Atualizar
+                    const { data, error } = await updateAnamneseField(editingField.id, {
+                        fieldLabel: localFieldLabel,
+                        fieldType: localFieldType,
+                        optionsArray: optionsArray
+                    });
+
+                    if (error) throw error;
+
+                    setCustomTemplateFields(prev => prev.map(f => f.id === data.id ? data : f));
+                    toast({
+                        title: 'Sucesso!',
+                        description: 'Pergunta atualizada com sucesso.',
+                    });
+                } else {
+                    // Criar
+                    const { data, error } = await createAnamneseField({
+                        nutritionistId: user.id,
+                        fieldLabel: localFieldLabel,
+                        fieldType: localFieldType,
+                        optionsArray: optionsArray
+                    });
+
+                    if (error) throw error;
+
+                    setCustomTemplateFields(prev => [...prev, data]);
+                    toast({
+                        title: 'Sucesso!',
+                        description: 'Pergunta adicionada com sucesso.',
+                    });
+                }
+
+                setShowFieldModal(false);
+                setEditingField(null);
+                setFieldForm({ fieldLabel: '', fieldType: 'texto_curto', optionsArray: '' });
+
+            } catch (err) {
+                console.error('Erro ao salvar campo:', err);
+                toast({
+                    title: 'Erro ao salvar pergunta',
+                    description: err.message,
+                    variant: 'destructive',
+                });
+            }
+        };
+
+        return (
+            <Dialog open={showFieldModal} onOpenChange={setShowFieldModal}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{editingField ? 'Editar Pergunta' : 'Nova Pergunta'}</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
                         <div>
-                            <Label htmlFor="field-options">Opções (separadas por vírgula)</Label>
-                            <Textarea
-                                id="field-options"
-                                value={fieldForm.optionsArray}
-                                onChange={(e) => setFieldForm({ ...fieldForm, optionsArray: e.target.value })}
-                                placeholder="Ex: Sim, Não, Não sei"
-                                rows={2}
+                            <Label htmlFor="field-label">Nome da Pergunta</Label>
+                            <Input
+                                id="field-label"
+                                value={localFieldLabel}
+                                onChange={(e) => setLocalFieldLabel(e.target.value)}
+                                placeholder="Ex: Histórico de Doenças Familiares"
                             />
                         </div>
-                    )}
-                </div>
 
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowFieldModal(false)}>
-                        Cancelar
-                    </Button>
-                    <Button onClick={handleSaveField}>
-                        {editingField ? 'Salvar' : 'Adicionar'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
+                        <div>
+                            <Label htmlFor="field-type">Tipo de Campo</Label>
+                            <Select
+                                value={localFieldType}
+                                onValueChange={(val) => setLocalFieldType(val)}
+                            >
+                                <SelectTrigger id="field-type">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="texto_curto">Texto Curto</SelectItem>
+                                    <SelectItem value="texto_longo">Texto Longo</SelectItem>
+                                    <SelectItem value="selecao_unica">Seleção Única</SelectItem>
+                                    <SelectItem value="selecao_multipla">Seleção Múltipla</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {(localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla') && (
+                            <div>
+                                <Label htmlFor="field-options">Opções (separadas por vírgula)</Label>
+                                <Textarea
+                                    id="field-options"
+                                    value={localOptionsArray}
+                                    onChange={(e) => setLocalOptionsArray(e.target.value)}
+                                    placeholder="Ex: Sim, Não, Não sei"
+                                    rows={2}
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowFieldModal(false)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSave}>
+                            {editingField ? 'Salvar' : 'Adicionar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    };
 
     // Dialogs de Confirmação
     const DeleteDialog = () => (

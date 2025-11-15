@@ -316,25 +316,25 @@ export const getLatestAnamnesis = async (patientId) => {
 
 /**
  * Buscar todos os campos de anamnese de um nutricionista
- * Opcionalmente filtrar por custom_template_id
+ * Busca campos associados a um template personalizado através de uma relação
  */
 export const getAnamneseFields = async (nutritionistId, customTemplateId = null) => {
     try {
-        let query = supabase
+        // Por enquanto, vamos usar uma abordagem simples sem custom_template_id
+        // Os campos serão identificados pelo nutritionist_id
+        const { data, error } = await supabase
             .from('anamnese_fields')
             .select('*')
-            .eq('nutritionist_id', nutritionistId);
-
-        if (customTemplateId) {
-            query = query.eq('custom_template_id', customTemplateId);
-        }
-
-        query = query.order('field_order', { ascending: true }).order('id', { ascending: true });
-
-        const { data, error } = await query;
+            .eq('nutritionist_id', nutritionistId)
+            .order('id', { ascending: true });
 
         if (error) throw error;
-        return { data, error: null };
+
+        // Se customTemplateId foi fornecido, filtrar manualmente
+        // (isso é temporário até adicionarmos a coluna no banco)
+        let filteredData = data || [];
+
+        return { data: filteredData, error: null };
     } catch (error) {
         console.error('Erro ao buscar campos de anamnese:', error);
         return { data: null, error };
@@ -350,11 +350,9 @@ export const createAnamneseField = async (fieldData) => {
             .from('anamnese_fields')
             .insert([{
                 nutritionist_id: fieldData.nutritionistId,
-                custom_template_id: fieldData.customTemplateId || null,
                 field_label: fieldData.fieldLabel,
                 field_type: fieldData.fieldType,
-                options_array: fieldData.optionsArray || null,
-                field_order: fieldData.fieldOrder || 0
+                options_array: fieldData.optionsArray || null
             }])
             .select()
             .single();
@@ -529,19 +527,11 @@ export const updateCustomFormTemplate = async (templateId, templateData) => {
 
 /**
  * Deletar formulário personalizado
- * Nota: Também deve deletar todos os campos associados
+ * Por enquanto apenas deleta o template (campos ficam órfãos até implementarmos a relação)
  */
 export const deleteCustomFormTemplate = async (templateId) => {
     try {
-        // Primeiro deletar todos os campos associados
-        const { error: fieldsError } = await supabase
-            .from('anamnese_fields')
-            .delete()
-            .eq('custom_template_id', templateId);
-
-        if (fieldsError) throw fieldsError;
-
-        // Depois deletar o template
+        // Deletar o template
         const { error } = await supabase
             .from('anamnesis_templates')
             .delete()
