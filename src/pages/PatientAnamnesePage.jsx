@@ -270,7 +270,7 @@ const PatientAnamnesePage = () => {
     };
 
     // Handler para editar template customizado
-    const handleEditCustomTemplate = async (template) => {
+    const handleEditCustomTemplate = useCallback(async (template) => {
         setEditingCustomTemplate(template);
         setLoadingFields(true);
 
@@ -288,7 +288,7 @@ const PatientAnamnesePage = () => {
         } finally {
             setLoadingFields(false);
         }
-    };
+    }, [user?.id, toast]);
 
     // Handler para adicionar novo campo
     const handleAddField = () => {
@@ -307,7 +307,7 @@ const PatientAnamnesePage = () => {
         setFieldForm({
             fieldLabel: field.field_label,
             fieldType: field.field_type,
-            optionsArray: Array.isArray(field.options_array) ? field.options_array.join(', ') : ''
+            optionsArray: ''
         });
         setShowFieldModal(true);
     };
@@ -899,10 +899,14 @@ const PatientAnamnesePage = () => {
     );
 
     // Modal de Campo (Adicionar/Editar Pergunta)
-    const FieldModal = () => {
+    const FieldModal = React.memo(() => {
         const [localFieldLabel, setLocalFieldLabel] = useState(fieldForm.fieldLabel);
         const [localFieldType, setLocalFieldType] = useState(fieldForm.fieldType);
-        const [localOptionsArray, setLocalOptionsArray] = useState(fieldForm.optionsArray);
+
+        React.useEffect(() => {
+            setLocalFieldLabel(fieldForm.fieldLabel);
+            setLocalFieldType(fieldForm.fieldType);
+        }, [fieldForm.fieldLabel, fieldForm.fieldType]);
 
         const handleSave = async () => {
             if (!localFieldLabel.trim()) {
@@ -914,30 +918,12 @@ const PatientAnamnesePage = () => {
                 return;
             }
 
-            if ((localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla') && !localOptionsArray.trim()) {
-                toast({
-                    title: 'Atenção',
-                    description: 'Digite as opções separadas por vírgula.',
-                    variant: 'destructive',
-                });
-                return;
-            }
-
             try {
-                let optionsArray = null;
-                if (localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla') {
-                    optionsArray = localOptionsArray
-                        .split(',')
-                        .map(opt => opt.trim())
-                        .filter(opt => opt.length > 0);
-                }
-
                 if (editingField) {
                     // Atualizar
                     const { data, error } = await updateAnamneseField(editingField.id, {
                         fieldLabel: localFieldLabel,
-                        fieldType: localFieldType,
-                        optionsArray: optionsArray
+                        fieldType: localFieldType
                     });
 
                     if (error) throw error;
@@ -952,8 +938,7 @@ const PatientAnamnesePage = () => {
                     const { data, error } = await createAnamneseField({
                         nutritionistId: user.id,
                         fieldLabel: localFieldLabel,
-                        fieldType: localFieldType,
-                        optionsArray: optionsArray
+                        fieldType: localFieldType
                     });
 
                     if (error) throw error;
@@ -993,7 +978,7 @@ const PatientAnamnesePage = () => {
                                 id="field-label"
                                 value={localFieldLabel}
                                 onChange={(e) => setLocalFieldLabel(e.target.value)}
-                                placeholder="Ex: Histórico de Doenças Familiares"
+                                placeholder="Ex: Qual seu objetivo com a consulta?"
                             />
                         </div>
 
@@ -1009,24 +994,9 @@ const PatientAnamnesePage = () => {
                                 <SelectContent>
                                     <SelectItem value="texto_curto">Texto Curto</SelectItem>
                                     <SelectItem value="texto_longo">Texto Longo</SelectItem>
-                                    <SelectItem value="selecao_unica">Seleção Única</SelectItem>
-                                    <SelectItem value="selecao_multipla">Seleção Múltipla</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
-
-                        {(localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla') && (
-                            <div>
-                                <Label htmlFor="field-options">Opções (separadas por vírgula)</Label>
-                                <Textarea
-                                    id="field-options"
-                                    value={localOptionsArray}
-                                    onChange={(e) => setLocalOptionsArray(e.target.value)}
-                                    placeholder="Ex: Sim, Não, Não sei"
-                                    rows={2}
-                                />
-                            </div>
-                        )}
                     </div>
 
                     <DialogFooter>
@@ -1040,7 +1010,7 @@ const PatientAnamnesePage = () => {
                 </DialogContent>
             </Dialog>
         );
-    };
+    });
 
     // Dialogs de Confirmação
     const DeleteDialog = () => (

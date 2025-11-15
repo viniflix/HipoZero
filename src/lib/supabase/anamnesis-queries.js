@@ -351,8 +351,7 @@ export const createAnamneseField = async (fieldData) => {
             .insert([{
                 nutritionist_id: fieldData.nutritionistId,
                 field_label: fieldData.fieldLabel,
-                field_type: fieldData.fieldType,
-                options_array: fieldData.optionsArray || null
+                field_type: fieldData.fieldType
             }])
             .select()
             .single();
@@ -374,8 +373,7 @@ export const updateAnamneseField = async (fieldId, fieldData) => {
             .from('anamnese_fields')
             .update({
                 field_label: fieldData.fieldLabel,
-                field_type: fieldData.fieldType,
-                options_array: fieldData.optionsArray || null
+                field_type: fieldData.fieldType
             })
             .eq('id', fieldId)
             .select()
