@@ -351,7 +351,9 @@ export const createAnamneseField = async (fieldData) => {
             .insert([{
                 nutritionist_id: fieldData.nutritionistId,
                 field_label: fieldData.fieldLabel,
-                field_type: fieldData.fieldType
+                field_type: fieldData.fieldType,
+                category: fieldData.category || 'geral',
+                is_required: fieldData.isRequired || false
             }])
             .select()
             .single();
@@ -369,12 +371,22 @@ export const createAnamneseField = async (fieldData) => {
  */
 export const updateAnamneseField = async (fieldId, fieldData) => {
     try {
+        const updateData = {
+            field_label: fieldData.fieldLabel,
+            field_type: fieldData.fieldType
+        };
+
+        // Adicionar category e is_required se fornecidos
+        if (fieldData.category !== undefined) {
+            updateData.category = fieldData.category;
+        }
+        if (fieldData.isRequired !== undefined) {
+            updateData.is_required = fieldData.isRequired;
+        }
+
         const { data, error } = await supabase
             .from('anamnese_fields')
-            .update({
-                field_label: fieldData.fieldLabel,
-                field_type: fieldData.fieldType
-            })
+            .update(updateData)
             .eq('id', fieldId)
             .select()
             .single();

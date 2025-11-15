@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -101,6 +102,8 @@ const PatientAnamnesePage = () => {
     const [fieldForm, setFieldForm] = useState({
         fieldLabel: '',
         fieldType: 'texto_curto',
+        category: 'geral',
+        isRequired: false,
         optionsArray: ''
     });
 
@@ -299,6 +302,8 @@ const PatientAnamnesePage = () => {
         setFieldForm({
             fieldLabel: '',
             fieldType: 'texto_curto',
+            category: 'geral',
+            isRequired: false,
             optionsArray: ''
         });
         setShowFieldModal(true);
@@ -310,6 +315,8 @@ const PatientAnamnesePage = () => {
         setFieldForm({
             fieldLabel: field.field_label,
             fieldType: field.field_type,
+            category: field.category || 'geral',
+            isRequired: field.is_required || false,
             optionsArray: ''
         });
         setShowFieldModal(true);
@@ -909,6 +916,8 @@ const PatientAnamnesePage = () => {
     const FieldModal = React.memo(() => {
         const [localFieldLabel, setLocalFieldLabel] = useState(fieldForm.fieldLabel);
         const [localFieldType, setLocalFieldType] = useState(fieldForm.fieldType);
+        const [localCategory, setLocalCategory] = useState(fieldForm.category);
+        const [localIsRequired, setLocalIsRequired] = useState(fieldForm.isRequired);
         const [localOptions, setLocalOptions] = useState([]);
         const [newOption, setNewOption] = useState('');
         const [loadingOptions, setLoadingOptions] = useState(false);
@@ -916,6 +925,8 @@ const PatientAnamnesePage = () => {
         React.useEffect(() => {
             setLocalFieldLabel(fieldForm.fieldLabel);
             setLocalFieldType(fieldForm.fieldType);
+            setLocalCategory(fieldForm.category);
+            setLocalIsRequired(fieldForm.isRequired);
 
             // Carregar opções se estiver editando campo de seleção
             if (editingField && (editingField.field_type === 'selecao_unica' || editingField.field_type === 'selecao_multipla')) {
@@ -923,7 +934,7 @@ const PatientAnamnesePage = () => {
             } else {
                 setLocalOptions([]);
             }
-        }, [fieldForm.fieldLabel, fieldForm.fieldType, editingField]);
+        }, [fieldForm.fieldLabel, fieldForm.fieldType, fieldForm.category, fieldForm.isRequired, editingField]);
 
         const loadOptions = async () => {
             if (!editingField) return;
@@ -975,7 +986,9 @@ const PatientAnamnesePage = () => {
                     // Atualizar campo
                     const { data, error } = await updateAnamneseField(editingField.id, {
                         fieldLabel: localFieldLabel,
-                        fieldType: localFieldType
+                        fieldType: localFieldType,
+                        category: localCategory,
+                        isRequired: localIsRequired
                     });
 
                     if (error) throw error;
@@ -995,7 +1008,9 @@ const PatientAnamnesePage = () => {
                     const { data, error } = await createAnamneseField({
                         nutritionistId: user.id,
                         fieldLabel: localFieldLabel,
-                        fieldType: localFieldType
+                        fieldType: localFieldType,
+                        category: localCategory,
+                        isRequired: localIsRequired
                     });
 
                     if (error) throw error;
@@ -1014,7 +1029,13 @@ const PatientAnamnesePage = () => {
 
                 setShowFieldModal(false);
                 setEditingField(null);
-                setFieldForm({ fieldLabel: '', fieldType: 'texto_curto', optionsArray: '' });
+                setFieldForm({
+                    fieldLabel: '',
+                    fieldType: 'texto_curto',
+                    category: 'geral',
+                    isRequired: false,
+                    optionsArray: ''
+                });
                 setLocalOptions([]);
 
             } catch (err) {
@@ -1047,27 +1068,64 @@ const PatientAnamnesePage = () => {
                             />
                         </div>
 
-                        <div>
-                            <Label htmlFor="field-type">Tipo de Campo</Label>
-                            <Select
-                                value={localFieldType}
-                                onValueChange={(val) => {
-                                    setLocalFieldType(val);
-                                    if (val !== 'selecao_unica' && val !== 'selecao_multipla') {
-                                        setLocalOptions([]);
-                                    }
-                                }}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="field-type">Tipo de Campo</Label>
+                                <Select
+                                    value={localFieldType}
+                                    onValueChange={(val) => {
+                                        setLocalFieldType(val);
+                                        if (val !== 'selecao_unica' && val !== 'selecao_multipla') {
+                                            setLocalOptions([]);
+                                        }
+                                    }}
+                                >
+                                    <SelectTrigger id="field-type">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="texto_curto">Texto Curto</SelectItem>
+                                        <SelectItem value="texto_longo">Texto Longo</SelectItem>
+                                        <SelectItem value="selecao_unica">Seleção Única</SelectItem>
+                                        <SelectItem value="selecao_multipla">Seleção Múltipla</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <Label htmlFor="field-category">Categoria</Label>
+                                <Select
+                                    value={localCategory}
+                                    onValueChange={setLocalCategory}
+                                >
+                                    <SelectTrigger id="field-category">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="geral">Geral</SelectItem>
+                                        <SelectItem value="identificacao">Identificação</SelectItem>
+                                        <SelectItem value="historico_clinico">Histórico Clínico</SelectItem>
+                                        <SelectItem value="historico_familiar">Histórico Familiar</SelectItem>
+                                        <SelectItem value="habitos_vida">Hábitos de Vida</SelectItem>
+                                        <SelectItem value="objetivos">Objetivos</SelectItem>
+                                        <SelectItem value="habitos_alimentares">Hábitos Alimentares</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id="field-required"
+                                checked={localIsRequired}
+                                onCheckedChange={setLocalIsRequired}
+                            />
+                            <Label
+                                htmlFor="field-required"
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                             >
-                                <SelectTrigger id="field-type">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="texto_curto">Texto Curto</SelectItem>
-                                    <SelectItem value="texto_longo">Texto Longo</SelectItem>
-                                    <SelectItem value="selecao_unica">Seleção Única</SelectItem>
-                                    <SelectItem value="selecao_multipla">Seleção Múltipla</SelectItem>
-                                </SelectContent>
-                            </Select>
+                                Campo obrigatório
+                            </Label>
                         </div>
 
                         {/* Campo de opções para seleção */}
