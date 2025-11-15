@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Save, FileCheck, Loader2, AlertCircle, ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -26,7 +26,10 @@ import {
 import {
     getAnamnesisById,
     createAnamnesis,
-    updateAnamnesis
+    updateAnamnesis,
+    getAnamneseFields,
+    getAnamneseAnswers,
+    upsertAnamneseAnswers
 } from '@/lib/supabase/anamnesis-queries';
 import { getPatientProfile } from '@/lib/supabase/patient-queries';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,9 +53,13 @@ import { useToast } from '@/hooks/use-toast';
 const PatientAnamnesisFormV2 = () => {
     const navigate = useNavigate();
     const { patientId, anamnesisId } = useParams();
+    const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const { toast } = useToast();
 
+    // Check if this is a custom form
+    const customTemplateId = searchParams.get('customTemplateId');
+    const isCustomForm = !!customTemplateId;
     const isEditMode = !!anamnesisId;
 
     const [patient, setPatient] = useState(null);
@@ -60,6 +67,10 @@ const PatientAnamnesisFormV2 = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
     const [openSections, setOpenSections] = useState(['section-0']);
+
+    // Custom form fields and answers
+    const [customFields, setCustomFields] = useState([]);
+    const [customAnswers, setCustomAnswers] = useState({});
 
     // Referências para scroll automático
     const formRef = useRef(null);
@@ -178,8 +189,25 @@ const PatientAnamnesisFormV2 = () => {
                 if (patientError) throw new Error('Erro ao buscar dados do paciente');
                 setPatient(patientData);
 
-                if (isEditMode) {
-                    // MODO EDIÇÃO: Buscar anamnese existente
+                // Se for formulário personalizado, carregar campos e respostas
+                if (isCustomForm) {
+                    const { data: fieldsData, error: fieldsError } = await getAnamneseFields(user.id);
+                    if (fieldsError) throw new Error('Erro ao buscar campos personalizados');
+                    setCustomFields(fieldsData || []);
+
+                    // Carregar respostas existentes (se houver)
+                    const { data: answersData, error: answersError } = await getAnamneseAnswers(patientId);
+                    if (answersError) throw new Error('Erro ao buscar respostas');
+
+                    // Converter array de respostas para objeto {fieldId: valor}
+                    const answersMap = {};
+                    (answersData || []).forEach(answer => {
+                        answersMap[answer.field_id] = answer.answer_value;
+                    });
+                    setCustomAnswers(answersMap);
+
+                } else if (isEditMode) {
+                    // MODO EDIÇÃO: Buscar anamnese existente (formulário padrão)
                     const { data: anamnesisData, error: anamnesisError } = await getAnamnesisById(anamnesisId);
                     if (anamnesisError) throw new Error('Erro ao buscar anamnese');
 
@@ -199,7 +227,7 @@ const PatientAnamnesisFormV2 = () => {
         };
 
         fetchData();
-    }, [patientId, anamnesisId, user?.id, isEditMode, reset]);
+    }, [patientId, anamnesisId, user?.id, isEditMode, isCustomForm, reset]);
 
     // ============================================================
     // LIMPAR CAMPOS CONDICIONAIS QUANDO MUDAREM
@@ -281,6 +309,28 @@ const PatientAnamnesisFormV2 = () => {
         setError(null);
 
         try {
+            // Se for formulário personalizado, salvar respostas na tabela anamnese_answers
+            if (isCustomForm) {
+                const answersToSave = customFields.map(field => ({
+                    patient_id: patientId,
+                    field_id: field.id,
+                    answer_value: customAnswers[field.id] || ''
+                }));
+
+                const { error: saveError } = await upsertAnamneseAnswers(answersToSave);
+                if (saveError) throw saveError;
+
+                toast({
+                    title: 'Anamnese salva!',
+                    description: 'As respostas do formulário personalizado foram salvas com sucesso.',
+                });
+
+                // Voltar para a página de anamnese do paciente
+                navigate(`/nutritionist/patients/${patientId}/anamnese`);
+                return;
+            }
+
+            // Formulário padrão - salvar na tabela anamnesis_records
             const submitData = {
                 patientId,
                 nutritionistId: user.id,
@@ -379,18 +429,18 @@ const PatientAnamnesisFormV2 = () => {
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => navigate(`/nutritionist/patients/${patientId}/hub`)}
+                            onClick={() => navigate(isCustomForm ? `/nutritionist/patients/${patientId}/anamnese` : `/nutritionist/patients/${patientId}/hub`)}
                             className="mb-3"
                         >
                             <ChevronLeft className="w-4 h-4 mr-1" />
-                            Voltar ao Prontuário
+                            {isCustomForm ? 'Voltar para Anamneses' : 'Voltar ao Prontuário'}
                         </Button>
                         <h1 className="text-3xl font-bold text-foreground">
-                            {isEditMode ? 'Editar Anamnese' : 'Nova Anamnese'}
+                            {isCustomForm ? 'Formulário Personalizado' : (isEditMode ? 'Editar Anamnese' : 'Nova Anamnese')}
                         </h1>
                         {patient && (
                             <p className="text-sm text-muted-foreground mt-1">
-                                Paciente: <span className="font-medium text-foreground">{patient.full_name || patient.name || 'Nome não disponível'}</span>
+                                Paciente: <span className="font-medium text-foreground">{patient.name || 'Nome não disponível'}</span>
                             </p>
                         )}
                     </div>
@@ -416,35 +466,93 @@ const PatientAnamnesisFormV2 = () => {
 
                 {/* Formulário */}
                 <form className="space-y-6">
-                    {/* Metadados da Anamnese */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Informações da Anamnese</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="date">Data da Anamnese<RequiredAsterisk /></Label>
-                                    <Input
-                                        id="date"
-                                        type="date"
-                                        {...register('date')}
-                                        className={cn(errors.date && "border-red-500")}
-                                    />
-                                    <FieldError error={errors.date} />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="notes">Observações Gerais (opcional)</Label>
-                                <Textarea
-                                    id="notes"
-                                    {...register('notes')}
-                                    placeholder="Anotações adicionais sobre esta anamnese..."
-                                    rows={3}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
+                    {/* CUSTOM FORM: Render custom fields */}
+                    {isCustomForm ? (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Formulário Personalizado</CardTitle>
+                                <p className="text-sm text-muted-foreground">
+                                    Preencha os campos abaixo
+                                </p>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                {customFields.length === 0 ? (
+                                    <Alert>
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertDescription>
+                                            Este formulário ainda não possui campos. Volte para a página de gerenciamento e adicione perguntas.
+                                        </AlertDescription>
+                                    </Alert>
+                                ) : (
+                                    customFields.map((field, index) => (
+                                        <div key={field.id} className="space-y-2">
+                                            <Label htmlFor={`field-${field.id}`} className="text-base">
+                                                {index + 1}. {field.field_label}
+                                            </Label>
+
+                                            {field.field_type === 'texto_curto' && (
+                                                <Input
+                                                    id={`field-${field.id}`}
+                                                    value={customAnswers[field.id] || ''}
+                                                    onChange={(e) => setCustomAnswers({
+                                                        ...customAnswers,
+                                                        [field.id]: e.target.value
+                                                    })}
+                                                    placeholder="Digite sua resposta..."
+                                                    className="max-w-2xl"
+                                                />
+                                            )}
+
+                                            {field.field_type === 'texto_longo' && (
+                                                <Textarea
+                                                    id={`field-${field.id}`}
+                                                    value={customAnswers[field.id] || ''}
+                                                    onChange={(e) => setCustomAnswers({
+                                                        ...customAnswers,
+                                                        [field.id]: e.target.value
+                                                    })}
+                                                    placeholder="Digite sua resposta..."
+                                                    rows={4}
+                                                    className="max-w-2xl"
+                                                />
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <>
+                            {/* STANDARD FORM: Original hardcoded form */}
+                            {/* Metadados da Anamnese */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">Informações da Anamnese</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="date">Data da Anamnese<RequiredAsterisk /></Label>
+                                            <Input
+                                                id="date"
+                                                type="date"
+                                                {...register('date')}
+                                                className={cn(errors.date && "border-red-500")}
+                                            />
+                                            <FieldError error={errors.date} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="notes">Observações Gerais (opcional)</Label>
+                                        <Textarea
+                                            id="notes"
+                                            {...register('notes')}
+                                            placeholder="Anotações adicionais sobre esta anamnese..."
+                                            rows={3}
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
 
                     {/* Accordion de Seções */}
                     <Card>
@@ -1514,6 +1622,8 @@ const PatientAnamnesisFormV2 = () => {
                             </Accordion>
                         </CardContent>
                     </Card>
+                        </>
+                    )}
 
                     {/* Botões de Ação */}
                     <Card>
@@ -1522,19 +1632,20 @@ const PatientAnamnesisFormV2 = () => {
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={() => navigate(`/nutritionist/patients/${patientId}/hub`)}
+                                    onClick={() => navigate(isCustomForm ? `/nutritionist/patients/${patientId}/anamnese` : `/nutritionist/patients/${patientId}/hub`)}
                                     disabled={saving}
                                 >
                                     Cancelar
                                 </Button>
                                 <div className="flex gap-3">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={handleSaveDraft}
-                                        disabled={saving}
-                                        className="gap-2"
-                                    >
+                                    {!isCustomForm && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={handleSaveDraft}
+                                            disabled={saving}
+                                            className="gap-2"
+                                        >
                                         {saving ? (
                                             <Loader2 className="w-4 h-4 animate-spin" />
                                         ) : (
@@ -1542,10 +1653,11 @@ const PatientAnamnesisFormV2 = () => {
                                         )}
                                         Salvar Rascunho
                                     </Button>
+                                    )}
                                     <Button
                                         type="button"
-                                        onClick={handleSaveCompleted}
-                                        disabled={saving}
+                                        onClick={isCustomForm ? () => onSubmit({}, 'completed') : handleSaveCompleted}
+                                        disabled={saving || (isCustomForm && customFields.length === 0)}
                                         className="gap-2"
                                     >
                                         {saving ? (
@@ -1553,7 +1665,7 @@ const PatientAnamnesisFormV2 = () => {
                                         ) : (
                                             <FileCheck className="w-4 h-4" />
                                         )}
-                                        Concluir e Salvar
+                                        {isCustomForm ? 'Salvar Respostas' : 'Concluir e Salvar'}
                                     </Button>
                                 </div>
                             </div>
