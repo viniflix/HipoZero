@@ -1,66 +1,96 @@
 // src/pages/PatientAnamnesePage.jsx
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import {
+    ClipboardList, Plus, Calendar, FileText, ChevronRight, Loader2, AlertCircle,
+    Trash2, MoreVertical, Settings, Edit2, ArrowLeft
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Settings, Edit2, Trash2, FileText, Save } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
-    getAnamneseFields,
-    createAnamneseField,
-    updateAnamneseField,
-    deleteAnamneseField,
-    getAnamneseAnswers,
-    upsertAnamneseAnswers
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from '@/components/ui/dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import {
+    getPatientAnamnesisList,
+    getAnamnesisTemplates,
+    deleteAnamnesis,
+    getCustomTemplates,
+    createCustomFormTemplate
 } from '@/lib/supabase/anamnesis-queries';
-import { exportAnamneseToPdf } from '@/lib/pdfUtils';
 import { supabase } from '@/lib/customSupabaseClient';
 
 const PatientAnamnesePage = () => {
+    const navigate = useNavigate();
     const { patientId } = useParams();
     const { user } = useAuth();
     const { toast } = useToast();
-    const navigate = useNavigate();
 
-    // Estado geral
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    // Estados
     const [patient, setPatient] = useState(null);
+    const [anamnesisList, setAnamnesisList] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Estado dos campos (perguntas)
-    const [fields, setFields] = useState([]);
+    // Templates
+    const [standardTemplates, setStandardTemplates] = useState([]);
+    const [customTemplates, setCustomTemplates] = useState([]);
 
-    // Estado das respostas
-    const [answers, setAnswers] = useState({});
+    // Modals
+    const [showTypeSelectionModal, setShowTypeSelectionModal] = useState(false);
+    const [showTemplateSelectionModal, setShowTemplateSelectionModal] = useState(false);
+    const [selectedTemplateType, setSelectedTemplateType] = useState(null); // 'standard' ou 'custom'
+    const [selectedTemplate, setSelectedTemplate] = useState(null);
 
-    // Modal de gerenciamento de perguntas
-    const [manageDialogOpen, setManageDialogOpen] = useState(false);
-    const [editingField, setEditingField] = useState(null);
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [fieldToDelete, setFieldToDelete] = useState(null);
-
-    // Formulário de nova pergunta
-    const [newField, setNewField] = useState({
-        fieldLabel: '',
-        fieldType: 'texto_curto',
-        optionsArray: ''
+    // Modal de criação de formulário personalizado
+    const [showCreateCustomModal, setShowCreateCustomModal] = useState(false);
+    const [newCustomTemplate, setNewCustomTemplate] = useState({
+        title: '',
+        description: ''
     });
+    const [creating, setCreating] = useState(false);
+
+    // Modal de confirmação de exclusão
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [anamnesisToDelete, setAnamnesisToDelete] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     // Carregar dados iniciais
     const loadData = useCallback(async () => {
-        if (!user?.id || !patientId) return;
+        if (!patientId || !user?.id) return;
 
         setLoading(true);
+        setError(null);
+
         try {
             // Buscar paciente
             const { data: patientData, error: patientError } = await supabase
@@ -72,609 +102,643 @@ const PatientAnamnesePage = () => {
             if (patientError) throw patientError;
             setPatient(patientData);
 
-            // Buscar campos do nutricionista
-            const { data: fieldsData, error: fieldsError } = await getAnamneseFields(user.id);
-            if (fieldsError) throw fieldsError;
-            setFields(fieldsData || []);
+            // Buscar lista de anamneses
+            const { data: anamnesisData, error: anamnesisError } = await getPatientAnamnesisList(patientId);
+            if (anamnesisError) throw anamnesisError;
+            setAnamnesisList(anamnesisData || []);
 
-            // Buscar respostas do paciente
-            const { data: answersData, error: answersError } = await getAnamneseAnswers(patientId);
-            if (answersError) throw answersError;
+            // Buscar templates padrão
+            const { data: templatesData, error: templatesError } = await getAnamnesisTemplates(user.id);
+            if (templatesError) throw templatesError;
+            const standard = (templatesData || []).filter(t => !t.is_custom_fields);
+            setStandardTemplates(standard);
 
-            // Transformar array de respostas em objeto { field_id: answer_value }
-            const answersMap = {};
-            (answersData || []).forEach(ans => {
-                answersMap[ans.field_id] = ans.answer_value;
-            });
-            setAnswers(answersMap);
+            // Buscar templates personalizados
+            const { data: customData, error: customError } = await getCustomTemplates(user.id);
+            if (customError) throw customError;
+            setCustomTemplates(customData || []);
 
-        } catch (error) {
-            console.error('Erro ao carregar dados:', error);
-            toast({
-                title: 'Erro ao carregar dados',
-                description: error.message || 'Ocorreu um erro ao carregar os dados da anamnese.',
-                variant: 'destructive',
-            });
+        } catch (err) {
+            console.error('Erro ao carregar dados:', err);
+            setError(err.message || 'Erro ao carregar dados');
         } finally {
             setLoading(false);
         }
-    }, [user?.id, patientId, toast]);
+    }, [patientId, user?.id]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
 
-    // ========== CRUD DE CAMPOS ==========
+    // Handler para criar nova anamnese
+    const handleCreateNew = () => {
+        setShowTypeSelectionModal(true);
+    };
 
-    const handleCreateField = async () => {
-        if (!newField.fieldLabel.trim()) {
-            toast({
-                title: 'Atenção',
-                description: 'Digite o nome da pergunta.',
-                variant: 'destructive',
-            });
-            return;
-        }
+    // Handler para selecionar tipo (padrão ou personalizado)
+    const handleSelectType = (type) => {
+        setSelectedTemplateType(type);
+        setShowTypeSelectionModal(false);
 
-        // Validar options_array se for seleção
-        if ((newField.fieldType === 'selecao_unica' || newField.fieldType === 'selecao_multipla') && !newField.optionsArray.trim()) {
-            toast({
-                title: 'Atenção',
-                description: 'Digite as opções separadas por vírgula.',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        try {
-            // Converter string de opções em array
-            let optionsArray = null;
-            if (newField.fieldType === 'selecao_unica' || newField.fieldType === 'selecao_multipla') {
-                optionsArray = newField.optionsArray
-                    .split(',')
-                    .map(opt => opt.trim())
-                    .filter(opt => opt.length > 0);
+        if (type === 'standard') {
+            if (standardTemplates.length === 0) {
+                toast({
+                    title: 'Atenção',
+                    description: 'Nenhum template padrão disponível.',
+                    variant: 'destructive',
+                });
+                return;
             }
 
-            const { data, error } = await createAnamneseField({
+            if (standardTemplates.length === 1) {
+                // Ir direto se só houver um template
+                navigate(`/nutritionist/patients/${patientId}/anamnesis/new?templateId=${standardTemplates[0].id}`);
+                return;
+            }
+
+            // Mostrar modal de seleção de template padrão
+            setShowTemplateSelectionModal(true);
+
+        } else if (type === 'custom') {
+            if (customTemplates.length === 0) {
+                // Se não houver templates personalizados, abrir modal de criação
+                setShowCreateCustomModal(true);
+                return;
+            }
+
+            // Mostrar modal de seleção de template personalizado
+            setShowTemplateSelectionModal(true);
+
+        } else if (type === 'create_new') {
+            setShowCreateCustomModal(true);
+        }
+    };
+
+    // Handler para selecionar template e navegar
+    const handleTemplateSelect = () => {
+        if (!selectedTemplate) return;
+
+        setShowTemplateSelectionModal(false);
+
+        if (selectedTemplateType === 'standard') {
+            navigate(`/nutritionist/patients/${patientId}/anamnesis/new?templateId=${selectedTemplate}`);
+        } else if (selectedTemplateType === 'custom') {
+            navigate(`/nutritionist/patients/${patientId}/anamnesis/new?customTemplateId=${selectedTemplate}`);
+        }
+    };
+
+    // Handler para criar formulário personalizado
+    const handleCreateCustomTemplate = async () => {
+        if (!newCustomTemplate.title.trim()) {
+            toast({
+                title: 'Atenção',
+                description: 'Digite um nome para o formulário personalizado.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setCreating(true);
+        try {
+            const { data, error } = await createCustomFormTemplate({
                 nutritionistId: user.id,
-                fieldLabel: newField.fieldLabel,
-                fieldType: newField.fieldType,
-                optionsArray: optionsArray
+                title: newCustomTemplate.title,
+                description: newCustomTemplate.description
             });
 
             if (error) throw error;
 
-            setFields([...fields, data]);
-            setNewField({ fieldLabel: '', fieldType: 'texto_curto', optionsArray: '' });
-
             toast({
                 title: 'Sucesso!',
-                description: 'Pergunta criada com sucesso.',
+                description: 'Formulário personalizado criado. Agora adicione suas perguntas.',
             });
 
-        } catch (error) {
-            console.error('Erro ao criar campo:', error);
+            setShowCreateCustomModal(false);
+            setNewCustomTemplate({ title: '', description: '' });
+
+            // Navegar para a página de edição do formulário personalizado
+            navigate(`/nutritionist/patients/${patientId}/anamnesis/new?customTemplateId=${data.id}&edit=true`);
+
+        } catch (err) {
+            console.error('Erro ao criar formulário personalizado:', err);
             toast({
-                title: 'Erro ao criar pergunta',
-                description: error.message,
-                variant: 'destructive',
-            });
-        }
-    };
-
-    const handleUpdateField = async () => {
-        if (!editingField?.field_label?.trim()) {
-            toast({
-                title: 'Atenção',
-                description: 'Digite o nome da pergunta.',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        try {
-            // Converter string de opções em array
-            let optionsArray = null;
-            if (editingField.field_type === 'selecao_unica' || editingField.field_type === 'selecao_multipla') {
-                optionsArray = (editingField.options_array_string || '')
-                    .split(',')
-                    .map(opt => opt.trim())
-                    .filter(opt => opt.length > 0);
-            }
-
-            const { data, error } = await updateAnamneseField(editingField.id, {
-                fieldLabel: editingField.field_label,
-                fieldType: editingField.field_type,
-                optionsArray: optionsArray
-            });
-
-            if (error) throw error;
-
-            setFields(fields.map(f => f.id === data.id ? data : f));
-            setEditingField(null);
-
-            toast({
-                title: 'Sucesso!',
-                description: 'Pergunta atualizada com sucesso.',
-            });
-
-        } catch (error) {
-            console.error('Erro ao atualizar campo:', error);
-            toast({
-                title: 'Erro ao atualizar pergunta',
-                description: error.message,
-                variant: 'destructive',
-            });
-        }
-    };
-
-    const handleDeleteField = async () => {
-        if (!fieldToDelete) return;
-
-        try {
-            const { error } = await deleteAnamneseField(fieldToDelete.id);
-            if (error) throw error;
-
-            setFields(fields.filter(f => f.id !== fieldToDelete.id));
-            setDeleteDialogOpen(false);
-            setFieldToDelete(null);
-
-            toast({
-                title: 'Sucesso!',
-                description: 'Pergunta excluída com sucesso.',
-            });
-
-        } catch (error) {
-            console.error('Erro ao deletar campo:', error);
-            toast({
-                title: 'Erro ao excluir pergunta',
-                description: error.message,
-                variant: 'destructive',
-            });
-        }
-    };
-
-    const openEditDialog = (field) => {
-        setEditingField({
-            ...field,
-            options_array_string: Array.isArray(field.options_array)
-                ? field.options_array.join(', ')
-                : ''
-        });
-    };
-
-    const openDeleteDialog = (field) => {
-        setFieldToDelete(field);
-        setDeleteDialogOpen(true);
-    };
-
-    // ========== FORMULÁRIO DINÂMICO ==========
-
-    const handleAnswerChange = (fieldId, value) => {
-        setAnswers(prev => ({
-            ...prev,
-            [fieldId]: value
-        }));
-    };
-
-    const renderField = (field) => {
-        const value = answers[field.id] || '';
-
-        switch (field.field_type) {
-            case 'texto_curto':
-                return (
-                    <Input
-                        value={value}
-                        onChange={(e) => handleAnswerChange(field.id, e.target.value)}
-                        placeholder="Digite sua resposta..."
-                        className="w-full"
-                    />
-                );
-
-            case 'texto_longo':
-                return (
-                    <Textarea
-                        value={value}
-                        onChange={(e) => handleAnswerChange(field.id, e.target.value)}
-                        placeholder="Digite sua resposta..."
-                        rows={4}
-                        className="w-full"
-                    />
-                );
-
-            case 'selecao_unica':
-                return (
-                    <RadioGroup
-                        value={value}
-                        onValueChange={(val) => handleAnswerChange(field.id, val)}
-                    >
-                        {(field.options_array || []).map((option, idx) => (
-                            <div key={idx} className="flex items-center space-x-2">
-                                <RadioGroupItem value={option} id={`${field.id}-${idx}`} />
-                                <Label htmlFor={`${field.id}-${idx}`} className="cursor-pointer">
-                                    {option}
-                                </Label>
-                            </div>
-                        ))}
-                    </RadioGroup>
-                );
-
-            case 'selecao_multipla':
-                const selectedValues = Array.isArray(value) ? value : (value ? [value] : []);
-
-                return (
-                    <div className="space-y-2">
-                        {(field.options_array || []).map((option, idx) => {
-                            const isChecked = selectedValues.includes(option);
-
-                            return (
-                                <div key={idx} className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id={`${field.id}-${idx}`}
-                                        checked={isChecked}
-                                        onCheckedChange={(checked) => {
-                                            let newValues;
-                                            if (checked) {
-                                                newValues = [...selectedValues, option];
-                                            } else {
-                                                newValues = selectedValues.filter(v => v !== option);
-                                            }
-                                            handleAnswerChange(field.id, newValues);
-                                        }}
-                                    />
-                                    <Label htmlFor={`${field.id}-${idx}`} className="cursor-pointer">
-                                        {option}
-                                    </Label>
-                                </div>
-                            );
-                        })}
-                    </div>
-                );
-
-            default:
-                return <p className="text-muted-foreground">Tipo de campo desconhecido</p>;
-        }
-    };
-
-    // ========== SALVAR RESPOSTAS ==========
-
-    const handleSaveAnswers = async () => {
-        setSaving(true);
-        try {
-            // Preparar dados para upsert
-            const answersData = fields.map(field => ({
-                patient_id: patientId,
-                field_id: field.id,
-                answer_value: answers[field.id] || null
-            }));
-
-            const { error } = await upsertAnamneseAnswers(answersData);
-            if (error) throw error;
-
-            toast({
-                title: 'Sucesso!',
-                description: 'Respostas salvas com sucesso.',
-            });
-
-        } catch (error) {
-            console.error('Erro ao salvar respostas:', error);
-            toast({
-                title: 'Erro ao salvar respostas',
-                description: error.message,
+                title: 'Erro ao criar formulário',
+                description: err.message,
                 variant: 'destructive',
             });
         } finally {
-            setSaving(false);
+            setCreating(false);
         }
     };
 
-    // ========== EXPORTAR PDF ==========
-
-    const handleExportPdf = () => {
-        // Preparar dados para exportação
-        const anamneseData = fields.map(field => {
-            const answer = answers[field.id];
-            let resposta = '';
-
-            if (answer) {
-                if (Array.isArray(answer)) {
-                    resposta = answer.join(', ');
-                } else {
-                    resposta = String(answer);
-                }
-            }
-
-            return {
-                pergunta: field.field_label,
-                resposta: resposta || '(não respondido)'
-            };
-        });
-
-        const patientName = patient?.full_name || patient?.name || 'Paciente';
-        const nutritionistName = user?.profile?.full_name || user?.profile?.name || 'Nutricionista';
-
-        exportAnamneseToPdf(anamneseData, patientName, nutritionistName);
-
-        toast({
-            title: 'PDF Exportado!',
-            description: 'O arquivo foi baixado com sucesso.',
-        });
+    // Handler para editar anamnese existente
+    const handleEditAnamnesis = (anamnesisId) => {
+        navigate(`/nutritionist/patients/${patientId}/anamnesis/${anamnesisId}/edit`);
     };
 
-    // ========== RENDER ==========
+    // Handler para abrir modal de confirmação de exclusão
+    const handleDeleteClick = (anamnesis, e) => {
+        e.stopPropagation();
+        setAnamnesisToDelete(anamnesis);
+        setShowDeleteDialog(true);
+    };
+
+    // Handler para confirmar exclusão
+    const handleConfirmDelete = async () => {
+        if (!anamnesisToDelete) return;
+
+        setDeleting(true);
+        try {
+            const { error } = await deleteAnamnesis(anamnesisToDelete.id);
+            if (error) throw error;
+
+            setAnamnesisList(prev => prev.filter(a => a.id !== anamnesisToDelete.id));
+            setShowDeleteDialog(false);
+            setAnamnesisToDelete(null);
+
+            toast({
+                title: 'Sucesso!',
+                description: 'Anamnese excluída com sucesso.',
+            });
+
+        } catch (err) {
+            console.error('Erro ao excluir anamnese:', err);
+            toast({
+                title: 'Erro ao excluir anamnese',
+                description: err.message,
+                variant: 'destructive',
+            });
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    // ============================================================
+    // COMPONENTES DE UI
+    // ============================================================
+
+    // Estado Vazio
+    const EmptyState = () => (
+        <Card className="border-dashed border-2 border-[#a9b388] bg-[#fefae0]/30">
+            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-20 h-20 rounded-full bg-[#fefae0] flex items-center justify-center mb-6">
+                    <ClipboardList className="w-10 h-10 text-[#5f6f52]" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-3">
+                    Nenhuma Anamnese Preenchida
+                </h3>
+                <p className="text-sm text-muted-foreground mb-8 max-w-md">
+                    Inicie a primeira anamnese usando um formulário padrão ou crie seu próprio formulário personalizado.
+                </p>
+                <Button
+                    onClick={handleCreateNew}
+                    size="lg"
+                    className="gap-2"
+                >
+                    <Plus className="w-5 h-5" />
+                    Iniciar Anamnese
+                </Button>
+            </CardContent>
+        </Card>
+    );
+
+    // Card de Anamnese
+    const AnamnesisCard = ({ anamnesis }) => {
+        const statusConfig = {
+            draft: {
+                label: 'Rascunho',
+                color: 'bg-yellow-100 text-yellow-800 border-yellow-300'
+            },
+            completed: {
+                label: 'Completa',
+                color: 'bg-green-100 text-green-800 border-green-300'
+            }
+        };
+
+        const config = statusConfig[anamnesis.status] || statusConfig.draft;
+
+        return (
+            <Card className="hover:shadow-md transition-all hover:border-[#5f6f52]">
+                <CardContent className="p-0">
+                    <div className="flex items-start gap-4 p-6 group">
+                        <div className="flex-shrink-0">
+                            <div className="w-12 h-12 rounded-lg bg-[#5f6f52]/10 flex items-center justify-center">
+                                <FileText className="w-6 h-6 text-[#5f6f52]" />
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => handleEditAnamnesis(anamnesis.id)}
+                            className="flex-1 min-w-0 text-left hover:bg-[#fefae0]/30 -mx-4 -my-6 px-4 py-6 transition-colors"
+                        >
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="font-semibold text-base text-foreground">
+                                        {anamnesis.template?.title || 'Anamnese'}
+                                    </h4>
+                                    <Badge variant="outline" className={cn("text-xs", config.color)}>
+                                        {config.label}
+                                    </Badge>
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                    <Calendar className="w-4 h-4" />
+                                    {new Date(anamnesis.date).toLocaleDateString('pt-BR', {
+                                        day: '2-digit',
+                                        month: 'long',
+                                        year: 'numeric'
+                                    })}
+                                </div>
+                                {anamnesis.updated_at && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Última modificação: {new Date(anamnesis.updated_at).toLocaleDateString('pt-BR')} às{' '}
+                                        {new Date(anamnesis.updated_at).toLocaleTimeString('pt-BR', {
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}
+                                    </p>
+                                )}
+                            </div>
+
+                            {anamnesis.notes && (
+                                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                    {anamnesis.notes}
+                                </p>
+                            )}
+                        </button>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                    onClick={(e) => handleDeleteClick(anamnesis, e)}
+                                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Excluir
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    };
+
+    // ============================================================
+    // MODALS
+    // ============================================================
+
+    // Modal de Seleção de Tipo
+    const TypeSelectionModal = () => (
+        <Dialog open={showTypeSelectionModal} onOpenChange={setShowTypeSelectionModal}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Como deseja preencher a anamnese?</DialogTitle>
+                    <DialogDescription>
+                        Escolha entre um formulário padrão ou crie seu próprio formulário personalizado
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                    {/* Opção 1: Formulário Padrão */}
+                    <button
+                        onClick={() => handleSelectType('standard')}
+                        className="p-6 rounded-lg border-2 border-gray-200 hover:border-[#5f6f52] hover:bg-[#fefae0]/30 transition-all text-left group"
+                    >
+                        <div className="w-12 h-12 rounded-lg bg-[#5f6f52]/10 flex items-center justify-center mb-4 group-hover:bg-[#5f6f52]/20 transition-colors">
+                            <FileText className="w-6 h-6 text-[#5f6f52]" />
+                        </div>
+                        <h3 className="font-semibold text-base mb-2">Formulário Padrão</h3>
+                        <p className="text-sm text-muted-foreground">
+                            Use o template completo de anamnese nutricional com perguntas pré-definidas.
+                        </p>
+                    </button>
+
+                    {/* Opção 2: Formulários Personalizados */}
+                    <button
+                        onClick={() => handleSelectType('custom')}
+                        className="p-6 rounded-lg border-2 border-gray-200 hover:border-[#5f6f52] hover:bg-[#fefae0]/30 transition-all text-left group"
+                    >
+                        <div className="w-12 h-12 rounded-lg bg-[#a9b388]/10 flex items-center justify-center mb-4 group-hover:bg-[#a9b388]/20 transition-colors">
+                            <Settings className="w-6 h-6 text-[#5f6f52]" />
+                        </div>
+                        <h3 className="font-semibold text-base mb-2">
+                            Formulários Personalizados
+                            {customTemplates.length > 0 && (
+                                <Badge className="ml-2 bg-[#5f6f52]">{customTemplates.length}</Badge>
+                            )}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                            {customTemplates.length > 0
+                                ? 'Escolha um dos seus formulários personalizados ou crie um novo.'
+                                : 'Crie seu primeiro formulário personalizado com perguntas sob medida.'}
+                        </p>
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+
+    // Modal de Seleção de Template
+    const TemplateSelectionModal = () => {
+        const templates = selectedTemplateType === 'standard' ? standardTemplates : customTemplates;
+
+        return (
+            <Dialog open={showTemplateSelectionModal} onOpenChange={setShowTemplateSelectionModal}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {selectedTemplateType === 'standard' ? 'Escolher Formulário Padrão' : 'Escolher Formulário Personalizado'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Selecione o formulário que deseja utilizar
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-2 py-4 max-h-[400px] overflow-y-auto">
+                        {templates.map((template) => (
+                            <button
+                                key={template.id}
+                                onClick={() => setSelectedTemplate(template.id)}
+                                className={cn(
+                                    "w-full text-left p-4 rounded-lg border-2 transition-all",
+                                    selectedTemplate === template.id
+                                        ? "border-[#5f6f52] bg-[#5f6f52]/5"
+                                        : "border-gray-200 hover:border-[#5f6f52]/50"
+                                )}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className={cn(
+                                        "w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5",
+                                        selectedTemplate === template.id
+                                            ? "border-[#5f6f52] bg-[#5f6f52]"
+                                            : "border-gray-300"
+                                    )}>
+                                        {selectedTemplate === template.id && (
+                                            <div className="w-2 h-2 rounded-full bg-white" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <h4 className="font-semibold text-sm">{template.title}</h4>
+                                            {template.is_system_default && (
+                                                <Badge variant="outline" className="text-xs bg-[#5f6f52]/10 text-[#5f6f52] border-[#5f6f52]">
+                                                    Padrão
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        {template.description && (
+                                            <p className="text-xs text-muted-foreground">
+                                                {template.description}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
+
+                        {/* Opção de criar novo formulário personalizado */}
+                        {selectedTemplateType === 'custom' && (
+                            <button
+                                onClick={() => {
+                                    setShowTemplateSelectionModal(false);
+                                    setShowCreateCustomModal(true);
+                                }}
+                                className="w-full text-left p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#5f6f52] hover:bg-[#fefae0]/30 transition-all"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-[#fefae0] flex items-center justify-center">
+                                        <Plus className="w-5 h-5 text-[#5f6f52]" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-sm">Criar Novo Formulário</h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            Monte um formulário personalizado do zero
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowTemplateSelectionModal(false)}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleTemplateSelect}
+                            disabled={!selectedTemplate}
+                        >
+                            Continuar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    };
+
+    // Modal de Criação de Formulário Personalizado
+    const CreateCustomModal = () => (
+        <Dialog open={showCreateCustomModal} onOpenChange={setShowCreateCustomModal}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Criar Formulário Personalizado</DialogTitle>
+                    <DialogDescription>
+                        Dê um nome ao seu formulário. Você poderá adicionar perguntas na próxima etapa.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                    <div>
+                        <Label htmlFor="custom-title">Nome do Formulário *</Label>
+                        <Input
+                            id="custom-title"
+                            value={newCustomTemplate.title}
+                            onChange={(e) => setNewCustomTemplate({ ...newCustomTemplate, title: e.target.value })}
+                            placeholder="Ex: Anamnese para Emagrecimento"
+                            maxLength={100}
+                        />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="custom-description">Descrição (opcional)</Label>
+                        <Textarea
+                            id="custom-description"
+                            value={newCustomTemplate.description}
+                            onChange={(e) => setNewCustomTemplate({ ...newCustomTemplate, description: e.target.value })}
+                            placeholder="Descreva o objetivo deste formulário..."
+                            rows={3}
+                            maxLength={500}
+                        />
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            setShowCreateCustomModal(false);
+                            setNewCustomTemplate({ title: '', description: '' });
+                        }}
+                        disabled={creating}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        onClick={handleCreateCustomTemplate}
+                        disabled={creating || !newCustomTemplate.title.trim()}
+                    >
+                        {creating ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Criando...
+                            </>
+                        ) : (
+                            'Criar e Adicionar Perguntas'
+                        )}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+
+    // Modal de Confirmação de Exclusão
+    const DeleteDialog = () => (
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Tem certeza que deseja excluir esta anamnese? Esta ação não pode ser desfeita.
+                        {anamnesisToDelete && (
+                            <div className="mt-3 p-3 bg-[#fefae0] rounded-lg border border-[#a9b388]">
+                                <p className="text-sm font-medium text-foreground">
+                                    {anamnesisToDelete.template?.title || 'Anamnese'}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Data: {new Date(anamnesisToDelete.date).toLocaleDateString('pt-BR')}
+                                </p>
+                            </div>
+                        )}
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={handleConfirmDelete}
+                        disabled={deleting}
+                        className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                    >
+                        {deleting ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Excluindo...
+                            </>
+                        ) : (
+                            'Excluir'
+                        )}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+
+    // ============================================================
+    // RENDER PRINCIPAL
+    // ============================================================
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <p className="text-muted-foreground">Carregando...</p>
+            <div className="flex items-center justify-center min-h-screen bg-background">
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-[#5f6f52] mx-auto mb-4" />
+                    <p className="text-sm text-muted-foreground">Carregando...</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col min-h-screen bg-background">
-            <header className="bg-card/80 backdrop-blur-md border-b border-border p-4 sticky top-0 z-10">
-                <div className="max-w-4xl mx-auto flex items-center justify-between">
-                    <Button asChild variant="ghost" size="sm">
-                        <Link to={`/nutritionist/patients/${patientId}/hub`}>
-                            <ArrowLeft className="w-4 h-4 mr-2" />
-                            Voltar para o Hub do Paciente
-                        </Link>
-                    </Button>
-                </div>
-            </header>
-
-            <main className="max-w-4xl mx-auto w-full p-4 md:p-8">
-                <Card className="bg-card shadow-card-dark rounded-xl">
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <div>
-                            <CardTitle className="font-clash text-2xl font-semibold text-primary">
-                                Anamnese - {patient?.full_name || patient?.name}
-                            </CardTitle>
-                            <CardDescription className="text-muted-foreground">
-                                Perguntas customizadas e histórico do paciente.
-                            </CardDescription>
+        <div className="min-h-screen bg-background">
+            <div className="max-w-5xl mx-auto p-6 space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate(`/nutritionist/patients/${patientId}/hub`)}
+                            >
+                                <ArrowLeft className="w-4 h-4 mr-2" />
+                                Voltar ao Prontuário
+                            </Button>
                         </div>
-                        <Dialog open={manageDialogOpen} onOpenChange={setManageDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline">
-                                    <Settings className="w-4 h-4 mr-2" />
-                                    Gerenciar Perguntas
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-                                <DialogHeader>
-                                    <DialogTitle>Gerenciar Perguntas da Anamnese</DialogTitle>
-                                    <DialogDescription>
-                                        Crie, edite ou exclua suas perguntas personalizadas.
-                                    </DialogDescription>
-                                </DialogHeader>
-
-                                {/* Formulário de Nova Pergunta */}
-                                <div className="space-y-4 border-b pb-4">
-                                    <h3 className="font-semibold text-lg">Nova Pergunta</h3>
-
-                                    <div>
-                                        <Label htmlFor="new-field-label">Nome da Pergunta</Label>
-                                        <Input
-                                            id="new-field-label"
-                                            value={newField.fieldLabel}
-                                            onChange={(e) => setNewField({ ...newField, fieldLabel: e.target.value })}
-                                            placeholder="Ex: Histórico de Doenças Familiares"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <Label htmlFor="new-field-type">Tipo de Campo</Label>
-                                        <Select
-                                            value={newField.fieldType}
-                                            onValueChange={(val) => setNewField({ ...newField, fieldType: val })}
-                                        >
-                                            <SelectTrigger id="new-field-type">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="texto_curto">Texto Curto</SelectItem>
-                                                <SelectItem value="texto_longo">Texto Longo</SelectItem>
-                                                <SelectItem value="selecao_unica">Seleção Única</SelectItem>
-                                                <SelectItem value="selecao_multipla">Seleção Múltipla</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {(newField.fieldType === 'selecao_unica' || newField.fieldType === 'selecao_multipla') && (
-                                        <div>
-                                            <Label htmlFor="new-field-options">Opções (separadas por vírgula)</Label>
-                                            <Textarea
-                                                id="new-field-options"
-                                                value={newField.optionsArray}
-                                                onChange={(e) => setNewField({ ...newField, optionsArray: e.target.value })}
-                                                placeholder="Ex: Sim, Não, Não sei"
-                                                rows={2}
-                                            />
-                                        </div>
-                                    )}
-
-                                    <Button onClick={handleCreateField} className="w-full">
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Criar Pergunta
-                                    </Button>
-                                </div>
-
-                                {/* Lista de Perguntas Existentes */}
-                                <div className="space-y-4">
-                                    <h3 className="font-semibold text-lg">Perguntas Existentes</h3>
-
-                                    {fields.length === 0 ? (
-                                        <p className="text-muted-foreground text-center py-4">
-                                            Você ainda não criou nenhuma pergunta.
-                                        </p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {fields.map(field => (
-                                                <div key={field.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                                    <div>
-                                                        <p className="font-medium">{field.field_label}</p>
-                                                        <p className="text-sm text-muted-foreground">
-                                                            Tipo: {field.field_type.replace('_', ' ')}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => openEditDialog(field)}
-                                                        >
-                                                            <Edit2 className="w-4 h-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => openDeleteDialog(field)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4 text-destructive" />
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                    </CardHeader>
-
-                    <CardContent>
-                        {fields.length === 0 ? (
-                            <div className="text-center py-12">
-                                <p className="text-muted-foreground mb-4">
-                                    Você ainda não criou nenhuma pergunta de anamnese.
-                                </p>
-                                <Button onClick={() => setManageDialogOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Criar Primeira Pergunta
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="space-y-6">
-                                {/* Formulário Dinâmico */}
-                                {fields.map(field => (
-                                    <div key={field.id} className="space-y-2">
-                                        <Label className="text-base font-medium">
-                                            {field.field_label}
-                                        </Label>
-                                        {renderField(field)}
-                                    </div>
-                                ))}
-
-                                {/* Botões de Ação */}
-                                <div className="flex gap-3 pt-6">
-                                    <Button
-                                        onClick={handleSaveAnswers}
-                                        disabled={saving}
-                                        className="flex-1"
-                                    >
-                                        <Save className="w-4 h-4 mr-2" />
-                                        {saving ? 'Salvando...' : 'Salvar Respostas'}
-                                    </Button>
-                                    <Button
-                                        onClick={handleExportPdf}
-                                        variant="outline"
-                                        className="flex-1"
-                                    >
-                                        <FileText className="w-4 h-4 mr-2" />
-                                        Exportar PDF
-                                    </Button>
-                                </div>
-                            </div>
+                        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                            <ClipboardList className="w-8 h-8 text-[#5f6f52]" />
+                            Anamnese
+                        </h1>
+                        {patient && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Paciente: <span className="font-medium text-foreground">{patient.full_name || patient.name}</span>
+                            </p>
                         )}
-                    </CardContent>
-                </Card>
-            </main>
+                    </div>
 
-            {/* Dialog de Edição */}
-            {editingField && (
-                <Dialog open={!!editingField} onOpenChange={() => setEditingField(null)}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Editar Pergunta</DialogTitle>
-                        </DialogHeader>
+                    {/* Botão Nova Anamnese (só aparece se já houver anamneses) */}
+                    {anamnesisList.length > 0 && (
+                        <Button
+                            onClick={handleCreateNew}
+                            size="lg"
+                            className="gap-2"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Nova Anamnese
+                        </Button>
+                    )}
+                </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <Label htmlFor="edit-field-label">Nome da Pergunta</Label>
-                                <Input
-                                    id="edit-field-label"
-                                    value={editingField.field_label}
-                                    onChange={(e) => setEditingField({ ...editingField, field_label: e.target.value })}
-                                />
-                            </div>
+                {/* Erro */}
+                {error && (
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                )}
 
-                            <div>
-                                <Label htmlFor="edit-field-type">Tipo de Campo</Label>
-                                <Select
-                                    value={editingField.field_type}
-                                    onValueChange={(val) => setEditingField({ ...editingField, field_type: val })}
-                                >
-                                    <SelectTrigger id="edit-field-type">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="texto_curto">Texto Curto</SelectItem>
-                                        <SelectItem value="texto_longo">Texto Longo</SelectItem>
-                                        <SelectItem value="selecao_unica">Seleção Única</SelectItem>
-                                        <SelectItem value="selecao_multipla">Seleção Múltipla</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                {/* Lista de Anamneses */}
+                {anamnesisList.length === 0 ? (
+                    <EmptyState />
+                ) : (
+                    <div className="space-y-4">
+                        {anamnesisList.map((anamnesis) => (
+                            <AnamnesisCard key={anamnesis.id} anamnesis={anamnesis} />
+                        ))}
+                    </div>
+                )}
+            </div>
 
-                            {(editingField.field_type === 'selecao_unica' || editingField.field_type === 'selecao_multipla') && (
-                                <div>
-                                    <Label htmlFor="edit-field-options">Opções (separadas por vírgula)</Label>
-                                    <Textarea
-                                        id="edit-field-options"
-                                        value={editingField.options_array_string || ''}
-                                        onChange={(e) => setEditingField({ ...editingField, options_array_string: e.target.value })}
-                                        placeholder="Ex: Sim, Não, Não sei"
-                                        rows={2}
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setEditingField(null)}>
-                                Cancelar
-                            </Button>
-                            <Button onClick={handleUpdateField}>
-                                Salvar Alterações
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            )}
-
-            {/* Dialog de Confirmação de Exclusão */}
-            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Tem certeza que deseja excluir a pergunta "{fieldToDelete?.field_label}"?
-                            Esta ação não pode ser desfeita e todas as respostas associadas serão perdidas.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setFieldToDelete(null)}>
-                            Cancelar
-                        </AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteField} className="bg-destructive hover:bg-destructive/90">
-                            Excluir
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            {/* Modals */}
+            <TypeSelectionModal />
+            <TemplateSelectionModal />
+            <CreateCustomModal />
+            <DeleteDialog />
         </div>
     );
 };

@@ -316,14 +316,22 @@ export const getLatestAnamnesis = async (patientId) => {
 
 /**
  * Buscar todos os campos de anamnese de um nutricionista
+ * Opcionalmente filtrar por custom_template_id
  */
-export const getAnamneseFields = async (nutritionistId) => {
+export const getAnamneseFields = async (nutritionistId, customTemplateId = null) => {
     try {
-        const { data, error } = await supabase
+        let query = supabase
             .from('anamnese_fields')
             .select('*')
-            .eq('nutritionist_id', nutritionistId)
-            .order('id', { ascending: true });
+            .eq('nutritionist_id', nutritionistId);
+
+        if (customTemplateId) {
+            query = query.eq('custom_template_id', customTemplateId);
+        }
+
+        query = query.order('field_order', { ascending: true }).order('id', { ascending: true });
+
+        const { data, error } = await query;
 
         if (error) throw error;
         return { data, error: null };
@@ -342,9 +350,11 @@ export const createAnamneseField = async (fieldData) => {
             .from('anamnese_fields')
             .insert([{
                 nutritionist_id: fieldData.nutritionistId,
+                custom_template_id: fieldData.customTemplateId || null,
                 field_label: fieldData.fieldLabel,
                 field_type: fieldData.fieldType,
-                options_array: fieldData.optionsArray || null
+                options_array: fieldData.optionsArray || null,
+                field_order: fieldData.fieldOrder || 0
             }])
             .select()
             .single();
@@ -439,5 +449,110 @@ export const upsertAnamneseAnswers = async (answersData) => {
     } catch (error) {
         console.error('Erro ao salvar respostas de anamnese:', error);
         return { data: null, error };
+    }
+};
+
+// ============================================================
+// CUSTOM TEMPLATES (Formulários Personalizados)
+// ============================================================
+
+/**
+ * Buscar formulários personalizados de um nutricionista
+ * Retorna templates customizados (baseados em anamnese_fields)
+ */
+export const getCustomTemplates = async (nutritionistId) => {
+    try {
+        const { data, error } = await supabase
+            .from('anamnesis_templates')
+            .select('*, fields_count:anamnese_fields(count)')
+            .eq('nutritionist_id', nutritionistId)
+            .eq('is_system_default', false)
+            .eq('is_custom_fields', true)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao buscar formulários personalizados:', error);
+        return { data: null, error };
+    }
+};
+
+/**
+ * Criar novo formulário personalizado
+ */
+export const createCustomFormTemplate = async (templateData) => {
+    try {
+        const { data, error } = await supabase
+            .from('anamnesis_templates')
+            .insert([{
+                nutritionist_id: templateData.nutritionistId,
+                title: templateData.title,
+                description: templateData.description || null,
+                is_system_default: false,
+                is_custom_fields: true,
+                is_active: true,
+                sections: [] // Vazio pois usa anamnese_fields
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao criar formulário personalizado:', error);
+        return { data: null, error };
+    }
+};
+
+/**
+ * Atualizar formulário personalizado
+ */
+export const updateCustomFormTemplate = async (templateId, templateData) => {
+    try {
+        const { data, error } = await supabase
+            .from('anamnesis_templates')
+            .update({
+                title: templateData.title,
+                description: templateData.description || null
+            })
+            .eq('id', templateId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao atualizar formulário personalizado:', error);
+        return { data: null, error };
+    }
+};
+
+/**
+ * Deletar formulário personalizado
+ * Nota: Também deve deletar todos os campos associados
+ */
+export const deleteCustomFormTemplate = async (templateId) => {
+    try {
+        // Primeiro deletar todos os campos associados
+        const { error: fieldsError } = await supabase
+            .from('anamnese_fields')
+            .delete()
+            .eq('custom_template_id', templateId);
+
+        if (fieldsError) throw fieldsError;
+
+        // Depois deletar o template
+        const { error } = await supabase
+            .from('anamnesis_templates')
+            .delete()
+            .eq('id', templateId);
+
+        if (error) throw error;
+        return { error: null };
+    } catch (error) {
+        console.error('Erro ao deletar formulário personalizado:', error);
+        return { error };
     }
 };
