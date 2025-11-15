@@ -54,6 +54,8 @@ import {
     createAnamneseField,
     updateAnamneseField,
     deleteAnamneseField,
+    addFieldToTemplate,
+    removeFieldFromTemplate,
     getFieldOptions,
     createFieldOptions,
     updateFieldOptions
@@ -1018,6 +1020,11 @@ const PatientAnamnesePage = () => {
                     // Criar opções se for campo de seleção
                     if (localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla') {
                         await createFieldOptions(data.id, localOptions);
+                    }
+
+                    // Associar campo ao template
+                    if (editingCustomTemplate) {
+                        await addFieldToTemplate(editingCustomTemplate.id, data.id, customTemplateFields.length);
                     }
 
                     setCustomTemplateFields(prev => [...prev, data]);

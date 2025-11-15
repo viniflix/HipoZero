@@ -316,25 +316,38 @@ export const getLatestAnamnesis = async (patientId) => {
 
 /**
  * Buscar todos os campos de anamnese de um nutricionista
- * Busca campos associados a um template personalizado através de uma relação
+ * Se customTemplateId fornecido, busca apenas campos associados ao template
  */
 export const getAnamneseFields = async (nutritionistId, customTemplateId = null) => {
     try {
-        // Por enquanto, vamos usar uma abordagem simples sem custom_template_id
-        // Os campos serão identificados pelo nutritionist_id
-        const { data, error } = await supabase
-            .from('anamnese_fields')
-            .select('*')
-            .eq('nutritionist_id', nutritionistId)
-            .order('id', { ascending: true });
+        if (customTemplateId) {
+            // Buscar campos associados ao template específico
+            const { data, error } = await supabase
+                .from('anamnesis_template_fields')
+                .select(`
+                    field_id,
+                    field_order,
+                    anamnese_fields (*)
+                `)
+                .eq('template_id', customTemplateId)
+                .order('field_order', { ascending: true });
 
-        if (error) throw error;
+            if (error) throw error;
 
-        // Se customTemplateId foi fornecido, filtrar manualmente
-        // (isso é temporário até adicionarmos a coluna no banco)
-        let filteredData = data || [];
+            // Extrair os campos da relação
+            const fields = (data || []).map(item => item.anamnese_fields).filter(Boolean);
+            return { data: fields, error: null };
+        } else {
+            // Buscar todos os campos do nutricionista (sem filtro de template)
+            const { data, error } = await supabase
+                .from('anamnese_fields')
+                .select('*')
+                .eq('nutritionist_id', nutritionistId)
+                .order('id', { ascending: true });
 
-        return { data: filteredData, error: null };
+            if (error) throw error;
+            return { data: data || [], error: null };
+        }
     } catch (error) {
         console.error('Erro ao buscar campos de anamnese:', error);
         return { data: null, error };
@@ -413,6 +426,47 @@ export const deleteAnamneseField = async (fieldId) => {
         return { error: null };
     } catch (error) {
         console.error('Erro ao deletar campo de anamnese:', error);
+        return { error };
+    }
+};
+
+/**
+ * Associar campo a um template personalizado
+ */
+export const addFieldToTemplate = async (templateId, fieldId, fieldOrder = 0) => {
+    try {
+        const { data, error } = await supabase
+            .from('anamnesis_template_fields')
+            .insert([{
+                template_id: templateId,
+                field_id: fieldId,
+                field_order: fieldOrder
+            }])
+            .select();
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao associar campo ao template:', error);
+        return { data: null, error };
+    }
+};
+
+/**
+ * Remover campo de um template personalizado
+ */
+export const removeFieldFromTemplate = async (templateId, fieldId) => {
+    try {
+        const { error } = await supabase
+            .from('anamnesis_template_fields')
+            .delete()
+            .eq('template_id', templateId)
+            .eq('field_id', fieldId);
+
+        if (error) throw error;
+        return { error: null };
+    } catch (error) {
+        console.error('Erro ao remover campo do template:', error);
         return { error };
     }
 };

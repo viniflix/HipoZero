@@ -199,7 +199,7 @@ const PatientAnamnesisFormV2 = () => {
 
                 // Se for formulário personalizado, carregar campos e respostas
                 if (isCustomForm) {
-                    const { data: fieldsData, error: fieldsError } = await getAnamneseFields(user.id);
+                    const { data: fieldsData, error: fieldsError } = await getAnamneseFields(user.id, customTemplateId);
                     if (fieldsError) throw new Error('Erro ao buscar campos personalizados');
                     setCustomFields(fieldsData || []);
 
