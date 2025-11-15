@@ -1,7 +1,7 @@
 -- Criar tabela para armazenar opções de campos de seleção
 CREATE TABLE IF NOT EXISTS anamnese_field_options (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    field_id UUID NOT NULL REFERENCES anamnese_fields(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    field_id BIGINT NOT NULL REFERENCES anamnese_fields(id) ON DELETE CASCADE,
     option_text TEXT NOT NULL,
     option_order INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
