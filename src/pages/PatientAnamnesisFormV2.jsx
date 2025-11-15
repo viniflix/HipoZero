@@ -350,6 +350,32 @@ const PatientAnamnesisFormV2 = () => {
                     }
                 }
 
+                // IMPORTANTE: Criar registro na tabela anamnesis_records primeiro
+                // para que o formulário apareça na lista de anamneses
+                if (isEditMode) {
+                    // Se está editando, atualizar o registro existente
+                    const updateData = {
+                        status,
+                        updated_at: new Date().toISOString()
+                    };
+                    const { error: updateError } = await updateAnamnesis(anamnesisId, updateData);
+                    if (updateError) throw updateError;
+                } else {
+                    // Se é novo, criar registro na anamnesis_records
+                    const recordData = {
+                        patientId,
+                        nutritionistId: user.id,
+                        templateId: customTemplateId, // ID do template personalizado
+                        date: new Date().toISOString().split('T')[0],
+                        notes: '',
+                        content: {}, // Formulário personalizado usa anamnese_answers, não content
+                        status
+                    };
+                    const { error: createError } = await createAnamnesis(recordData);
+                    if (createError) throw createError;
+                }
+
+                // Agora salvar as respostas dos campos personalizados
                 const answersToSave = customFields.map(field => {
                     let answerValue = customAnswers[field.id] || '';
 
@@ -418,8 +444,8 @@ const PatientAnamnesisFormV2 = () => {
                 });
             }
 
-            // Sucesso - voltar para hub do paciente
-            navigate(`/nutritionist/patients/${patientId}/hub`);
+            // Sucesso - voltar para a página de anamnese do paciente
+            navigate(`/nutritionist/patients/${patientId}/anamnese`);
         } catch (err) {
             console.error('Erro ao salvar anamnese:', err);
             setError('Erro ao salvar anamnese. Tente novamente.');

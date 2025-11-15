@@ -916,29 +916,15 @@ const PatientAnamnesePage = () => {
 
     // Modal de Campo (Adicionar/Editar Pergunta)
     const FieldModal = React.memo(() => {
-        const [localFieldLabel, setLocalFieldLabel] = useState(fieldForm.fieldLabel);
-        const [localFieldType, setLocalFieldType] = useState(fieldForm.fieldType);
-        const [localCategory, setLocalCategory] = useState(fieldForm.category);
-        const [localIsRequired, setLocalIsRequired] = useState(fieldForm.isRequired);
+        const [localFieldLabel, setLocalFieldLabel] = useState('');
+        const [localFieldType, setLocalFieldType] = useState('texto_curto');
+        const [localCategory, setLocalCategory] = useState('geral');
+        const [localIsRequired, setLocalIsRequired] = useState(false);
         const [localOptions, setLocalOptions] = useState([]);
         const [newOption, setNewOption] = useState('');
         const [loadingOptions, setLoadingOptions] = useState(false);
 
-        React.useEffect(() => {
-            setLocalFieldLabel(fieldForm.fieldLabel);
-            setLocalFieldType(fieldForm.fieldType);
-            setLocalCategory(fieldForm.category);
-            setLocalIsRequired(fieldForm.isRequired);
-
-            // Carregar opções se estiver editando campo de seleção
-            if (editingField && (editingField.field_type === 'selecao_unica' || editingField.field_type === 'selecao_multipla')) {
-                loadOptions();
-            } else {
-                setLocalOptions([]);
-            }
-        }, [fieldForm.fieldLabel, fieldForm.fieldType, fieldForm.category, fieldForm.isRequired, editingField]);
-
-        const loadOptions = async () => {
+        const loadOptions = React.useCallback(async () => {
             if (!editingField) return;
 
             setLoadingOptions(true);
@@ -951,7 +937,25 @@ const PatientAnamnesePage = () => {
             } finally {
                 setLoadingOptions(false);
             }
-        };
+        }, [editingField?.id]);
+
+        // Atualizar valores locais apenas quando o modal abrir
+        React.useEffect(() => {
+            if (showFieldModal) {
+                setLocalFieldLabel(fieldForm.fieldLabel);
+                setLocalFieldType(fieldForm.fieldType);
+                setLocalCategory(fieldForm.category);
+                setLocalIsRequired(fieldForm.isRequired);
+
+                // Carregar opções se estiver editando campo de seleção
+                if (editingField && (editingField.field_type === 'selecao_unica' || editingField.field_type === 'selecao_multipla')) {
+                    loadOptions();
+                } else {
+                    setLocalOptions([]);
+                }
+            }
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [showFieldModal]);
 
         const handleAddOption = () => {
             if (!newOption.trim()) return;
