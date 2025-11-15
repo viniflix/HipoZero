@@ -95,7 +95,7 @@ const PatientAnamnesePage = () => {
             // Buscar paciente
             const { data: patientData, error: patientError } = await supabase
                 .from('user_profiles')
-                .select('id, name, full_name')
+                .select('id, name')
                 .eq('id', patientId)
                 .single();
 
@@ -107,13 +107,13 @@ const PatientAnamnesePage = () => {
             if (anamnesisError) throw anamnesisError;
             setAnamnesisList(anamnesisData || []);
 
-            // Buscar templates padrão
+            // Buscar templates padrão (apenas templates do sistema)
             const { data: templatesData, error: templatesError } = await getAnamnesisTemplates(user.id);
             if (templatesError) throw templatesError;
-            const standard = (templatesData || []).filter(t => !t.is_custom_fields);
+            const standard = (templatesData || []).filter(t => t.is_system_default === true);
             setStandardTemplates(standard);
 
-            // Buscar templates personalizados
+            // Buscar templates personalizados (templates criados pelo nutricionista)
             const { data: customData, error: customError } = await getCustomTemplates(user.id);
             if (customError) throw customError;
             setCustomTemplates(customData || []);
@@ -696,7 +696,7 @@ const PatientAnamnesePage = () => {
                         </h1>
                         {patient && (
                             <p className="text-sm text-muted-foreground mt-1">
-                                Paciente: <span className="font-medium text-foreground">{patient.full_name || patient.name}</span>
+                                Paciente: <span className="font-medium text-foreground">{patient.name}</span>
                             </p>
                         )}
                     </div>

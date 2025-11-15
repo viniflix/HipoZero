@@ -458,16 +458,15 @@ export const upsertAnamneseAnswers = async (answersData) => {
 
 /**
  * Buscar formulários personalizados de um nutricionista
- * Retorna templates customizados (baseados em anamnese_fields)
+ * Retorna templates customizados criados pelo nutricionista (não do sistema)
  */
 export const getCustomTemplates = async (nutritionistId) => {
     try {
         const { data, error } = await supabase
             .from('anamnesis_templates')
-            .select('*, fields_count:anamnese_fields(count)')
+            .select('*')
             .eq('nutritionist_id', nutritionistId)
             .eq('is_system_default', false)
-            .eq('is_custom_fields', true)
             .eq('is_active', true)
             .order('created_at', { ascending: false });
 
@@ -491,7 +490,6 @@ export const createCustomFormTemplate = async (templateData) => {
                 title: templateData.title,
                 description: templateData.description || null,
                 is_system_default: false,
-                is_custom_fields: true,
                 is_active: true,
                 sections: [] // Vazio pois usa anamnese_fields
             }])
