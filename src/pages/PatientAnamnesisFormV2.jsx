@@ -3,6 +3,12 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Save, FileCheck, Loader2, AlertCircle, ChevronLeft, Plus, Trash2 } from 'lucide-react';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -331,6 +337,25 @@ const PatientAnamnesisFormV2 = () => {
         try {
             // Se for formulário personalizado, salvar respostas na tabela anamnese_answers
             if (isCustomForm) {
+                // Validar campos obrigatórios apenas se não for rascunho
+                if (status === 'completed') {
+                    const missingRequired = customFields.filter(field =>
+                        field.is_required && (!customAnswers[field.id] ||
+                        (Array.isArray(customAnswers[field.id]) && customAnswers[field.id].length === 0) ||
+                        (typeof customAnswers[field.id] === 'string' && customAnswers[field.id].trim() === ''))
+                    );
+
+                    if (missingRequired.length > 0) {
+                        toast({
+                            variant: 'destructive',
+                            title: 'Campos obrigatórios não preenchidos',
+                            description: `Preencha todos os campos obrigatórios: ${missingRequired.map(f => f.field_label).join(', ')}`,
+                        });
+                        setSaving(false);
+                        return;
+                    }
+                }
+
                 const answersToSave = customFields.map(field => {
                     let answerValue = customAnswers[field.id] || '';
 
@@ -350,8 +375,10 @@ const PatientAnamnesisFormV2 = () => {
                 if (saveError) throw saveError;
 
                 toast({
-                    title: 'Anamnese salva!',
-                    description: 'As respostas do formulário personalizado foram salvas com sucesso.',
+                    title: status === 'draft' ? 'Rascunho salvo!' : 'Anamnese salva!',
+                    description: status === 'draft'
+                        ? 'Rascunho salvo com sucesso. Você pode continuar depois.'
+                        : 'As respostas do formulário personalizado foram salvas com sucesso.',
                 });
 
                 // Voltar para a página de anamnese do paciente
@@ -501,10 +528,10 @@ const PatientAnamnesisFormV2 = () => {
                             <CardHeader>
                                 <CardTitle>Formulário Personalizado</CardTitle>
                                 <p className="text-sm text-muted-foreground">
-                                    Preencha os campos abaixo
+                                    Preencha os campos abaixo. Campos com <span className="text-red-500">*</span> são obrigatórios.
                                 </p>
                             </CardHeader>
-                            <CardContent className="space-y-6">
+                            <CardContent>
                                 {customFields.length === 0 ? (
                                     <Alert>
                                         <AlertCircle className="h-4 w-4" />
@@ -513,11 +540,46 @@ const PatientAnamnesisFormV2 = () => {
                                         </AlertDescription>
                                     </Alert>
                                 ) : (
-                                    customFields.map((field, index) => (
-                                        <div key={field.id} className="space-y-2">
-                                            <Label htmlFor={`field-${field.id}`} className="text-base">
-                                                {index + 1}. {field.field_label}
-                                            </Label>
+                                    <Accordion type="multiple" defaultValue={['geral', 'identificacao', 'historico_clinico', 'historico_familiar', 'habitos_vida', 'objetivos', 'habitos_alimentares']} className="w-full">
+                                        {/* Agrupar campos por categoria */}
+                                        {Object.entries(
+                                            customFields.reduce((acc, field) => {
+                                                const category = field.category || 'geral';
+                                                if (!acc[category]) acc[category] = [];
+                                                acc[category].push(field);
+                                                return acc;
+                                            }, {})
+                                        ).map(([category, fields], categoryIndex) => {
+                                            const categoryNames = {
+                                                geral: 'Geral',
+                                                identificacao: 'Identificação',
+                                                historico_clinico: 'Histórico Clínico',
+                                                historico_familiar: 'Histórico Familiar',
+                                                habitos_vida: 'Hábitos de Vida',
+                                                objetivos: 'Objetivos',
+                                                habitos_alimentares: 'Hábitos Alimentares'
+                                            };
+
+                                            return (
+                                                <AccordionItem key={category} value={category} className="border-b">
+                                                    <AccordionTrigger className="hover:no-underline">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={cn(
+                                                                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold bg-[#5f6f52]/10 text-[#5f6f52]"
+                                                            )}>
+                                                                {categoryIndex + 1}
+                                                            </div>
+                                                            <span className="font-semibold text-left">{categoryNames[category] || category}</span>
+                                                        </div>
+                                                    </AccordionTrigger>
+                                                    <AccordionContent className="pt-4 pb-6">
+                                                        <div className="space-y-6 pl-11">
+                                                            {fields.map((field, index) => (
+                                                                <div key={field.id} className="space-y-2">
+                                                                    <Label htmlFor={`field-${field.id}`} className="text-base">
+                                                                        {field.field_label}
+                                                                        {field.is_required && <span className="text-red-500 ml-1">*</span>}
+                                                                    </Label>
 
                                             {field.field_type === 'texto_curto' && (
                                                 <Input
@@ -614,8 +676,14 @@ const PatientAnamnesisFormV2 = () => {
                                                     })}
                                                 </div>
                                             )}
-                                        </div>
-                                    ))
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </AccordionContent>
+                                                </AccordionItem>
+                                            );
+                                        })}
+                                    </Accordion>
                                 )}
                             </CardContent>
                         </Card>
@@ -1736,14 +1804,13 @@ const PatientAnamnesisFormV2 = () => {
                                     Cancelar
                                 </Button>
                                 <div className="flex gap-3">
-                                    {!isCustomForm && (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={handleSaveDraft}
-                                            disabled={saving}
-                                            className="gap-2"
-                                        >
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={isCustomForm ? () => onSubmit({}, 'draft') : handleSaveDraft}
+                                        disabled={saving || (isCustomForm && customFields.length === 0)}
+                                        className="gap-2"
+                                    >
                                         {saving ? (
                                             <Loader2 className="w-4 h-4 animate-spin" />
                                         ) : (
@@ -1751,7 +1818,6 @@ const PatientAnamnesisFormV2 = () => {
                                         )}
                                         Salvar Rascunho
                                     </Button>
-                                    )}
                                     <Button
                                         type="button"
                                         onClick={isCustomForm ? () => onSubmit({}, 'completed') : handleSaveCompleted}
