@@ -406,6 +406,81 @@ export const deleteAnamneseField = async (fieldId) => {
 };
 
 // ============================================================
+// FIELD OPTIONS (Opções para campos de seleção)
+// ============================================================
+
+/**
+ * Buscar opções de um campo específico
+ */
+export const getFieldOptions = async (fieldId) => {
+    try {
+        const { data, error } = await supabase
+            .from('anamnese_field_options')
+            .select('*')
+            .eq('field_id', fieldId)
+            .order('option_order', { ascending: true });
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao buscar opções do campo:', error);
+        return { data: null, error };
+    }
+};
+
+/**
+ * Criar opções para um campo (usado após criar campo de seleção)
+ */
+export const createFieldOptions = async (fieldId, options) => {
+    try {
+        // options é um array de strings: ['Opção 1', 'Opção 2', ...]
+        const optionsData = options.map((optionText, index) => ({
+            field_id: fieldId,
+            option_text: optionText,
+            option_order: index
+        }));
+
+        const { data, error } = await supabase
+            .from('anamnese_field_options')
+            .insert(optionsData)
+            .select();
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao criar opções do campo:', error);
+        return { data: null, error };
+    }
+};
+
+/**
+ * Atualizar opções de um campo (deleta antigas e cria novas)
+ */
+export const updateFieldOptions = async (fieldId, options) => {
+    try {
+        // Deletar opções antigas
+        const { error: deleteError } = await supabase
+            .from('anamnese_field_options')
+            .delete()
+            .eq('field_id', fieldId);
+
+        if (deleteError) throw deleteError;
+
+        // Criar novas opções
+        if (options && options.length > 0) {
+            const { data, error: createError } = await createFieldOptions(fieldId, options);
+            if (createError) throw createError;
+            return { data, error: null };
+        }
+
+        return { data: [], error: null };
+    } catch (error) {
+        console.error('Erro ao atualizar opções do campo:', error);
+        return { data: null, error };
+    }
+};
+
+// ============================================================
 // ANAMNESE ANSWERS (Sistema Modular)
 // ============================================================
 

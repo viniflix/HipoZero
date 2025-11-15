@@ -29,7 +29,8 @@ import {
     updateAnamnesis,
     getAnamneseFields,
     getAnamneseAnswers,
-    upsertAnamneseAnswers
+    upsertAnamneseAnswers,
+    getFieldOptions
 } from '@/lib/supabase/anamnesis-queries';
 import { getPatientProfile } from '@/lib/supabase/patient-queries';
 import { useAuth } from '@/contexts/AuthContext';
@@ -71,6 +72,7 @@ const PatientAnamnesisFormV2 = () => {
     // Custom form fields and answers
     const [customFields, setCustomFields] = useState([]);
     const [customAnswers, setCustomAnswers] = useState({});
+    const [fieldOptions, setFieldOptions] = useState({}); // { fieldId: [options] }
 
     // Referências para scroll automático
     const formRef = useRef(null);
@@ -195,6 +197,18 @@ const PatientAnamnesisFormV2 = () => {
                     if (fieldsError) throw new Error('Erro ao buscar campos personalizados');
                     setCustomFields(fieldsData || []);
 
+                    // Carregar opções para campos de seleção
+                    const optionsMap = {};
+                    for (const field of fieldsData || []) {
+                        if (field.field_type === 'selecao_unica' || field.field_type === 'selecao_multipla') {
+                            const { data: options, error: optionsError } = await getFieldOptions(field.id);
+                            if (!optionsError && options) {
+                                optionsMap[field.id] = options;
+                            }
+                        }
+                    }
+                    setFieldOptions(optionsMap);
+
                     // Carregar respostas existentes (se houver)
                     const { data: answersData, error: answersError } = await getAnamneseAnswers(patientId);
                     if (answersError) throw new Error('Erro ao buscar respostas');
@@ -202,7 +216,13 @@ const PatientAnamnesisFormV2 = () => {
                     // Converter array de respostas para objeto {fieldId: valor}
                     const answersMap = {};
                     (answersData || []).forEach(answer => {
-                        answersMap[answer.field_id] = answer.answer_value;
+                        // Parse JSON para seleção múltipla
+                        try {
+                            const parsedValue = JSON.parse(answer.answer_value);
+                            answersMap[answer.field_id] = parsedValue;
+                        } catch {
+                            answersMap[answer.field_id] = answer.answer_value;
+                        }
                     });
                     setCustomAnswers(answersMap);
 
@@ -311,11 +331,20 @@ const PatientAnamnesisFormV2 = () => {
         try {
             // Se for formulário personalizado, salvar respostas na tabela anamnese_answers
             if (isCustomForm) {
-                const answersToSave = customFields.map(field => ({
-                    patient_id: patientId,
-                    field_id: field.id,
-                    answer_value: customAnswers[field.id] || ''
-                }));
+                const answersToSave = customFields.map(field => {
+                    let answerValue = customAnswers[field.id] || '';
+
+                    // Se for seleção múltipla, converter array para JSON
+                    if (field.field_type === 'selecao_multipla' && Array.isArray(answerValue)) {
+                        answerValue = JSON.stringify(answerValue);
+                    }
+
+                    return {
+                        patient_id: patientId,
+                        field_id: field.id,
+                        answer_value: typeof answerValue === 'string' ? answerValue : String(answerValue)
+                    };
+                });
 
                 const { error: saveError } = await upsertAnamneseAnswers(answersToSave);
                 if (saveError) throw saveError;
@@ -515,6 +544,75 @@ const PatientAnamnesisFormV2 = () => {
                                                     rows={4}
                                                     className="max-w-2xl"
                                                 />
+                                            )}
+
+                                            {field.field_type === 'selecao_unica' && fieldOptions[field.id] && (
+                                                <Controller
+                                                    name={`field-${field.id}`}
+                                                    control={control}
+                                                    defaultValue={customAnswers[field.id] || ''}
+                                                    render={({ field: controllerField }) => (
+                                                        <Select
+                                                            value={customAnswers[field.id] || ''}
+                                                            onValueChange={(value) => {
+                                                                setCustomAnswers({
+                                                                    ...customAnswers,
+                                                                    [field.id]: value
+                                                                });
+                                                                controllerField.onChange(value);
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="max-w-2xl">
+                                                                <SelectValue placeholder="Selecione uma opção..." />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {fieldOptions[field.id].map((option) => (
+                                                                    <SelectItem key={option.id} value={option.option_text}>
+                                                                        {option.option_text}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    )}
+                                                />
+                                            )}
+
+                                            {field.field_type === 'selecao_multipla' && fieldOptions[field.id] && (
+                                                <div className="space-y-2 max-w-2xl">
+                                                    {fieldOptions[field.id].map((option) => {
+                                                        const selectedValues = Array.isArray(customAnswers[field.id])
+                                                            ? customAnswers[field.id]
+                                                            : [];
+                                                        const isChecked = selectedValues.includes(option.option_text);
+
+                                                        return (
+                                                            <div key={option.id} className="flex items-center space-x-2">
+                                                                <Checkbox
+                                                                    id={`${field.id}-${option.id}`}
+                                                                    checked={isChecked}
+                                                                    onCheckedChange={(checked) => {
+                                                                        let newValues = [...selectedValues];
+                                                                        if (checked) {
+                                                                            newValues.push(option.option_text);
+                                                                        } else {
+                                                                            newValues = newValues.filter(v => v !== option.option_text);
+                                                                        }
+                                                                        setCustomAnswers({
+                                                                            ...customAnswers,
+                                                                            [field.id]: newValues
+                                                                        });
+                                                                    }}
+                                                                />
+                                                                <Label
+                                                                    htmlFor={`${field.id}-${option.id}`}
+                                                                    className="text-sm font-normal cursor-pointer"
+                                                                >
+                                                                    {option.option_text}
+                                                                </Label>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             )}
                                         </div>
                                     ))

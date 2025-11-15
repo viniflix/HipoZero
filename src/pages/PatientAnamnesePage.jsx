@@ -52,7 +52,10 @@ import {
     getAnamneseFields,
     createAnamneseField,
     updateAnamneseField,
-    deleteAnamneseField
+    deleteAnamneseField,
+    getFieldOptions,
+    createFieldOptions,
+    updateFieldOptions
 } from '@/lib/supabase/anamnesis-queries';
 import { supabase } from '@/lib/customSupabaseClient';
 
@@ -291,7 +294,7 @@ const PatientAnamnesePage = () => {
     }, [user?.id, toast]);
 
     // Handler para adicionar novo campo
-    const handleAddField = () => {
+    const handleAddField = useCallback(() => {
         setEditingField(null);
         setFieldForm({
             fieldLabel: '',
@@ -299,10 +302,10 @@ const PatientAnamnesePage = () => {
             optionsArray: ''
         });
         setShowFieldModal(true);
-    };
+    }, []);
 
     // Handler para editar campo existente
-    const handleEditField = (field) => {
+    const handleEditField = useCallback((field) => {
         setEditingField(field);
         setFieldForm({
             fieldLabel: field.field_label,
@@ -310,7 +313,7 @@ const PatientAnamnesePage = () => {
             optionsArray: ''
         });
         setShowFieldModal(true);
-    };
+    }, []);
 
     // Handler para deletar campo
     const handleDeleteField = async () => {
@@ -804,109 +807,148 @@ const PatientAnamnesePage = () => {
     };
 
     // Modal de Edição de Template Customizado (Gerenciar Campos)
-    const EditCustomTemplateModal = () => (
-        <Dialog open={!!editingCustomTemplate} onOpenChange={() => setEditingCustomTemplate(null)}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <DialogTitle>Editar Formulário: {editingCustomTemplate?.title}</DialogTitle>
-                            <DialogDescription>
-                                Adicione, edite ou remova perguntas do formulário
-                            </DialogDescription>
-                        </div>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                setTemplateToDelete(editingCustomTemplate);
-                                setShowDeleteTemplateDialog(true);
-                            }}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Excluir Formulário
-                        </Button>
-                    </div>
-                </DialogHeader>
+    const EditCustomTemplateModal = React.memo(() => {
+        if (!editingCustomTemplate) return null;
 
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-semibold">Perguntas ({customTemplateFields.length})</h3>
-                        <Button onClick={handleAddField} size="sm">
-                            <Plus className="w-4 h-4 mr-2" />
-                            Adicionar Pergunta
-                        </Button>
-                    </div>
-
-                    {loadingFields ? (
-                        <div className="flex items-center justify-center py-8">
-                            <Loader2 className="w-6 h-6 animate-spin text-[#5f6f52]" />
-                        </div>
-                    ) : customTemplateFields.length === 0 ? (
-                        <div className="text-center py-8 border-2 border-dashed rounded-lg">
-                            <p className="text-muted-foreground">Nenhuma pergunta adicionada ainda.</p>
-                            <Button onClick={handleAddField} size="sm" className="mt-4">
-                                <Plus className="w-4 h-4 mr-2" />
-                                Adicionar Primeira Pergunta
+        return (
+            <Dialog open={!!editingCustomTemplate} onOpenChange={() => setEditingCustomTemplate(null)}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <DialogTitle>Editar Formulário: {editingCustomTemplate?.title}</DialogTitle>
+                                <DialogDescription>
+                                    Adicione, edite ou remova perguntas do formulário
+                                </DialogDescription>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    setTemplateToDelete(editingCustomTemplate);
+                                    setShowDeleteTemplateDialog(true);
+                                }}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir Formulário
                             </Button>
                         </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {customTemplateFields.map((field, index) => (
-                                <div key={field.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm text-muted-foreground">#{index + 1}</span>
-                                            <p className="font-medium">{field.field_label}</p>
-                                        </div>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            Tipo: {field.field_type.replace('_', ' ')}
-                                        </p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleEditField(field)}
-                                        >
-                                            <Edit2 className="w-4 h-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                                setFieldToDelete(field);
-                                                setShowDeleteFieldDialog(true);
-                                            }}
-                                        >
-                                            <Trash2 className="w-4 h-4 text-destructive" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                    </DialogHeader>
 
-                <DialogFooter>
-                    <Button onClick={() => setEditingCustomTemplate(null)}>
-                        Concluir
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-semibold">Perguntas ({customTemplateFields.length})</h3>
+                            <Button onClick={handleAddField} size="sm">
+                                <Plus className="w-4 h-4 mr-2" />
+                                Adicionar Pergunta
+                            </Button>
+                        </div>
+
+                        {loadingFields ? (
+                            <div className="flex items-center justify-center py-8">
+                                <Loader2 className="w-6 h-6 animate-spin text-[#5f6f52]" />
+                            </div>
+                        ) : customTemplateFields.length === 0 ? (
+                            <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                                <p className="text-muted-foreground">Nenhuma pergunta adicionada ainda.</p>
+                                <Button onClick={handleAddField} size="sm" className="mt-4">
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Adicionar Primeira Pergunta
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {customTemplateFields.map((field, index) => (
+                                    <div key={field.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm text-muted-foreground">#{index + 1}</span>
+                                                <p className="font-medium">{field.field_label}</p>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                Tipo: {field.field_type.replace('_', ' ')}
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleEditField(field)}
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setFieldToDelete(field);
+                                                    setShowDeleteFieldDialog(true);
+                                                }}
+                                            >
+                                                <Trash2 className="w-4 h-4 text-destructive" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button onClick={() => setEditingCustomTemplate(null)}>
+                            Concluir
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    });
 
     // Modal de Campo (Adicionar/Editar Pergunta)
     const FieldModal = React.memo(() => {
         const [localFieldLabel, setLocalFieldLabel] = useState(fieldForm.fieldLabel);
         const [localFieldType, setLocalFieldType] = useState(fieldForm.fieldType);
+        const [localOptions, setLocalOptions] = useState([]);
+        const [newOption, setNewOption] = useState('');
+        const [loadingOptions, setLoadingOptions] = useState(false);
 
         React.useEffect(() => {
             setLocalFieldLabel(fieldForm.fieldLabel);
             setLocalFieldType(fieldForm.fieldType);
-        }, [fieldForm.fieldLabel, fieldForm.fieldType]);
+
+            // Carregar opções se estiver editando campo de seleção
+            if (editingField && (editingField.field_type === 'selecao_unica' || editingField.field_type === 'selecao_multipla')) {
+                loadOptions();
+            } else {
+                setLocalOptions([]);
+            }
+        }, [fieldForm.fieldLabel, fieldForm.fieldType, editingField]);
+
+        const loadOptions = async () => {
+            if (!editingField) return;
+
+            setLoadingOptions(true);
+            try {
+                const { data, error } = await getFieldOptions(editingField.id);
+                if (error) throw error;
+                setLocalOptions((data || []).map(opt => opt.option_text));
+            } catch (err) {
+                console.error('Erro ao carregar opções:', err);
+            } finally {
+                setLoadingOptions(false);
+            }
+        };
+
+        const handleAddOption = () => {
+            if (!newOption.trim()) return;
+            setLocalOptions(prev => [...prev, newOption.trim()]);
+            setNewOption('');
+        };
+
+        const handleRemoveOption = (index) => {
+            setLocalOptions(prev => prev.filter((_, i) => i !== index));
+        };
 
         const handleSave = async () => {
             if (!localFieldLabel.trim()) {
@@ -918,9 +960,19 @@ const PatientAnamnesePage = () => {
                 return;
             }
 
+            // Validar opções para campos de seleção
+            if ((localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla') && localOptions.length === 0) {
+                toast({
+                    title: 'Atenção',
+                    description: 'Adicione pelo menos uma opção para campos de seleção.',
+                    variant: 'destructive',
+                });
+                return;
+            }
+
             try {
                 if (editingField) {
-                    // Atualizar
+                    // Atualizar campo
                     const { data, error } = await updateAnamneseField(editingField.id, {
                         fieldLabel: localFieldLabel,
                         fieldType: localFieldType
@@ -928,13 +980,18 @@ const PatientAnamnesePage = () => {
 
                     if (error) throw error;
 
+                    // Atualizar opções se for campo de seleção
+                    if (localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla') {
+                        await updateFieldOptions(editingField.id, localOptions);
+                    }
+
                     setCustomTemplateFields(prev => prev.map(f => f.id === data.id ? data : f));
                     toast({
                         title: 'Sucesso!',
                         description: 'Pergunta atualizada com sucesso.',
                     });
                 } else {
-                    // Criar
+                    // Criar novo campo
                     const { data, error } = await createAnamneseField({
                         nutritionistId: user.id,
                         fieldLabel: localFieldLabel,
@@ -942,6 +999,11 @@ const PatientAnamnesePage = () => {
                     });
 
                     if (error) throw error;
+
+                    // Criar opções se for campo de seleção
+                    if (localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla') {
+                        await createFieldOptions(data.id, localOptions);
+                    }
 
                     setCustomTemplateFields(prev => [...prev, data]);
                     toast({
@@ -953,6 +1015,7 @@ const PatientAnamnesePage = () => {
                 setShowFieldModal(false);
                 setEditingField(null);
                 setFieldForm({ fieldLabel: '', fieldType: 'texto_curto', optionsArray: '' });
+                setLocalOptions([]);
 
             } catch (err) {
                 console.error('Erro ao salvar campo:', err);
@@ -964,9 +1027,11 @@ const PatientAnamnesePage = () => {
             }
         };
 
+        const isSelectionType = localFieldType === 'selecao_unica' || localFieldType === 'selecao_multipla';
+
         return (
             <Dialog open={showFieldModal} onOpenChange={setShowFieldModal}>
-                <DialogContent>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>{editingField ? 'Editar Pergunta' : 'Nova Pergunta'}</DialogTitle>
                     </DialogHeader>
@@ -986,7 +1051,12 @@ const PatientAnamnesePage = () => {
                             <Label htmlFor="field-type">Tipo de Campo</Label>
                             <Select
                                 value={localFieldType}
-                                onValueChange={(val) => setLocalFieldType(val)}
+                                onValueChange={(val) => {
+                                    setLocalFieldType(val);
+                                    if (val !== 'selecao_unica' && val !== 'selecao_multipla') {
+                                        setLocalOptions([]);
+                                    }
+                                }}
                             >
                                 <SelectTrigger id="field-type">
                                     <SelectValue />
@@ -994,13 +1064,80 @@ const PatientAnamnesePage = () => {
                                 <SelectContent>
                                     <SelectItem value="texto_curto">Texto Curto</SelectItem>
                                     <SelectItem value="texto_longo">Texto Longo</SelectItem>
+                                    <SelectItem value="selecao_unica">Seleção Única</SelectItem>
+                                    <SelectItem value="selecao_multipla">Seleção Múltipla</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {/* Campo de opções para seleção */}
+                        {isSelectionType && (
+                            <div className="space-y-3">
+                                <Label>Opções de Resposta</Label>
+
+                                {loadingOptions ? (
+                                    <div className="flex items-center justify-center py-4">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Lista de opções */}
+                                        {localOptions.length > 0 && (
+                                            <div className="space-y-2 mb-3">
+                                                {localOptions.map((option, index) => (
+                                                    <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                                                        <span className="flex-1 text-sm">{option}</span>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => handleRemoveOption(index)}
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-500" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Adicionar nova opção */}
+                                        <div className="flex gap-2">
+                                            <Input
+                                                value={newOption}
+                                                onChange={(e) => setNewOption(e.target.value)}
+                                                placeholder="Digite uma opção..."
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        handleAddOption();
+                                                    }
+                                                }}
+                                            />
+                                            <Button
+                                                type="button"
+                                                onClick={handleAddOption}
+                                                variant="outline"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+
+                                        {localOptions.length === 0 && (
+                                            <p className="text-sm text-muted-foreground italic">
+                                                Adicione pelo menos uma opção de resposta
+                                            </p>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowFieldModal(false)}>
+                        <Button variant="outline" onClick={() => {
+                            setShowFieldModal(false);
+                            setLocalOptions([]);
+                        }}>
                             Cancelar
                         </Button>
                         <Button onClick={handleSave}>
