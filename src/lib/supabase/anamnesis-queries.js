@@ -309,3 +309,135 @@ export const getLatestAnamnesis = async (patientId) => {
         return { data: null, error };
     }
 };
+
+// ============================================================
+// ANAMNESE FIELDS (Sistema Modular)
+// ============================================================
+
+/**
+ * Buscar todos os campos de anamnese de um nutricionista
+ */
+export const getAnamneseFields = async (nutritionistId) => {
+    try {
+        const { data, error } = await supabase
+            .from('anamnese_fields')
+            .select('*')
+            .eq('nutritionist_id', nutritionistId)
+            .order('id', { ascending: true });
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao buscar campos de anamnese:', error);
+        return { data: null, error };
+    }
+};
+
+/**
+ * Criar novo campo de anamnese
+ */
+export const createAnamneseField = async (fieldData) => {
+    try {
+        const { data, error } = await supabase
+            .from('anamnese_fields')
+            .insert([{
+                nutritionist_id: fieldData.nutritionistId,
+                field_label: fieldData.fieldLabel,
+                field_type: fieldData.fieldType,
+                options_array: fieldData.optionsArray || null
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao criar campo de anamnese:', error);
+        return { data: null, error };
+    }
+};
+
+/**
+ * Atualizar campo de anamnese
+ */
+export const updateAnamneseField = async (fieldId, fieldData) => {
+    try {
+        const { data, error } = await supabase
+            .from('anamnese_fields')
+            .update({
+                field_label: fieldData.fieldLabel,
+                field_type: fieldData.fieldType,
+                options_array: fieldData.optionsArray || null
+            })
+            .eq('id', fieldId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao atualizar campo de anamnese:', error);
+        return { data: null, error };
+    }
+};
+
+/**
+ * Deletar campo de anamnese
+ */
+export const deleteAnamneseField = async (fieldId) => {
+    try {
+        const { error } = await supabase
+            .from('anamnese_fields')
+            .delete()
+            .eq('id', fieldId);
+
+        if (error) throw error;
+        return { error: null };
+    } catch (error) {
+        console.error('Erro ao deletar campo de anamnese:', error);
+        return { error };
+    }
+};
+
+// ============================================================
+// ANAMNESE ANSWERS (Sistema Modular)
+// ============================================================
+
+/**
+ * Buscar respostas de anamnese para um paciente específico
+ */
+export const getAnamneseAnswers = async (patientId) => {
+    try {
+        const { data, error } = await supabase
+            .from('anamnese_answers')
+            .select('*')
+            .eq('patient_id', patientId);
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao buscar respostas de anamnese:', error);
+        return { data: null, error };
+    }
+};
+
+/**
+ * Salvar/atualizar respostas de anamnese (upsert)
+ * Usa (patient_id, field_id) como constraint para evitar duplicatas
+ */
+export const upsertAnamneseAnswers = async (answersData) => {
+    try {
+        const { data, error } = await supabase
+            .from('anamnese_answers')
+            .upsert(answersData, {
+                onConflict: 'patient_id,field_id'
+            })
+            .select();
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Erro ao salvar respostas de anamnese:', error);
+        return { data: null, error };
+    }
+};
