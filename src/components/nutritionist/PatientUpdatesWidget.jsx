@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Utensils, Weight, Loader2, Edit3, Search, X, Filter } from 'lucide-react';
+import { Utensils, Weight, Loader2, Edit3, Search, X, Filter, Trash2 } from 'lucide-react';
 import { translateMealType } from '@/utils/mealTranslations';
 
 /**
@@ -51,25 +51,16 @@ const PatientUpdatesWidget = () => {
                 const activities = [];
 
                 // OTIMIZADO: Buscar últimos 100 registros de cada tipo
-                const [mealsData, editsData, weightData] = await Promise.all([
-                    // 1. REFEIÇÕES - Últimas 100 (apenas não deletadas)
+                const [mealAuditData, weightData] = await Promise.all([
+                    // 1. AUDITORIA DE REFEIÇÕES - Últimas 100 (CREATE, UPDATE, DELETE)
                     supabase
-                        .from('meals')
-                        .select('id, patient_id, meal_type, total_calories, created_at')
+                        .from('meal_audit_log')
+                        .select('id, patient_id, action, meal_type, details, created_at')
                         .in('patient_id', patientIds)
-                        .is('deleted_at', null)
                         .order('created_at', { ascending: false })
                         .limit(100),
 
-                    // 2. EDIÇÕES DE REFEIÇÃO - Últimas 100
-                    supabase
-                        .from('meal_edit_history')
-                        .select('id, patient_id, edited_at')
-                        .in('patient_id', patientIds)
-                        .order('edited_at', { ascending: false })
-                        .limit(100),
-
-                    // 3. PESO REGISTRADO - Últimos 100
+                    // 2. PESO REGISTRADO - Últimos 100
                     supabase
                         .from('growth_records')
                         .select('id, patient_id, weight, created_at')
@@ -78,36 +69,36 @@ const PatientUpdatesWidget = () => {
                         .limit(100)
                 ]);
 
-                // Processar REFEIÇÕES
-                if (mealsData.data) {
-                    mealsData.data.forEach(meal => {
-                        const patient = patientMap[meal.patient_id];
+                // Processar AUDITORIA DE REFEIÇÕES (CREATE, UPDATE, DELETE)
+                if (mealAuditData.data) {
+                    mealAuditData.data.forEach(audit => {
+                        const patient = patientMap[audit.patient_id];
                         if (patient) {
-                            activities.push({
-                                id: `meal-${meal.id}`,
-                                type: 'meal',
-                                patient_name: patient.name,
-                                description: 'registrou',
-                                meal_type: translateMealType(meal.meal_type), // Traduzido e separado para negrito
-                                detail: `${meal.total_calories || 0} kcal`,
-                                timestamp: meal.created_at
-                            });
-                        }
-                    });
-                }
+                            const totalCalories = audit.details?.total_calories || 0;
 
-                // Processar EDIÇÕES
-                if (editsData.data) {
-                    editsData.data.forEach(edit => {
-                        const patient = patientMap[edit.patient_id];
-                        if (patient) {
+                            // Descrição e tipo baseado na ação
+                            let description = '';
+                            let type = '';
+
+                            if (audit.action === 'create') {
+                                description = 'registrou';
+                                type = 'meal';
+                            } else if (audit.action === 'update') {
+                                description = 'editou';
+                                type = 'edit';
+                            } else if (audit.action === 'delete') {
+                                description = 'deletou';
+                                type = 'delete';
+                            }
+
                             activities.push({
-                                id: `edit-${edit.id}`,
-                                type: 'edit',
+                                id: `audit-${audit.id}`,
+                                type: type,
                                 patient_name: patient.name,
-                                description: 'editou uma refeição',
-                                detail: '',
-                                timestamp: edit.edited_at
+                                description: description,
+                                meal_type: translateMealType(audit.meal_type),
+                                detail: `${totalCalories} kcal`,
+                                timestamp: audit.created_at
                             });
                         }
                     });
@@ -152,7 +143,9 @@ const PatientUpdatesWidget = () => {
             case 'weight':
                 return <Weight className="h-5 w-5 text-primary" />;
             case 'edit':
-                return <Edit3 className="h-5 w-5 text-neutral-600" />;
+                return <Edit3 className="h-5 w-5 text-blue-600" />;
+            case 'delete':
+                return <Trash2 className="h-5 w-5 text-red-600" />;
             default:
                 return null;
         }
@@ -250,6 +243,12 @@ const PatientUpdatesWidget = () => {
                                 <Edit3 className="h-4 w-4 mr-2" />
                                 <span className={activeFilter === 'edit' ? 'font-semibold' : ''}>
                                     Edições
+                                </span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setActiveFilter('delete')}>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                <span className={activeFilter === 'delete' ? 'font-semibold' : ''}>
+                                    Exclusões
                                 </span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
