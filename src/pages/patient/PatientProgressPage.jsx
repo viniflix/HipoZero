@@ -188,18 +188,15 @@ export default function PatientProgressPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white">
-      {/* Header fixo */}
-      <div className="bg-gradient-to-r from-primary to-primary/80 text-white sticky top-0 z-10 shadow-md">
-        <div className="px-4 py-4">
-          <h1 className="text-2xl font-bold">Meu Progresso</h1>
-          <p className="text-sm text-white/90 mt-1">
+    <div className="flex flex-col min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-8">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-foreground">Meu Progresso</h1>
+          <p className="text-muted-foreground mt-1">
             Acompanhe sua evolução
           </p>
         </div>
-      </div>
-
-      <div className="p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-4">
             <TabsTrigger value="peso" className="text-xs">
@@ -383,9 +380,6 @@ export default function PatientProgressPage() {
             </motion.div>
           </TabsContent>
         </Tabs>
-
-        {/* Espaço para a Bottom Navigation */}
-        <div className="h-4 mt-4"></div>
       </div>
 
       {/* FAB - Floating Action Button */}
@@ -393,9 +387,9 @@ export default function PatientProgressPage() {
         <DialogTrigger asChild>
           <Button
             size="lg"
-            className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-lg z-40 bg-primary hover:bg-primary/90"
+            className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-lg z-40 bg-primary hover:bg-primary/90 text-white"
           >
-            <Plus className="h-6 w-6" />
+            <Plus className="h-6 w-6 text-white" />
           </Button>
         </DialogTrigger>
         <DialogContent>

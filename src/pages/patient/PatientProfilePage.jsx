@@ -142,18 +142,15 @@ export default function PatientProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-white">
-      {/* Header fixo */}
-      <div className="bg-gradient-to-r from-gray-700 to-gray-600 text-white sticky top-0 z-10 shadow-md">
-        <div className="px-4 py-4">
-          <h1 className="text-2xl font-bold">Perfil</h1>
-          <p className="text-sm text-white/90 mt-1">
+    <div className="flex flex-col min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-8 space-y-6">
+        {/* Header */}
+        <div className="mb-2">
+          <h1 className="text-3xl font-bold text-foreground">Perfil</h1>
+          <p className="text-muted-foreground mt-1">
             Gerencie sua conta e preferências
           </p>
         </div>
-      </div>
-
-      <div className="p-4 space-y-4">
         {/* Seção: Meus Dados */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -387,9 +384,6 @@ export default function PatientProfilePage() {
             Sair da Conta
           </Button>
         </motion.div>
-
-        {/* Espaço para a Bottom Navigation */}
-        <div className="h-4"></div>
       </div>
     </div>
   );

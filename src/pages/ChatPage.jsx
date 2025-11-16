@@ -346,8 +346,8 @@ const ChatPage = () => {
         onClose={() => setModalMedia({ path: null, type: null })}
       />
 
-      {/* Header fixo */}
-      <header className="flex-shrink-0 bg-white border-b p-4 flex items-center shadow-md z-20">
+      {/* Header fixo - sticky no topo com safe-area para mobile */}
+      <header className="sticky top-0 flex-shrink-0 bg-white border-b p-4 pt-safe flex items-center shadow-md z-30">
         <Button variant="ghost" size="icon" onClick={handleBack} className="mr-2 ">
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -405,8 +405,8 @@ const ChatPage = () => {
         <div ref={messagesEndRef} />
       </main>
 
-      {/* Footer fixo */}
-      <footer className="flex-shrink-0 bg-white p-4 border-t shadow-lg z-20">
+      {/* Footer fixo - acima do BottomNav no mobile */}
+      <footer className="flex-shrink-0 bg-white p-4 border-t shadow-lg z-20 mb-16 md:mb-0">
         {mediaPreview && (
           <div className="relative p-2 mb-2 border rounded-lg max-w-sm flex items-center gap-2 bg-slate-50">
             {mediaType === 'image' && <img src={mediaPreview} alt="Preview" className="max-h-24 rounded" />}
