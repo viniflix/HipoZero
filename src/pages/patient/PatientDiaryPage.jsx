@@ -342,7 +342,12 @@ export default function PatientDiaryPage() {
                               size="sm"
                               variant="ghost"
                               className="w-full mt-2"
-                              onClick={() => navigate(`/patient/add-food/${meal.id}`)}
+                              onClick={() => navigate('/patient/add-meal', {
+                                state: {
+                                  editMode: true,
+                                  mealId: meal.id
+                                }
+                              })}
                             >
                               Editar refeição
                             </Button>

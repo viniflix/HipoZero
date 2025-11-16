@@ -30,16 +30,20 @@ export default function AddMealPage() {
 
   // Dados vindos da navegação
   const {
-    mealType,
+    mealType: initialMealType,
     mealTime,
     mealName,
-    recommendedFoods = []
+    recommendedFoods = [],
+    editMode = false,
+    mealId = null
   } = location.state || {};
 
   // Estado da refeição
-  const [mealDateTime, setMealDateTime] = useState(format(new Date(), 'HH:mm'));
+  const [mealType, setMealType] = useState(initialMealType);
+  const [mealDateTime, setMealDateTime] = useState(mealTime || format(new Date(), 'HH:mm'));
   const [notes, setNotes] = useState('');
   const [addedFoods, setAddedFoods] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Estado de busca de alimentos
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,6 +62,13 @@ export default function AddMealPage() {
     loadHouseholdMeasures();
   }, []);
 
+  // Carregar dados da refeição existente se estiver em modo de edição
+  useEffect(() => {
+    if (editMode && mealId) {
+      loadExistingMeal();
+    }
+  }, [editMode, mealId]);
+
   const loadHouseholdMeasures = async () => {
     const { data } = await supabase
       .from('household_measures')
@@ -65,6 +76,62 @@ export default function AddMealPage() {
       .order('name');
 
     setHouseholdMeasures(data || []);
+  };
+
+  const loadExistingMeal = async () => {
+    setLoading(true);
+    try {
+      // Buscar dados da refeição
+      const { data: mealData, error: mealError } = await supabase
+        .from('meals')
+        .select('*')
+        .eq('id', mealId)
+        .single();
+
+      if (mealError) throw mealError;
+
+      // Buscar itens da refeição
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('meal_items')
+        .select('*')
+        .eq('meal_id', mealId);
+
+      if (itemsError) throw itemsError;
+
+      // Preencher estados com dados existentes
+      setMealType(mealData.meal_type);
+      setMealDateTime(mealData.meal_time || format(new Date(), 'HH:mm'));
+      setNotes(mealData.notes || '');
+
+      // Transformar meal_items para o formato addedFoods
+      const foods = itemsData.map((item, index) => ({
+        id: item.id || Date.now() + index,
+        food_id: item.food_id,
+        food_name: item.name,
+        quantity: item.quantity,
+        unit: 'g', // default
+        measure_type: 'direct',
+        base_calories: item.calories / (item.quantity / 100),
+        base_protein: item.protein / (item.quantity / 100),
+        base_carbs: item.carbs / (item.quantity / 100),
+        base_fat: item.fat / (item.quantity / 100),
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat
+      }));
+
+      setAddedFoods(foods);
+    } catch (error) {
+      console.error('Erro ao carregar refeição:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os dados da refeição',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Buscar alimentos
@@ -209,47 +276,99 @@ export default function AddMealPage() {
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
 
-      // Criar refeição
-      const { data: meal, error: mealError } = await supabase
-        .from('meals')
-        .insert({
-          patient_id: user.id,
-          meal_type: mealType,
-          meal_date: today,
-          meal_time: mealDateTime,
-          notes: notes,
-          total_calories: totals.calories,
-          total_protein: totals.protein,
-          total_carbs: totals.carbs,
-          total_fat: totals.fat
-        })
-        .select()
-        .single();
+      if (editMode && mealId) {
+        // MODO DE EDIÇÃO - Atualizar refeição existente
 
-      if (mealError) throw mealError;
+        // Atualizar dados da refeição
+        const { error: mealError } = await supabase
+          .from('meals')
+          .update({
+            meal_type: mealType,
+            meal_time: mealDateTime,
+            notes: notes,
+            total_calories: totals.calories,
+            total_protein: totals.protein,
+            total_carbs: totals.carbs,
+            total_fat: totals.fat
+          })
+          .eq('id', mealId);
 
-      // Adicionar itens da refeição
-      const mealItems = addedFoods.map(food => ({
-        meal_id: meal.id,
-        food_id: food.food_id,
-        name: food.food_name,
-        quantity: parseFloat(food.quantity) || 0,
-        calories: parseFloat(food.calories) || 0,
-        protein: parseFloat(food.protein) || 0,
-        carbs: parseFloat(food.carbs) || 0,
-        fat: parseFloat(food.fat) || 0
-      }));
+        if (mealError) throw mealError;
 
-      const { error: itemsError } = await supabase
-        .from('meal_items')
-        .insert(mealItems);
+        // Deletar itens antigos
+        const { error: deleteError } = await supabase
+          .from('meal_items')
+          .delete()
+          .eq('meal_id', mealId);
 
-      if (itemsError) throw itemsError;
+        if (deleteError) throw deleteError;
 
-      toast({
-        title: 'Sucesso!',
-        description: 'Refeição registrada com sucesso'
-      });
+        // Inserir novos itens
+        const mealItems = addedFoods.map(food => ({
+          meal_id: mealId,
+          food_id: food.food_id,
+          name: food.food_name,
+          quantity: parseFloat(food.quantity) || 0,
+          calories: parseFloat(food.calories) || 0,
+          protein: parseFloat(food.protein) || 0,
+          carbs: parseFloat(food.carbs) || 0,
+          fat: parseFloat(food.fat) || 0
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('meal_items')
+          .insert(mealItems);
+
+        if (itemsError) throw itemsError;
+
+        toast({
+          title: 'Sucesso!',
+          description: 'Refeição atualizada com sucesso'
+        });
+      } else {
+        // MODO DE CRIAÇÃO - Criar nova refeição
+
+        const { data: meal, error: mealError } = await supabase
+          .from('meals')
+          .insert({
+            patient_id: user.id,
+            meal_type: mealType,
+            meal_date: today,
+            meal_time: mealDateTime,
+            notes: notes,
+            total_calories: totals.calories,
+            total_protein: totals.protein,
+            total_carbs: totals.carbs,
+            total_fat: totals.fat
+          })
+          .select()
+          .single();
+
+        if (mealError) throw mealError;
+
+        // Adicionar itens da refeição
+        const mealItems = addedFoods.map(food => ({
+          meal_id: meal.id,
+          food_id: food.food_id,
+          name: food.food_name,
+          quantity: parseFloat(food.quantity) || 0,
+          calories: parseFloat(food.calories) || 0,
+          protein: parseFloat(food.protein) || 0,
+          carbs: parseFloat(food.carbs) || 0,
+          fat: parseFloat(food.fat) || 0
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('meal_items')
+          .insert(mealItems);
+
+        if (itemsError) throw itemsError;
+
+        toast({
+          title: 'Sucesso!',
+          description: 'Refeição registrada com sucesso'
+        });
+      }
 
       navigate('/patient/diario');
     } catch (error) {
@@ -264,7 +383,19 @@ export default function AddMealPage() {
     }
   };
 
-  if (!mealType) {
+  // Loading state para modo de edição
+  if (editMode && loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-muted-foreground">Carregando dados da refeição...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Validação de mealType
+  if (!mealType && !editMode) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -291,10 +422,10 @@ export default function AddMealPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-foreground">
-              Registrar {translateMealType(mealType)}
+              {editMode ? 'Editar' : 'Registrar'} {translateMealType(mealType)}
             </h1>
             <p className="text-muted-foreground mt-1">
-              Adicione os alimentos consumidos
+              {editMode ? 'Atualize os alimentos da refeição' : 'Adicione os alimentos consumidos'}
             </p>
           </div>
         </div>
@@ -559,11 +690,11 @@ export default function AddMealPage() {
                   disabled={saving || addedFoods.length === 0}
                 >
                   {saving ? (
-                    <>Salvando...</>
+                    <>{editMode ? 'Atualizando...' : 'Salvando...'}</>
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-2" />
-                      Salvar Refeição
+                      {editMode ? 'Atualizar Refeição' : 'Salvar Refeição'}
                     </>
                   )}
                 </Button>
