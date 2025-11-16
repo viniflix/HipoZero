@@ -34,10 +34,9 @@ ON meal_audit_log
 FOR SELECT
 USING (
     EXISTS (
-        SELECT 1 FROM patient_nutritionist_assignments
-        WHERE patient_id = meal_audit_log.patient_id
+        SELECT 1 FROM user_profiles
+        WHERE id = meal_audit_log.patient_id
         AND nutritionist_id = auth.uid()
-        AND status = 'active'
     )
 );
 
