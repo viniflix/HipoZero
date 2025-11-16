@@ -3,14 +3,16 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, Plus, Utensils, Trash2 } from 'lucide-react';
+import { CalendarDays, Plus, Utensils, Trash2, MoreHorizontal } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/hooks/use-toast';
+import { translateMealType } from '@/utils/mealTranslations';
 
 /**
  * PatientDiaryPage - Aba 2: Diário
@@ -28,16 +30,48 @@ export default function PatientDiaryPage() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [meals, setMeals] = useState([]);
+  const [mealPlan, setMealPlan] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const mealTypes = [
-    'Café da Manhã',
-    'Lanche da Manhã',
-    'Almoço',
-    'Lanche da Tarde',
-    'Jantar',
-    'Ceia'
+  // Todos os tipos possíveis (para modal)
+  const ALL_MEAL_TYPES = [
+    { key: 'breakfast', label: 'Café da Manhã' },
+    { key: 'morning_snack', label: 'Lanche da Manhã' },
+    { key: 'lunch', label: 'Almoço' },
+    { key: 'afternoon_snack', label: 'Lanche da Tarde' },
+    { key: 'dinner', label: 'Jantar' },
+    { key: 'supper', label: 'Ceia' }
   ];
+
+  // Tipos filtrados pelo plano do paciente
+  const planMealTypes = mealPlan?.meal_plan_meals?.map(m => m.meal_type) || [];
+
+  const loadMealPlan = useCallback(async () => {
+    if (!user) return;
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+    const { data: mealPlanData } = await supabase
+      .from('meal_plans')
+      .select(`
+        *,
+        meal_plan_meals (
+          *,
+          meal_plan_foods (
+            *,
+            foods (id, name)
+          )
+        )
+      `)
+      .eq('patient_id', user.id)
+      .eq('is_active', true)
+      .lte('start_date', todayStr)
+      .or(`end_date.is.null,end_date.gte.${todayStr}`)
+      .maybeSingle();
+
+    setMealPlan(mealPlanData);
+  }, [user]);
 
   const loadMeals = useCallback(async () => {
     if (!user) return;
@@ -77,6 +111,10 @@ export default function PatientDiaryPage() {
   }, [user, selectedDate, toast]);
 
   useEffect(() => {
+    loadMealPlan();
+  }, [loadMealPlan]);
+
+  useEffect(() => {
     loadMeals();
   }, [loadMeals]);
 
@@ -91,8 +129,11 @@ export default function PatientDiaryPage() {
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
 
-  // Agrupar refeições por tipo
-  const mealsByType = mealTypes.reduce((acc, type) => {
+  // Agrupar refeições por tipo (apenas as do plano + outras registradas)
+  const registeredMealTypes = [...new Set(meals.map(m => m.meal_type))];
+  const displayMealTypes = [...new Set([...planMealTypes, ...registeredMealTypes])];
+
+  const mealsByType = displayMealTypes.reduce((acc, type) => {
     acc[type] = meals.filter((meal) => meal.meal_type === type);
     return acc;
   }, {});
@@ -117,19 +158,19 @@ export default function PatientDiaryPage() {
     }
   };
 
-  const handleAddFood = (mealType) => {
-    // Criar nova refeição ou editar existente
-    const existingMeal = mealsByType[mealType]?.[0];
-    if (existingMeal) {
-      navigate(`/patient/add-food/${existingMeal.id}`);
-    } else {
-      navigate('/patient/add-food', {
-        state: {
-          mealType,
-          mealDate: format(selectedDate, 'yyyy-MM-dd')
-        }
-      });
-    }
+  const handleAddMeal = (mealType) => {
+    // Buscar dados da refeição do plano (se existir)
+    const planMeal = mealPlan?.meal_plan_meals?.find(m => m.meal_type === mealType);
+
+    navigate('/patient/add-meal', {
+      state: {
+        mealType,
+        mealTime: planMeal?.meal_time || format(new Date(), 'HH:mm'),
+        mealName: planMeal?.name || '',
+        recommendedFoods: planMeal?.meal_plan_foods || []
+      }
+    });
+    setModalOpen(false);
   };
 
   return (
@@ -217,7 +258,7 @@ export default function PatientDiaryPage() {
 
         {/* Lista de Refeições por Tipo */}
         <div className="space-y-4">
-          {mealTypes.map((mealType, index) => {
+          {displayMealTypes.map((mealType, index) => {
             const mealsOfType = mealsByType[mealType] || [];
             const hasMeals = mealsOfType.length > 0;
 
@@ -233,16 +274,16 @@ export default function PatientDiaryPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Utensils className="w-5 h-5 text-primary" />
-                        <CardTitle className="text-base">{mealType}</CardTitle>
+                        <CardTitle className="text-base">{translateMealType(mealType)}</CardTitle>
                       </div>
                       <Button
                         size="sm"
                         className={hasMeals ? '' : 'bg-primary hover:bg-primary/90'}
                         variant={hasMeals ? 'outline' : 'default'}
-                        onClick={() => handleAddFood(mealType)}
+                        onClick={() => handleAddMeal(mealType)}
                       >
                         <Plus className="w-4 h-4 mr-1" />
-                        {hasMeals ? 'Adicionar mais' : 'Adicionar'}
+                        {hasMeals ? 'Adicionar mais' : 'Registrar'}
                       </Button>
                     </div>
                   </CardHeader>
@@ -316,6 +357,37 @@ export default function PatientDiaryPage() {
             );
           })}
         </div>
+
+        {/* Botão: Registrar Outra Refeição */}
+        <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="w-full">
+              <MoreHorizontal className="w-4 h-4 mr-2" />
+              Registrar Outra Refeição
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Escolha o Tipo de Refeição</DialogTitle>
+              <DialogDescription>
+                Selecione qual refeição deseja registrar
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 gap-2 py-4">
+              {ALL_MEAL_TYPES.map((mealType) => (
+                <Button
+                  key={mealType.key}
+                  variant="outline"
+                  className="justify-start"
+                  onClick={() => handleAddMeal(mealType.key)}
+                >
+                  <Utensils className="w-4 h-4 mr-2" />
+                  {mealType.label}
+                </Button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
 
       </div>
 
