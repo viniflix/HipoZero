@@ -188,9 +188,9 @@ export default function PatientProgressPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-patient-primary/5 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white">
       {/* Header fixo */}
-      <div className="bg-gradient-to-r from-patient-primary to-patient-primary/80 text-white sticky top-0 z-10 shadow-md">
+      <div className="bg-gradient-to-r from-primary to-primary/80 text-white sticky top-0 z-10 shadow-md">
         <div className="px-4 py-4">
           <h1 className="text-2xl font-bold">Meu Progresso</h1>
           <p className="text-sm text-white/90 mt-1">
@@ -393,7 +393,7 @@ export default function PatientProgressPage() {
         <DialogTrigger asChild>
           <Button
             size="lg"
-            className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-lg z-40 bg-patient-primary hover:bg-patient-primary/90"
+            className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-lg z-40 bg-primary hover:bg-primary/90"
           >
             <Plus className="h-6 w-6" />
           </Button>

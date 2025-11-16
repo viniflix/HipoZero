@@ -133,9 +133,9 @@ export default function PatientDiaryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-patient-secondary/5 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white">
       {/* Header fixo */}
-      <div className="bg-gradient-to-r from-patient-secondary to-patient-secondary/80 text-white sticky top-0 z-10 shadow-md">
+      <div className="bg-gradient-to-r from-primary to-primary/80 text-white sticky top-0 z-10 shadow-md">
         <div className="px-4 py-4">
           <h1 className="text-2xl font-bold">Diário Alimentar</h1>
           <p className="text-sm text-white/90 mt-1">
@@ -240,7 +240,7 @@ export default function PatientDiaryPage() {
                       </div>
                       <Button
                         size="sm"
-                        className={hasMeals ? '' : 'bg-patient-secondary hover:bg-patient-secondary/90'}
+                        className={hasMeals ? '' : 'bg-primary hover:bg-primary/90'}
                         variant={hasMeals ? 'outline' : 'default'}
                         onClick={() => handleAddFood(mealType)}
                       >

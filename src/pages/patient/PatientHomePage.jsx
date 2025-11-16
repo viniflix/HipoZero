@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { LineChart, BookMarked, UtensilsCrossed, CalendarClock } from 'lucide-react';
+import { BookMarked, UtensilsCrossed, CalendarClock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,12 +13,6 @@ import PatientMetricsWidget from '@/components/patient/PatientMetricsWidget';
 
 /**
  * PatientHomePage - Aba 1: Início
- *
- * Visão do Dia do Paciente:
- * - Header de boas-vindas personalizado
- * - Card do Plano Alimentar de Hoje
- * - Cards de atalho para Progresso e Diário
- * - Lembrete de próxima consulta
  */
 export default function PatientHomePage() {
   const { user } = useAuth();
@@ -35,7 +29,7 @@ export default function PatientHomePage() {
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
 
-    // 1. Buscar prescrição ativa com meal plan
+    // 1. Buscar prescrição ativa com meal plan (CORRIGIDO)
     const { data: presData, error: presError } = await supabase
       .from('prescriptions')
       .select('*')
@@ -95,18 +89,18 @@ export default function PatientHomePage() {
   const firstName = user?.profile?.name?.split(' ')[0] || 'Paciente';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-patient-primary/5 via-white to-patient-secondary/5">
+    <div className="min-h-screen bg-slate-50">
       {/* Header com saudação */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-patient-primary to-patient-primary/80 text-white sticky top-0 z-10 shadow-md"
+        className="bg-white border-b sticky top-0 z-10"
       >
         <div className="px-4 py-6">
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl font-bold text-foreground">
             Olá, {firstName}! 👋
           </h1>
-          <p className="text-sm text-white/90 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
           </p>
         </div>
@@ -120,17 +114,17 @@ export default function PatientHomePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card className="bg-accent/10 border-accent/20">
+            <Card className="bg-blue-50 border-blue-200">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
-                  <CalendarClock className="w-5 h-5 text-accent" />
-                  <CardTitle className="text-lg text-accent">
+                  <CalendarClock className="w-5 h-5 text-blue-600" />
+                  <CardTitle className="text-lg text-blue-900">
                     Próxima Consulta
                   </CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm font-medium">
+                <p className="text-sm font-medium text-blue-900">
                   {format(
                     new Date(nextAppointment.appointment_time),
                     "dd 'de' MMMM 'às' HH:mm",
@@ -148,7 +142,7 @@ export default function PatientHomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <Card className="shadow-sm">
+          <Card className="shadow-sm bg-white">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -178,7 +172,7 @@ export default function PatientHomePage() {
           </Card>
         </motion.div>
 
-        {/* Widget de Métricas (substitui card de Progresso) */}
+        {/* Widget de Métricas */}
         <PatientMetricsWidget />
 
         {/* Card de Atalho: Diário Alimentar */}
@@ -188,18 +182,18 @@ export default function PatientHomePage() {
           transition={{ delay: 0.4 }}
         >
           <Card
-            className="cursor-pointer hover:shadow-md transition-all duration-200 bg-white border-patient-secondary/20"
+            className="cursor-pointer hover:shadow-md transition-all duration-200 bg-white"
             onClick={() => navigate('/patient/diario')}
           >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <BookMarked className="w-5 h-5 text-patient-secondary" />
+                  <BookMarked className="w-5 h-5 text-primary" />
                   <CardTitle className="text-base">Diário Alimentar</CardTitle>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                   todayMealsCount > 0
-                    ? 'bg-patient-secondary/10 text-patient-secondary'
+                    ? 'bg-primary/10 text-primary'
                     : 'bg-gray-100 text-gray-500'
                 }`}>
                   {todayMealsCount > 0
@@ -216,7 +210,7 @@ export default function PatientHomePage() {
               </p>
               <Button
                 size="sm"
-                className="w-full bg-patient-secondary hover:bg-patient-secondary/90"
+                className="w-full"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate('/patient/diario');

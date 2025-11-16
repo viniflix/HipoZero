@@ -338,7 +338,7 @@ const ChatPage = () => {
   if (!recipient) return <div className="flex items-center justify-center h-screen p-4 text-center text-muted-foreground">Você não tem um {user.profile.user_type === 'patient' ? 'nutricionista' : 'paciente'} associado.</div>;
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-white">
+    <div className="flex flex-col h-full bg-slate-50">
       {/* --- MUDANÇA NA CHAMADA DO MODAL --- */}
       <ImageModal
         mediaPath={modalMedia.path}
@@ -347,27 +347,27 @@ const ChatPage = () => {
       />
 
       {/* Header fixo */}
-      <header className="flex-shrink-0 bg-gradient-to-r from-patient-primary to-patient-primary/80 text-white p-4 flex items-center shadow-md z-20">
-        <Button variant="ghost" size="icon" onClick={handleBack} className="mr-2 text-white hover:bg-white/20">
+      <header className="flex-shrink-0 bg-white border-b p-4 flex items-center shadow-md z-20">
+        <Button variant="ghost" size="icon" onClick={handleBack} className="mr-2 ">
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <div className="w-10 h-10 bg-white/20 rounded-full mr-3 flex items-center justify-center font-bold overflow-hidden">
+        <div className="w-10 h-10 bg-primary/10 rounded-full mr-3 flex items-center justify-center font-bold overflow-hidden">
           {recipient.avatar_url ? (
             <img src={recipient.avatar_url} alt={recipient.name} className="w-full h-full object-cover" />
           ) : (
-            <UserIcon className="w-6 h-6 text-white" />
+            <UserIcon className="w-6 h-6 text-primary" />
           )}
         </div>
         <div>
-          <h2 className="font-semibold text-white">{recipient.name}</h2>
-          <p className="text-xs text-white/80">
+          <h2 className="font-semibold text-foreground">{recipient.name}</h2>
+          <p className="text-xs text-muted-foreground">
             {recipient.user_type === 'nutritionist' ? 'Nutricionista' : 'Paciente'}
           </p>
         </div>
       </header>
 
       {/* Main com scroll */}
-      <main className="flex-1 overflow-y-auto p-4 space-y-2 bg-gradient-to-b from-patient-primary/5 to-white">
+      <main className="flex-1 overflow-y-auto p-4 space-y-2 ">
         {Object.entries(groupedMessages).map(([date, msgs]) => (
           <Fragment key={date}>
             <DateSeparator date={date} />
@@ -461,7 +461,7 @@ const ChatPage = () => {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Digite sua mensagem..."
-              className="flex-1 bg-slate-50 border-gray-200 focus:border-patient-primary"
+              className="flex-1 bg-slate-50 border-gray-200 focus:border-primary focus:ring-primary"
               autoComplete="off"
               disabled={isSending}
             />
@@ -481,7 +481,7 @@ const ChatPage = () => {
               type="submit"
               size="icon"
               disabled={isSending || (newMessage.trim() === '' && !mediaFile)}
-              className="bg-patient-primary hover:bg-patient-primary/90"
+              className=""
             >
               {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             </Button>

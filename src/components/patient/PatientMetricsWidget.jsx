@@ -103,10 +103,10 @@ export default function PatientMetricsWidget() {
       onClick={() => navigate('/patient/progresso')}
       className="cursor-pointer"
     >
-      <Card className="shadow-sm hover:shadow-md transition-all duration-200 bg-gradient-to-br from-patient-primary/5 to-patient-primary/10 border-patient-primary/20">
+      <Card className="shadow-sm hover:shadow-md transition-all duration-200 bg-white border-primary/20">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg text-patient-primary flex items-center gap-2">
+            <CardTitle className="text-lg text-primary flex items-center gap-2">
               <Activity className="w-5 h-5" />
               Meus Indicadores
             </CardTitle>
@@ -118,11 +118,11 @@ export default function PatientMetricsWidget() {
         <CardContent>
           <div className="grid grid-cols-2 gap-4">
             {/* Métrica: Peso */}
-            <div className="flex flex-col items-center justify-center p-4 bg-white/80 rounded-lg backdrop-blur-sm">
-              <Scale className="w-6 h-6 text-patient-primary mb-2" />
+            <div className="flex flex-col items-center justify-center p-4 bg-primary/5 rounded-lg">
+              <Scale className="w-6 h-6 text-primary mb-2" />
               {latestWeight ? (
                 <>
-                  <p className="text-2xl font-bold text-patient-primary">
+                  <p className="text-2xl font-bold text-primary">
                     {latestWeight.weight}
                     <span className="text-sm font-normal ml-1">kg</span>
                   </p>
@@ -141,11 +141,11 @@ export default function PatientMetricsWidget() {
             </div>
 
             {/* Métrica: Glicemia */}
-            <div className="flex flex-col items-center justify-center p-4 bg-white/80 rounded-lg backdrop-blur-sm">
-              <Droplet className="w-6 h-6 text-patient-secondary mb-2" />
+            <div className="flex flex-col items-center justify-center p-4 bg-secondary/5 rounded-lg">
+              <Droplet className="w-6 h-6 text-secondary mb-2" />
               {latestGlycemia ? (
                 <>
-                  <p className="text-2xl font-bold text-patient-secondary">
+                  <p className="text-2xl font-bold text-secondary">
                     {latestGlycemia.glycemia_value}
                     <span className="text-sm font-normal ml-1">mg/dL</span>
                   </p>
@@ -165,7 +165,7 @@ export default function PatientMetricsWidget() {
           </div>
 
           <div className="mt-4 text-center">
-            <p className="text-xs text-patient-primary font-medium">
+            <p className="text-xs text-primary font-medium">
               Toque para ver todos os gráficos →
             </p>
           </div>
