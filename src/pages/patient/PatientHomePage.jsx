@@ -29,31 +29,29 @@ export default function PatientHomePage() {
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
 
-    // 1. Buscar prescrição ativa com meal plan
-    const { data: presData, error: presError } = await supabase
-      .from('prescriptions')
-      .select('*')
+    // 1. Buscar plano alimentar ativo do paciente
+    const { data: mealPlanData, error: mealPlanError } = await supabase
+      .from('meal_plans')
+      .select(`
+        *,
+        meal_plan_meals (
+          *,
+          meal_plan_foods (
+            *,
+            foods (id, name)
+          )
+        )
+      `)
       .eq('patient_id', user.id)
+      .eq('is_active', true)
       .lte('start_date', todayStr)
-      .gte('end_date', todayStr)
+      .or(`end_date.is.null,end_date.gte.${todayStr}`)
       .maybeSingle();
 
-    console.log('Prescription data:', presData); // Debug
+    console.log('Meal plan data:', mealPlanData); // Debug
+    console.log('Meal plan error:', mealPlanError); // Debug
 
-    if (!presError && presData?.template_id) {
-      // Buscar itens do template com alimentos
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('meal_plan_template_items')
-        .select('*, foods(id, name)')
-        .eq('template_id', presData.template_id);
-
-      console.log('Meal plan items:', itemsData); // Debug
-      console.log('Items error:', itemsError); // Debug
-
-      setPrescription({ ...presData, meal_plan_items: itemsData || [] });
-    } else {
-      setPrescription(presData);
-    }
+    setPrescription(mealPlanData);
 
     // 2. Buscar próxima consulta
     const { data: apptData } = await supabase
@@ -162,8 +160,8 @@ export default function PatientHomePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {prescription?.meal_plan_items && prescription.meal_plan_items.length > 0 ? (
-                    <MealPlanView mealPlanItems={prescription.meal_plan_items} />
+                  {prescription?.meal_plan_meals && prescription.meal_plan_meals.length > 0 ? (
+                    <MealPlanView mealPlanItems={prescription.meal_plan_meals} />
                   ) : (
                     <div className="text-center py-8">
                       <UtensilsCrossed className="mx-auto h-12 w-12 text-muted-foreground mb-3" />

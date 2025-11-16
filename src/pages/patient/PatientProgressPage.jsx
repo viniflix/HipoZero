@@ -69,37 +69,16 @@ export default function PatientProgressPage() {
 
     setWeightData(weightRecords || []);
 
-    // 2. Buscar meta de peso da prescrição ativa
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const { data: prescription } = await supabase
-      .from('prescriptions')
-      .select('goal_weight')
-      .eq('patient_id', user.id)
-      .lte('start_date', todayStr)
-      .gte('end_date', todayStr)
-      .maybeSingle();
+    // 2. Meta de peso - por enquanto null (precisa ser adicionada ao growth_records ou meal_plans)
+    setGoalWeight(null);
 
-    setGoalWeight(prescription?.goal_weight || null);
+    // 3. Glicemia - tabela não existe ainda
+    setGlycemiaData([]);
 
-    // 3. Buscar registros de glicemia
-    const { data: glycemiaRecords } = await supabase
-      .from('glycemia_records')
-      .select('*')
-      .eq('patient_id', user.id)
-      .order('record_date', { ascending: true });
+    // 4. Fotos de progresso - tabela não existe ainda
+    setPhotosData([]);
 
-    setGlycemiaData(glycemiaRecords || []);
-
-    // 4. Buscar fotos de progresso
-    const { data: photos } = await supabase
-      .from('progress_photos')
-      .select('*')
-      .eq('patient_id', user.id)
-      .order('photo_date', { ascending: false });
-
-    setPhotosData(photos || []);
-
-    // 5. Buscar medidas (usando growth_records para IMC, etc)
+    // 5. Medidas (usando growth_records para IMC, etc)
     setMeasurementsData(weightRecords || []);
 
     setLoading(false);

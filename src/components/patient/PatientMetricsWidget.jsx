@@ -51,17 +51,9 @@ export default function PatientMetricsWidget() {
         }
       }
 
-      // Buscar última glicemia
-      const { data: glycemiaData } = await supabase
-        .from('glycemia_records')
-        .select('glycemia_value, record_date')
-        .eq('patient_id', user.id)
-        .order('record_date', { ascending: false })
-        .limit(1);
-
-      if (glycemiaData && glycemiaData.length > 0) {
-        setLatestGlycemia(glycemiaData[0]);
-      }
+      // Buscar última glicemia - tabela não existe ainda
+      // TODO: Criar tabela glycemia_records
+      setLatestGlycemia(null);
 
       setLoading(false);
     };
@@ -71,10 +63,10 @@ export default function PatientMetricsWidget() {
 
   if (loading) {
     return (
-      <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-gradient-to-br from-patient-primary/5 to-patient-primary/10">
+      <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-gradient-to-br from-primary/5 to-primary/10">
         <CardContent className="pt-6">
           <div className="flex items-center justify-center h-32">
-            <Activity className="w-8 h-8 text-patient-primary animate-pulse" />
+            <Activity className="w-8 h-8 text-primary animate-pulse" />
           </div>
         </CardContent>
       </Card>
