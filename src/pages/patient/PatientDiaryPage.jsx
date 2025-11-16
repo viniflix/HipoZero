@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +34,7 @@ export default function PatientDiaryPage() {
   const [mealPlan, setMealPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [mealToDelete, setMealToDelete] = useState(null);
 
   // Todos os tipos possíveis (para modal)
   const ALL_MEAL_TYPES = [
@@ -138,10 +140,10 @@ export default function PatientDiaryPage() {
     return acc;
   }, {});
 
-  const handleDeleteMeal = async (mealId) => {
-    if (!confirm('Deseja realmente excluir esta refeição?')) return;
+  const handleDeleteMeal = async () => {
+    if (!mealToDelete) return;
 
-    const { error } = await supabase.from('meals').delete().eq('id', mealId);
+    const { error } = await supabase.from('meals').delete().eq('id', mealToDelete);
 
     if (error) {
       toast({
@@ -156,6 +158,7 @@ export default function PatientDiaryPage() {
       });
       loadMeals();
     }
+    setMealToDelete(null);
   };
 
   const handleAddMeal = (mealType) => {
@@ -309,7 +312,7 @@ export default function PatientDiaryPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleDeleteMeal(meal.id)}
+                                onClick={() => setMealToDelete(meal.id)}
                                 className="text-destructive hover:text-destructive"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -390,6 +393,24 @@ export default function PatientDiaryPage() {
         </Dialog>
 
       </div>
+
+      {/* AlertDialog de Confirmação de Exclusão */}
+      <AlertDialog open={!!mealToDelete} onOpenChange={() => setMealToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Refeição</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente excluir esta refeição? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteMeal} className="bg-destructive hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Loading Overlay */}
       {loading && (

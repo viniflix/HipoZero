@@ -92,13 +92,22 @@ export default function AddMealPage() {
 
   // Adicionar alimento recomendado
   const handleAddRecommended = (recommendedFood) => {
+    const qty = parseFloat(recommendedFood.quantity) || 100;
+    const multiplier = qty / 100; // Base 100g
+
     const newFood = {
       id: Date.now(),
       food_id: recommendedFood.foods.id,
       food_name: recommendedFood.foods.name,
-      quantity: recommendedFood.quantity,
-      unit: recommendedFood.unit,
+      quantity: qty,
+      unit: recommendedFood.unit || 'g',
       measure_type: 'direct',
+      // Valores base (assumindo que vêm por 100g)
+      base_calories: (recommendedFood.calories || 0) / multiplier,
+      base_protein: (recommendedFood.protein || 0) / multiplier,
+      base_carbs: (recommendedFood.carbs || 0) / multiplier,
+      base_fat: (recommendedFood.fat || 0) / multiplier,
+      // Valores calculados para a quantidade recomendada
       calories: recommendedFood.calories || 0,
       protein: recommendedFood.protein || 0,
       carbs: recommendedFood.carbs || 0,
@@ -108,18 +117,42 @@ export default function AddMealPage() {
   };
 
   // Adicionar alimento da busca
-  const handleAddFood = (food) => {
+  const handleAddFood = async (food) => {
+    // Buscar nutrientes completos do alimento
+    const { data: foodData } = await supabase
+      .from('foods')
+      .select('*')
+      .eq('id', food.id)
+      .single();
+
+    if (!foodData) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os dados do alimento',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Calcular nutrientes para 100g (base)
+    const baseQuantity = 100;
     const newFood = {
       id: Date.now(),
-      food_id: food.id,
-      food_name: food.name,
-      quantity: 100,
+      food_id: foodData.id,
+      food_name: foodData.name,
+      quantity: baseQuantity,
       unit: 'g',
       measure_type: 'direct',
-      calories: (food.calories || 0) * 1, // Calculado baseado na quantidade
-      protein: (food.protein || 0) * 1,
-      carbs: (food.carbs || 0) * 1,
-      fat: (food.fat || 0) * 1
+      // Nutrientes já vêm na base de 100g na tabela foods
+      base_calories: foodData.calories || 0,
+      base_protein: foodData.protein || 0,
+      base_carbs: foodData.carbs || 0,
+      base_fat: foodData.fat || 0,
+      // Calculados para a quantidade
+      calories: foodData.calories || 0,
+      protein: foodData.protein || 0,
+      carbs: foodData.carbs || 0,
+      fat: foodData.fat || 0
     };
     setAddedFoods(prev => [...prev, newFood]);
     setSearchTerm('');
@@ -133,12 +166,12 @@ export default function AddMealPage() {
         const updated = { ...food, [field]: value };
 
         // Recalcular nutrientes se mudou quantidade
-        if (field === 'quantity' && value) {
-          const multiplier = parseFloat(value) / 100; // Assumindo base 100g
-          updated.calories = (food.calories / (food.quantity / 100)) * multiplier;
-          updated.protein = (food.protein / (food.quantity / 100)) * multiplier;
-          updated.carbs = (food.carbs / (food.quantity / 100)) * multiplier;
-          updated.fat = (food.fat / (food.quantity / 100)) * multiplier;
+        if (field === 'quantity' && value && food.base_calories !== undefined) {
+          const multiplier = parseFloat(value) / 100; // Base 100g
+          updated.calories = food.base_calories * multiplier;
+          updated.protein = food.base_protein * multiplier;
+          updated.carbs = food.base_carbs * multiplier;
+          updated.fat = food.base_fat * multiplier;
         }
 
         return updated;
@@ -199,8 +232,12 @@ export default function AddMealPage() {
       const mealItems = addedFoods.map(food => ({
         meal_id: meal.id,
         food_id: food.food_id,
-        quantity: food.quantity,
-        unit: food.unit
+        name: food.food_name,
+        quantity: parseFloat(food.quantity) || 0,
+        calories: parseFloat(food.calories) || 0,
+        protein: parseFloat(food.protein) || 0,
+        carbs: parseFloat(food.carbs) || 0,
+        fat: parseFloat(food.fat) || 0
       }));
 
       const { error: itemsError } = await supabase
