@@ -171,27 +171,63 @@ export default function AddMealPage() {
   }, [searchTerm, handleSearchFoods]);
 
   // Adicionar alimento recomendado
-  const handleAddRecommended = (recommendedFood) => {
+  const handleAddRecommended = async (recommendedFood) => {
+    // Buscar dados completos do alimento
+    const { data: foodData } = await supabase
+      .from('foods')
+      .select('*')
+      .eq('id', recommendedFood.foods.id)
+      .single();
+
+    if (!foodData) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os dados do alimento',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     const qty = parseFloat(recommendedFood.quantity) || 100;
-    const multiplier = qty / 100; // Base 100g
+
+    // Normalizar unidade para os valores aceitos pelo Select
+    let unit = recommendedFood.unit || 'g';
+    const unitLower = unit.toLowerCase().trim();
+
+    // Mapear variações para valores padronizados
+    if (unitLower.includes('gram') || unitLower === 'g') {
+      unit = 'g';
+    } else if (unitLower.includes('ml') || unitLower.includes('mililitr')) {
+      unit = 'ml';
+    } else if (unitLower.includes('unid')) {
+      unit = 'unit';
+    }
+
+    // Calcular nutrientes baseado na quantidade e unidade do plano
+    let multiplier;
+    if (unit === 'unit') {
+      multiplier = qty; // Para unidades, multiplicar diretamente
+    } else {
+      multiplier = qty / 100; // Para g/ml, base é per 100g
+    }
 
     const newFood = {
       id: Date.now(),
-      food_id: recommendedFood.foods.id,
-      food_name: recommendedFood.foods.name,
+      food_id: foodData.id,
+      food_name: foodData.name,
       quantity: qty,
-      unit: recommendedFood.unit || 'g',
+      unit: unit,
       measure_type: 'direct',
-      // Valores base (assumindo que vêm por 100g)
-      base_calories: (recommendedFood.calories || 0) / multiplier,
-      base_protein: (recommendedFood.protein || 0) / multiplier,
-      base_carbs: (recommendedFood.carbs || 0) / multiplier,
-      base_fat: (recommendedFood.fat || 0) / multiplier,
+      // Valores base (per 100g da tabela foods)
+      base_calories: foodData.calories || 0,
+      base_protein: foodData.protein || 0,
+      base_carbs: foodData.carbs || 0,
+      base_fat: foodData.fat || 0,
       // Valores calculados para a quantidade recomendada
-      calories: recommendedFood.calories || 0,
-      protein: recommendedFood.protein || 0,
-      carbs: recommendedFood.carbs || 0,
-      fat: recommendedFood.fat || 0
+      calories: (foodData.calories || 0) * multiplier,
+      protein: (foodData.protein || 0) * multiplier,
+      carbs: (foodData.carbs || 0) * multiplier,
+      fat: (foodData.fat || 0) * multiplier
     };
     setAddedFoods(prev => [...prev, newFood]);
   };
@@ -599,11 +635,11 @@ export default function AddMealPage() {
                           <div>
                             <Label>Unidade</Label>
                             <Select
-                              value={food.unit}
+                              value={food.unit || 'g'}
                               onValueChange={(value) => handleUpdateFood(food.id, 'unit', value)}
                             >
                               <SelectTrigger>
-                                <SelectValue />
+                                <SelectValue placeholder="Selecione..." />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="g">Gramas (g)</SelectItem>
