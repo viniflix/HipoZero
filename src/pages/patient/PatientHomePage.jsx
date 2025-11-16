@@ -148,15 +148,45 @@ export default function PatientHomePage() {
           </p>
         </div>
 
+        {/* Lembrete de Consulta - SEMPRE PRIMEIRO (TOPO) */}
+        {nextAppointment && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mb-6"
+          >
+            <Card className="bg-blue-50 border-blue-200 shadow-card">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="w-5 h-5 text-blue-600" />
+                  <CardTitle className="text-lg text-blue-900">
+                    Próxima Consulta
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm font-medium text-blue-900">
+                  {format(
+                    new Date(nextAppointment.appointment_time),
+                    "dd 'de' MMMM 'às' HH:mm",
+                    { locale: ptBR }
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Coluna Principal */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Card de Progresso Diário */}
+            {/* 1. Card de Progresso Diário */}
             {prescriptionGoal && currentProgress && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
+                transition={{ delay: 0.2 }}
               >
                 <DailyAdherenceCard
                   goal={prescriptionGoal}
@@ -165,36 +195,7 @@ export default function PatientHomePage() {
               </motion.div>
             )}
 
-            {/* Lembrete de Consulta */}
-            {nextAppointment && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <Card className="bg-blue-50 border-blue-200 shadow-card">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <CalendarClock className="w-5 h-5 text-blue-600" />
-                      <CardTitle className="text-lg text-blue-900">
-                        Próxima Consulta
-                      </CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm font-medium text-blue-900">
-                      {format(
-                        new Date(nextAppointment.appointment_time),
-                        "dd 'de' MMMM 'às' HH:mm",
-                        { locale: ptBR }
-                      )}
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-
-            {/* Card: Próxima Refeição */}
+            {/* 2. Card: Próxima Refeição */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -233,7 +234,7 @@ export default function PatientHomePage() {
               </Card>
             </motion.div>
 
-            {/* Card: Diário Alimentar */}
+            {/* 3. Card: Diário Alimentar */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -280,10 +281,21 @@ export default function PatientHomePage() {
                 </CardContent>
               </Card>
             </motion.div>
+
+            {/* 4. Meus Indicadores (Mobile) - Aparece só no mobile */}
+            <div className="lg:hidden">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+              >
+                <PatientMetricsWidget />
+              </motion.div>
+            </div>
           </div>
 
-          {/* Coluna Lateral */}
-          <div className="lg:col-span-1 space-y-6">
+          {/* Coluna Lateral (Desktop) */}
+          <div className="hidden lg:block lg:col-span-1 space-y-6">
             {/* Widget de Métricas */}
             <PatientMetricsWidget />
           </div>

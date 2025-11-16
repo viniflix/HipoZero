@@ -6,16 +6,23 @@ import { TrendingUp, Flame, Beef, Wheat, Droplet } from 'lucide-react';
 /**
  * CircularProgress - Gráfico circular de progresso (donut chart)
  */
-const CircularProgress = ({ percentage, size = 160, strokeWidth = 12 }) => {
+const CircularProgress = ({ percentage, size = 120, strokeWidth = 10 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (percentage / 100) * circumference;
 
-  // Cor baseada na porcentagem
+  // Cor baseada na porcentagem - COM MELHOR CONTRASTE
   const getColor = () => {
+    if (percentage === 0) return '#d1d5db'; // Cinza claro quando vazio
     if (percentage >= 90) return '#22c55e'; // Verde
     if (percentage >= 50) return '#eab308'; // Amarelo
     return '#f97316'; // Laranja
+  };
+
+  // Cor de fundo também ajustada
+  const getBackgroundOpacity = () => {
+    if (percentage === 0) return 'text-muted/10'; // Muito claro quando vazio
+    return 'text-muted/20';
   };
 
   return (
@@ -29,7 +36,7 @@ const CircularProgress = ({ percentage, size = 160, strokeWidth = 12 }) => {
           stroke="currentColor"
           strokeWidth={strokeWidth}
           fill="none"
-          className="text-muted/20"
+          className={getBackgroundOpacity()}
         />
         {/* Círculo de progresso */}
         <circle
@@ -47,10 +54,10 @@ const CircularProgress = ({ percentage, size = 160, strokeWidth = 12 }) => {
       </svg>
       {/* Texto no centro */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold text-foreground">
+        <span className={`text-2xl md:text-3xl font-bold ${percentage === 0 ? 'text-muted-foreground' : 'text-foreground'}`}>
           {Math.round(percentage)}%
         </span>
-        <span className="text-xs text-muted-foreground mt-1">do dia</span>
+        <span className="text-xs text-muted-foreground mt-0.5">do dia</span>
       </div>
     </div>
   );
@@ -63,21 +70,22 @@ const MacroMiniCard = ({ icon: Icon, label, current, goal, unit, color }) => {
   const percentage = goal > 0 ? Math.min(Math.round((current / goal) * 100), 100) : 0;
 
   const getProgressColor = () => {
+    if (percentage === 0) return 'bg-gray-300';
     if (percentage >= 90) return 'bg-green-500';
     if (percentage >= 50) return 'bg-yellow-500';
     return 'bg-orange-500';
   };
 
   return (
-    <Card className="border-2 border-muted/30 hover:border-primary/30 transition-colors">
-      <CardContent className="p-4 space-y-3">
+    <Card className="border border-muted/30 hover:border-primary/30 transition-colors">
+      <CardContent className="p-3 space-y-2">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className={`p-2 rounded-lg ${color}`}>
-              <Icon className="w-4 h-4 text-white" />
+          <div className="flex items-center gap-1.5">
+            <div className={`p-1.5 rounded-lg ${color}`}>
+              <Icon className="w-3 h-3 text-white" />
             </div>
-            <span className="text-sm font-medium text-muted-foreground">{label}</span>
+            <span className="text-xs font-medium text-muted-foreground">{label}</span>
           </div>
           <span className="text-xs text-muted-foreground font-semibold">
             {percentage}%
@@ -87,10 +95,10 @@ const MacroMiniCard = ({ icon: Icon, label, current, goal, unit, color }) => {
         {/* Valores */}
         <div className="space-y-1">
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-bold text-foreground">
+            <span className="text-lg font-bold text-foreground">
               {Math.round(current)}
             </span>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               / {Math.round(goal)} {unit}
             </span>
           </div>
@@ -98,7 +106,7 @@ const MacroMiniCard = ({ icon: Icon, label, current, goal, unit, color }) => {
           {/* Mini barra de progresso */}
           <Progress
             value={percentage}
-            className="h-1.5"
+            className="h-1"
             indicatorClassName={getProgressColor()}
           />
         </div>
@@ -109,7 +117,7 @@ const MacroMiniCard = ({ icon: Icon, label, current, goal, unit, color }) => {
 
 /**
  * DailyAdherenceCard - Card de Progresso de Macros Diário
- * Layout: Calorias em destaque (com gráfico) + 3 mini cards para outros macros
+ * Layout otimizado para mobile e desktop
  */
 export default function DailyAdherenceCard({ goal, current }) {
   // Se não houver metas ou progresso, não renderiza nada
@@ -155,43 +163,43 @@ export default function DailyAdherenceCard({ goal, current }) {
 
   return (
     <Card className="shadow-card-dark rounded-xl border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/5">
-      <CardHeader className="pb-4">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-primary" />
-            <CardTitle className="text-lg font-semibold text-primary">
+            <CardTitle className="text-base md:text-lg font-semibold text-primary">
               Progresso Diário
             </CardTitle>
           </div>
-          <div className="px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-semibold">
-            {caloriesPercentage}% completo
+          <div className="px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+            {caloriesPercentage}%
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         {/* SEÇÃO DE CALORIAS (Destaque) */}
-        <Card className="border-2 border-primary/30 bg-gradient-to-br from-orange-50/50 to-amber-50/50 dark:from-orange-950/20 dark:to-amber-950/20">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              {/* Gráfico Circular */}
+        <Card className="border border-primary/30 bg-gradient-to-br from-orange-50/50 to-amber-50/50 dark:from-orange-950/20 dark:to-amber-950/20">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              {/* Gráfico Circular - MENOR NO MOBILE */}
               <div className="flex-shrink-0">
-                <CircularProgress percentage={caloriesPercentage} size={160} strokeWidth={14} />
+                <CircularProgress percentage={caloriesPercentage} size={120} strokeWidth={10} />
               </div>
 
               {/* Informações de Calorias */}
-              <div className="flex-1 space-y-4 text-center md:text-left">
-                <div className="flex items-center gap-3 justify-center md:justify-start">
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-red-500">
-                    <Flame className="w-6 h-6 text-white" />
+              <div className="flex-1 space-y-3 text-center sm:text-left w-full">
+                <div className="flex items-center gap-2 justify-center sm:justify-start">
+                  <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500 to-red-500">
+                    <Flame className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Calorias
                     </h3>
-                    <p className="text-3xl font-bold text-foreground">
+                    <p className="text-2xl md:text-3xl font-bold text-foreground">
                       {Math.round(current.calories)}
-                      <span className="text-lg text-muted-foreground font-normal">
+                      <span className="text-base md:text-lg text-muted-foreground font-normal">
                         {' '}/ {Math.round(goal.calories)} kcal
                       </span>
                     </p>
@@ -199,17 +207,17 @@ export default function DailyAdherenceCard({ goal, current }) {
                 </div>
 
                 {/* Mensagem motivacional */}
-                <div className={`flex items-center gap-2 justify-center md:justify-start ${motivation.color}`}>
-                  <span className="text-lg">{motivation.icon}</span>
-                  <p className="text-sm font-medium">{motivation.text}</p>
+                <div className={`flex items-center gap-2 justify-center sm:justify-start ${motivation.color}`}>
+                  <span className="text-base">{motivation.icon}</span>
+                  <p className="text-xs md:text-sm font-medium">{motivation.text}</p>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* GRID DE MACROS SECUNDÁRIOS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* GRID DE MACROS SECUNDÁRIOS - 3 COLUNAS SEMPRE (MESMO NO MOBILE) */}
+        <div className="grid grid-cols-3 gap-2 md:gap-4">
           {/* Proteínas */}
           <MacroMiniCard
             icon={Beef}
