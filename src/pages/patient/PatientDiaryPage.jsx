@@ -82,6 +82,7 @@ export default function PatientDiaryPage() {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
     // Buscar refeições do dia com itens e alimentos
+    // Filtrar apenas refeições NÃO deletadas (deleted_at IS NULL)
     const { data: mealsData, error } = await supabase
       .from('meals')
       .select(`
@@ -96,6 +97,7 @@ export default function PatientDiaryPage() {
       `)
       .eq('patient_id', user.id)
       .eq('meal_date', dateStr)
+      .is('deleted_at', null)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -175,10 +177,18 @@ export default function PatientDiaryPage() {
   const handleDeleteMeal = async () => {
     if (!mealToDelete) return;
 
-    // Buscar dados da refeição antes de deletar (para auditoria)
+    // Buscar dados COMPLETOS da refeição antes de deletar (para auditoria)
     const meal = meals.find(m => m.id === mealToDelete);
 
-    const { error } = await supabase.from('meals').delete().eq('id', mealToDelete);
+    // =====================================================
+    // SOFT DELETE: Marca como deletada ao invés de remover
+    // =====================================================
+    // IMPORTANTE: Soft delete permite auditoria completa
+    // O nutricionista poderá ver o histórico completo de ações
+    const { error } = await supabase
+      .from('meals')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', mealToDelete);
 
     if (error) {
       toast({
@@ -188,14 +198,15 @@ export default function PatientDiaryPage() {
       });
     } else {
       // =====================================================
-      // AUDITORIA: Registrar ação de DELETE
+      // AUDITORIA: Registrar ação de DELETE com TODOS os detalhes
       // =====================================================
       // IMPORTANTE PARA MÓDULO FUTURO:
       // Este log será usado no Hub do Paciente para:
       // - Feed de atividades do paciente
       // - Timeline de ações no módulo "Diário do Paciente"
-      // - Histórico de alterações com diff de dados
+      // - Histórico de alterações com diff de dados (mostrar exatamente o que foi deletado)
       // - Notificações para o nutricionista
+      // - Detectar tentativas de manipulação (deletar e recriar com dados diferentes)
       if (meal) {
         await supabase.rpc('log_meal_action', {
           p_patient_id: user.id,
@@ -209,7 +220,18 @@ export default function PatientDiaryPage() {
             total_protein: meal.total_protein,
             total_carbs: meal.total_carbs,
             total_fat: meal.total_fat,
-            items_count: meal.meal_items?.length || 0
+            // Salvar TODOS os alimentos que foram deletados
+            items: (meal.meal_items || []).map(item => ({
+              food_id: item.food_id,
+              name: item.name,
+              quantity: item.quantity,
+              unit: item.unit,
+              calories: item.calories,
+              protein: item.protein,
+              carbs: item.carbs,
+              fat: item.fat
+            })),
+            deleted_at: new Date().toISOString()
           }
         });
       }

@@ -63,11 +63,12 @@ export default function AddMealPage() {
   const loadExistingMeal = async () => {
     setLoading(true);
     try {
-      // Buscar dados da refeição
+      // Buscar dados da refeição (apenas se não foi deletada)
       const { data: mealData, error: mealError } = await supabase
         .from('meals')
         .select('*')
         .eq('id', mealId)
+        .is('deleted_at', null)
         .single();
 
       if (mealError) throw mealError;

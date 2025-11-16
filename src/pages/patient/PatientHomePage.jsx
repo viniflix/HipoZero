@@ -66,12 +66,13 @@ export default function PatientHomePage() {
 
     setNextAppointment(apptData);
 
-    // 3. Buscar refeições registradas hoje
+    // 3. Buscar refeições registradas hoje (não deletadas)
     const { data: mealsData, count } = await supabase
       .from('meals')
       .select('*', { count: 'exact' })
       .eq('patient_id', user.id)
-      .eq('meal_date', todayStr);
+      .eq('meal_date', todayStr)
+      .is('deleted_at', null);
 
     setTodayMealsCount(count || 0);
     setRegisteredMeals(mealsData || []);

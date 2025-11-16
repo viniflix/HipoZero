@@ -13,6 +13,7 @@ import { supabase } from '@/lib/customSupabaseClient';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Utensils, Weight, Loader2, Edit3, Search, X, Filter } from 'lucide-react';
+import { translateMealType } from '@/utils/mealTranslations';
 
 /**
  * Widget que mostra TODOS os registros DOS PACIENTES com filtros e pesquisa
@@ -51,11 +52,12 @@ const PatientUpdatesWidget = () => {
 
                 // OTIMIZADO: Buscar últimos 100 registros de cada tipo
                 const [mealsData, editsData, weightData] = await Promise.all([
-                    // 1. REFEIÇÕES - Últimas 100
+                    // 1. REFEIÇÕES - Últimas 100 (apenas não deletadas)
                     supabase
                         .from('meals')
                         .select('id, patient_id, meal_type, total_calories, created_at')
                         .in('patient_id', patientIds)
+                        .is('deleted_at', null)
                         .order('created_at', { ascending: false })
                         .limit(100),
 
@@ -85,7 +87,8 @@ const PatientUpdatesWidget = () => {
                                 id: `meal-${meal.id}`,
                                 type: 'meal',
                                 patient_name: patient.name,
-                                description: `registrou ${meal.meal_type}`,
+                                description: 'registrou',
+                                meal_type: translateMealType(meal.meal_type), // Traduzido e separado para negrito
                                 detail: `${meal.total_calories || 0} kcal`,
                                 timestamp: meal.created_at
                             });
@@ -280,6 +283,12 @@ const PatientUpdatesWidget = () => {
                                             <span className="font-semibold text-primary">{update.patient_name}</span>
                                             {' '}
                                             <span className="text-foreground">{update.description}</span>
+                                            {update.meal_type && (
+                                                <>
+                                                    {' seu '}
+                                                    <span className="font-semibold text-foreground">{update.meal_type}</span>
+                                                </>
+                                            )}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
                                             {update.detail && `${update.detail} • `}

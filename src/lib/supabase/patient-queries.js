@@ -124,11 +124,12 @@ export const getModulesStatus = async (patientId) => {
             .limit(1)
             .maybeSingle();
 
-        // Verificar se tem refeições registradas
+        // Verificar se tem refeições registradas (não deletadas)
         const { data: mealsData } = await supabase
             .from('meals')
             .select('id')
             .eq('patient_id', patientId)
+            .is('deleted_at', null)
             .limit(1)
             .maybeSingle();
 
@@ -172,6 +173,7 @@ export const getPatientActivities = async (patientId, limit = 10) => {
             .from('meals')
             .select('id, meal_type, created_at, total_calories')
             .eq('patient_id', patientId)
+            .is('deleted_at', null)
             .order('created_at', { ascending: false })
             .limit(30);
 
