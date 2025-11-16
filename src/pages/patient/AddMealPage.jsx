@@ -103,25 +103,38 @@ export default function AddMealPage() {
       setMealDateTime(mealData.meal_time || format(new Date(), 'HH:mm'));
       setNotes(mealData.notes || '');
 
-      // Transformar meal_items para o formato addedFoods
-      const foods = itemsData.map((item, index) => ({
-        id: item.id || Date.now() + index,
-        food_id: item.food_id,
-        food_name: item.name,
-        quantity: item.quantity,
-        unit: 'g', // default
-        measure_type: 'direct',
-        base_calories: item.calories / (item.quantity / 100),
-        base_protein: item.protein / (item.quantity / 100),
-        base_carbs: item.carbs / (item.quantity / 100),
-        base_fat: item.fat / (item.quantity / 100),
-        calories: item.calories,
-        protein: item.protein,
-        carbs: item.carbs,
-        fat: item.fat
-      }));
+      // Buscar dados completos de cada alimento
+      const foodsWithData = await Promise.all(
+        itemsData.map(async (item, index) => {
+          // Buscar dados originais do alimento
+          const { data: foodData } = await supabase
+            .from('foods')
+            .select('*')
+            .eq('id', item.food_id)
+            .single();
 
-      setAddedFoods(foods);
+          return {
+            id: item.id || Date.now() + index,
+            food_id: item.food_id,
+            food_name: item.name,
+            quantity: item.quantity,
+            unit: item.unit || 'g', // Carregar unidade salva ou usar 'g' como fallback
+            measure_type: 'direct',
+            // Usar base_* do alimento original (per 100g)
+            base_calories: foodData?.calories || 0,
+            base_protein: foodData?.protein || 0,
+            base_carbs: foodData?.carbs || 0,
+            base_fat: foodData?.fat || 0,
+            // Manter valores calculados que foram salvos
+            calories: item.calories,
+            protein: item.protein,
+            carbs: item.carbs,
+            fat: item.fat
+          };
+        })
+      );
+
+      setAddedFoods(foodsWithData);
     } catch (error) {
       console.error('Erro ao carregar refeição:', error);
       toast({
@@ -232,9 +245,27 @@ export default function AddMealPage() {
       if (food.id === id) {
         const updated = { ...food, [field]: value };
 
-        // Recalcular nutrientes se mudou quantidade
-        if (field === 'quantity' && value && food.base_calories !== undefined) {
-          const multiplier = parseFloat(value) / 100; // Base 100g
+        // Recalcular nutrientes se mudou quantidade ou unidade
+        const shouldRecalculate =
+          (field === 'quantity' && value) ||
+          (field === 'unit' && food.quantity);
+
+        if (shouldRecalculate && food.base_calories !== undefined) {
+          const currentQuantity = field === 'quantity' ? parseFloat(value) : parseFloat(food.quantity);
+          const currentUnit = field === 'unit' ? value : food.unit;
+
+          let multiplier;
+
+          // Calcular multiplicador baseado na unidade
+          if (currentUnit === 'unit') {
+            // Para unidades, assumir que base é per unidade
+            // Então 1 unidade = 1x os valores base
+            multiplier = currentQuantity;
+          } else {
+            // Para g e ml, assumir que base é per 100g/ml
+            multiplier = currentQuantity / 100;
+          }
+
           updated.calories = food.base_calories * multiplier;
           updated.protein = food.base_protein * multiplier;
           updated.carbs = food.base_carbs * multiplier;
@@ -309,6 +340,7 @@ export default function AddMealPage() {
           food_id: food.food_id,
           name: food.food_name,
           quantity: parseFloat(food.quantity) || 0,
+          unit: food.unit || 'g',
           calories: parseFloat(food.calories) || 0,
           protein: parseFloat(food.protein) || 0,
           carbs: parseFloat(food.carbs) || 0,
@@ -352,6 +384,7 @@ export default function AddMealPage() {
           food_id: food.food_id,
           name: food.food_name,
           quantity: parseFloat(food.quantity) || 0,
+          unit: food.unit || 'g',
           calories: parseFloat(food.calories) || 0,
           protein: parseFloat(food.protein) || 0,
           carbs: parseFloat(food.carbs) || 0,
