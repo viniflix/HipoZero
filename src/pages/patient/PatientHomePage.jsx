@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
-import MealPlanView from '@/components/patient/MealPlanView';
+import NextMealCard from '@/components/patient/NextMealCard';
 import PatientMetricsWidget from '@/components/patient/PatientMetricsWidget';
 
 /**
@@ -20,6 +20,7 @@ export default function PatientHomePage() {
   const [prescription, setPrescription] = useState(null);
   const [nextAppointment, setNextAppointment] = useState(null);
   const [todayMealsCount, setTodayMealsCount] = useState(0);
+  const [registeredMeals, setRegisteredMeals] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -65,14 +66,15 @@ export default function PatientHomePage() {
 
     setNextAppointment(apptData);
 
-    // 3. Contar refeições registradas hoje
-    const { count } = await supabase
+    // 3. Buscar refeições registradas hoje
+    const { data: mealsData, count } = await supabase
       .from('meals')
-      .select('*', { count: 'exact', head: true })
+      .select('*', { count: 'exact' })
       .eq('patient_id', user.id)
       .eq('meal_date', todayStr);
 
     setTodayMealsCount(count || 0);
+    setRegisteredMeals(mealsData || []);
 
     setLoading(false);
   }, [user]);
@@ -141,7 +143,7 @@ export default function PatientHomePage() {
               </motion.div>
             )}
 
-            {/* Card: Plano Alimentar do Dia */}
+            {/* Card: Próxima Refeição */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -152,16 +154,19 @@ export default function PatientHomePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <UtensilsCrossed className="w-5 h-5 text-primary" />
-                      <CardTitle className="text-lg font-semibold">Plano Alimentar de Hoje</CardTitle>
+                      <CardTitle className="text-lg font-semibold">Próxima Refeição</CardTitle>
                     </div>
                   </div>
                   <CardDescription>
-                    Veja as refeições prescritas para o dia
+                    Veja o que está planejado para sua próxima refeição
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {prescription?.meal_plan_meals && prescription.meal_plan_meals.length > 0 ? (
-                    <MealPlanView mealPlanItems={prescription.meal_plan_meals} />
+                    <NextMealCard
+                      mealPlanMeals={prescription.meal_plan_meals}
+                      registeredMeals={registeredMeals}
+                    />
                   ) : (
                     <div className="text-center py-8">
                       <UtensilsCrossed className="mx-auto h-12 w-12 text-muted-foreground mb-3" />

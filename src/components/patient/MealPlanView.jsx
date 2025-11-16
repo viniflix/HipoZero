@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UtensilsCrossed } from 'lucide-react';
+import { translateMealType, translateUnit } from '@/utils/mealTranslations';
 
 /**
  * MealPlanView - Visualização do plano alimentar
@@ -28,15 +29,7 @@ const MealPlanView = ({ mealPlanItems }) => {
     );
   }
 
-  const mealOrder = ['cafe_da_manha', 'lanche_da_manha', 'almoco', 'lanche_da_tarde', 'jantar', 'ceia'];
-  const mealTypeLabels = {
-    'cafe_da_manha': 'Café da Manhã',
-    'lanche_da_manha': 'Lanche da Manhã',
-    'almoco': 'Almoço',
-    'lanche_da_tarde': 'Lanche da Tarde',
-    'jantar': 'Jantar',
-    'ceia': 'Ceia'
-  };
+  const mealOrder = ['breakfast', 'cafe_da_manha', 'morning_snack', 'lanche_da_manha', 'lunch', 'almoco', 'afternoon_snack', 'lanche_da_tarde', 'dinner', 'jantar', 'supper', 'ceia'];
 
   // Agrupar por tipo de refeição
   const mealsByType = mealPlanItems.reduce((acc, meal) => {
@@ -58,7 +51,7 @@ const MealPlanView = ({ mealPlanItems }) => {
       {sortedMealTypes.map((mealType) => (
         <div key={mealType} className="border-l-4 border-primary/30 pl-4 py-2">
           <h4 className="font-semibold text-lg mb-3 text-foreground">
-            {mealTypeLabels[mealType] || mealType}
+            {translateMealType(mealType)}
           </h4>
 
           {mealsByType[mealType].map((meal) => (
@@ -75,7 +68,7 @@ const MealPlanView = ({ mealPlanItems }) => {
                         {foodItem.foods?.name || 'Alimento sem nome'}
                       </span>
                       <span className="font-medium text-primary">
-                        {foodItem.quantity} {foodItem.unit}
+                        {foodItem.quantity} {translateUnit(foodItem.unit)}
                       </span>
                     </li>
                   ))}
