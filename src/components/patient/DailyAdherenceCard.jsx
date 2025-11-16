@@ -66,48 +66,41 @@ const CircularProgress = ({ percentage, size = 120, strokeWidth = 10 }) => {
 /**
  * MacroMiniCard - Mini card para cada macro (Proteínas, Carboidratos, Gorduras)
  */
-const MacroMiniCard = ({ icon: Icon, label, current, goal, unit, color }) => {
+const MacroMiniCard = ({ icon: Icon, label, current, goal, unit, iconColor, progressColor }) => {
   const percentage = goal > 0 ? Math.min(Math.round((current / goal) * 100), 100) : 0;
 
-  const getProgressColor = () => {
-    if (percentage === 0) return 'bg-gray-300';
-    if (percentage >= 90) return 'bg-green-500';
-    if (percentage >= 50) return 'bg-yellow-500';
-    return 'bg-orange-500';
-  };
-
   return (
-    <Card className="border border-muted/30 hover:border-primary/30 transition-colors">
-      <CardContent className="p-3 space-y-2">
+    <Card className="border border-muted/30 hover:border-primary/30 transition-colors overflow-hidden">
+      <CardContent className="p-2 md:p-3 space-y-2">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <div className={`p-1.5 rounded-lg ${color}`}>
+        <div className="flex items-center justify-between gap-1 min-w-0">
+          <div className="flex items-center gap-1 min-w-0 flex-1">
+            <div className={`p-1 md:p-1.5 rounded-lg flex-shrink-0 ${iconColor}`}>
               <Icon className="w-3 h-3 text-white" />
             </div>
-            <span className="text-xs font-medium text-muted-foreground">{label}</span>
+            <span className="text-xs font-medium text-muted-foreground truncate">{label}</span>
           </div>
-          <span className="text-xs text-muted-foreground font-semibold">
+          <span className="text-xs text-muted-foreground font-semibold flex-shrink-0">
             {percentage}%
           </span>
         </div>
 
         {/* Valores */}
-        <div className="space-y-1">
-          <div className="flex items-baseline gap-1">
-            <span className="text-lg font-bold text-foreground">
+        <div className="space-y-1 min-w-0">
+          <div className="flex items-baseline gap-0.5 min-w-0">
+            <span className="text-base md:text-lg font-bold text-foreground truncate">
               {Math.round(current)}
             </span>
-            <span className="text-xs text-muted-foreground">
-              / {Math.round(goal)} {unit}
+            <span className="text-xs text-muted-foreground truncate flex-shrink-0">
+              /{Math.round(goal)}{unit}
             </span>
           </div>
 
-          {/* Mini barra de progresso */}
+          {/* Mini barra de progresso - TRACK NEUTRO */}
           <Progress
             value={percentage}
-            className="h-1"
-            indicatorClassName={getProgressColor()}
+            className="h-1 bg-slate-200"
+            indicatorClassName={progressColor}
           />
         </div>
       </CardContent>
@@ -218,34 +211,37 @@ export default function DailyAdherenceCard({ goal, current }) {
 
         {/* GRID DE MACROS SECUNDÁRIOS - 3 COLUNAS SEMPRE (MESMO NO MOBILE) */}
         <div className="grid grid-cols-3 gap-2 md:gap-4">
-          {/* Proteínas */}
+          {/* Proteínas - AZUL CLARO */}
           <MacroMiniCard
             icon={Beef}
             label="Proteínas"
             current={current.protein}
             goal={goal.protein}
             unit="g"
-            color="bg-gradient-to-br from-red-500 to-red-600"
+            iconColor="bg-gradient-to-br from-sky-500 to-sky-600"
+            progressColor="bg-sky-500"
           />
 
-          {/* Carboidratos */}
+          {/* Carboidratos - LARANJA */}
           <MacroMiniCard
             icon={Wheat}
             label="Carboidratos"
             current={current.carbs}
             goal={goal.carbs}
             unit="g"
-            color="bg-gradient-to-br from-amber-500 to-amber-600"
+            iconColor="bg-gradient-to-br from-orange-500 to-orange-600"
+            progressColor="bg-orange-500"
           />
 
-          {/* Gorduras */}
+          {/* Gorduras - AMARELO */}
           <MacroMiniCard
             icon={Droplet}
             label="Gorduras"
             current={current.fat}
             goal={goal.fat}
             unit="g"
-            color="bg-gradient-to-br from-yellow-500 to-yellow-600"
+            iconColor="bg-gradient-to-br from-yellow-400 to-yellow-500"
+            progressColor="bg-yellow-400"
           />
         </div>
       </CardContent>
