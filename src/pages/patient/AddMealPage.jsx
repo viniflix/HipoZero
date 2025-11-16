@@ -331,6 +331,34 @@ export default function AddMealPage() {
 
         if (itemsError) throw itemsError;
 
+        // =====================================================
+        // AUDITORIA: Registrar ação de UPDATE
+        // =====================================================
+        // IMPORTANTE PARA MÓDULO FUTURO:
+        // - Feed mostrará "Paciente X editou Café da Manhã"
+        // - Timeline exibirá diff: alterações em alimentos, quantidades
+        // - Histórico completo de versões da refeição
+        await supabase.rpc('log_meal_action', {
+          p_patient_id: user.id,
+          p_meal_id: mealId,
+          p_action: 'update',
+          p_meal_type: mealType,
+          p_meal_date: format(new Date(), 'yyyy-MM-dd'),
+          p_meal_time: mealDateTime,
+          p_details: {
+            total_calories: totals.calories,
+            total_protein: totals.protein,
+            total_carbs: totals.carbs,
+            total_fat: totals.fat,
+            items: addedFoods.map(f => ({
+              food_id: f.food_id,
+              name: f.food_name,
+              quantity: f.quantity,
+              unit: f.unit
+            }))
+          }
+        });
+
         toast({
           title: 'Sucesso!',
           description: 'Refeição atualizada com sucesso'
@@ -374,6 +402,34 @@ export default function AddMealPage() {
           .insert(mealItems);
 
         if (itemsError) throw itemsError;
+
+        // =====================================================
+        // AUDITORIA: Registrar ação de CREATE
+        // =====================================================
+        // IMPORTANTE PARA MÓDULO FUTURO:
+        // - Feed mostrará "Paciente X registrou Café da Manhã"
+        // - Dashboard do nutricionista exibe atividade em tempo real
+        // - Notificação push/email para nutricionista (se configurado)
+        await supabase.rpc('log_meal_action', {
+          p_patient_id: user.id,
+          p_meal_id: meal.id,
+          p_action: 'create',
+          p_meal_type: mealType,
+          p_meal_date: today,
+          p_meal_time: mealDateTime,
+          p_details: {
+            total_calories: totals.calories,
+            total_protein: totals.protein,
+            total_carbs: totals.carbs,
+            total_fat: totals.fat,
+            items: addedFoods.map(f => ({
+              food_id: f.food_id,
+              name: f.food_name,
+              quantity: f.quantity,
+              unit: f.unit
+            }))
+          }
+        });
 
         toast({
           title: 'Sucesso!',

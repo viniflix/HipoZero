@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, addDays, subDays, isToday, isYesterday, isTomorrow, startOfDay, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, Plus, Utensils, Trash2, MoreHorizontal } from 'lucide-react';
+import { CalendarDays, Plus, Utensils, Trash2, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -140,8 +140,43 @@ export default function PatientDiaryPage() {
     return acc;
   }, {});
 
+  // Navegação de datas
+  const goToPreviousDay = () => {
+    setSelectedDate(prev => subDays(prev, 1));
+  };
+
+  const goToNextDay = () => {
+    setSelectedDate(prev => addDays(prev, 1));
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date());
+  };
+
+  // Formatar label da data
+  const getDateLabel = (date) => {
+    if (isToday(date)) {
+      return 'HOJE';
+    } else if (isYesterday(date)) {
+      return 'ONTEM';
+    } else if (isTomorrow(date)) {
+      return 'AMANHÃ';
+    } else {
+      // Formato: "12 de Janeiro"
+      return format(date, "dd 'de' MMMM", { locale: ptBR });
+    }
+  };
+
+  const getDateSubtitle = (date) => {
+    // Sempre mostra a data completa como subtítulo
+    return format(date, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+  };
+
   const handleDeleteMeal = async () => {
     if (!mealToDelete) return;
+
+    // Buscar dados da refeição antes de deletar (para auditoria)
+    const meal = meals.find(m => m.id === mealToDelete);
 
     const { error } = await supabase.from('meals').delete().eq('id', mealToDelete);
 
@@ -152,6 +187,33 @@ export default function PatientDiaryPage() {
         variant: 'destructive'
       });
     } else {
+      // =====================================================
+      // AUDITORIA: Registrar ação de DELETE
+      // =====================================================
+      // IMPORTANTE PARA MÓDULO FUTURO:
+      // Este log será usado no Hub do Paciente para:
+      // - Feed de atividades do paciente
+      // - Timeline de ações no módulo "Diário do Paciente"
+      // - Histórico de alterações com diff de dados
+      // - Notificações para o nutricionista
+      if (meal) {
+        await supabase.rpc('log_meal_action', {
+          p_patient_id: user.id,
+          p_meal_id: mealToDelete,
+          p_action: 'delete',
+          p_meal_type: meal.meal_type,
+          p_meal_date: meal.meal_date,
+          p_meal_time: meal.meal_time,
+          p_details: {
+            total_calories: meal.total_calories,
+            total_protein: meal.total_protein,
+            total_carbs: meal.total_carbs,
+            total_fat: meal.total_fat,
+            items_count: meal.meal_items?.length || 0
+          }
+        });
+      }
+
       toast({
         title: 'Sucesso',
         description: 'Refeição excluída com sucesso.'
@@ -186,33 +248,77 @@ export default function PatientDiaryPage() {
             Registre suas refeições do dia
           </p>
         </div>
-        {/* Seletor de Data */}
+        {/* Navegação de Data com Histórico */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <Card>
-            <CardContent className="pt-6">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => date && setSelectedDate(date)}
-                    initialFocus
-                    locale={ptBR}
-                  />
-                </PopoverContent>
-              </Popover>
+            <CardContent className="pt-6 space-y-3">
+              {/* Label da Data (HOJE, ONTEM, etc) */}
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-primary">
+                  {getDateLabel(selectedDate)}
+                </h2>
+                <p className="text-sm text-muted-foreground capitalize">
+                  {getDateSubtitle(selectedDate)}
+                </p>
+              </div>
+
+              {/* Navegação com Botões */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={goToPreviousDay}
+                  className="flex-shrink-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-center"
+                    >
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      Selecionar Data
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="center">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => date && setSelectedDate(date)}
+                      initialFocus
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={goToNextDay}
+                  className="flex-shrink-0"
+                  disabled={isSameDay(selectedDate, new Date())}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Botão "Ir para Hoje" */}
+              {!isToday(selectedDate) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goToToday}
+                  className="w-full text-primary"
+                >
+                  Ir para Hoje
+                </Button>
+              )}
             </CardContent>
           </Card>
         </motion.div>
