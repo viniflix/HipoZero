@@ -389,7 +389,7 @@ export default function AddMealPage() {
                       <div>
                         <p className="font-medium text-sm">{food.foods?.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {food.quantity} {translateUnit(food.unit)}
+                          {formatQuantityWithUnit(food.quantity, food.unit)}
                         </p>
                       </div>
                       <Button
