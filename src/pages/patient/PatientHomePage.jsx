@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import NextMealCard from '@/components/patient/NextMealCard';
 import PatientMetricsWidget from '@/components/patient/PatientMetricsWidget';
+import DailyAdherenceCard from '@/components/patient/DailyAdherenceCard';
 
 /**
  * PatientHomePage - Aba 1: Início
@@ -21,6 +22,8 @@ export default function PatientHomePage() {
   const [nextAppointment, setNextAppointment] = useState(null);
   const [todayMealsCount, setTodayMealsCount] = useState(0);
   const [registeredMeals, setRegisteredMeals] = useState([]);
+  const [prescriptionGoal, setPrescriptionGoal] = useState(null); // Metas de macros
+  const [currentProgress, setCurrentProgress] = useState(null); // Progresso atual
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -77,6 +80,39 @@ export default function PatientHomePage() {
     setTodayMealsCount(count || 0);
     setRegisteredMeals(mealsData || []);
 
+    // 4. Buscar prescrição nutricional (metas de macros do dia)
+    const { data: prescriptionData } = await supabase
+      .from('prescriptions')
+      .select('calories, protein, carbs, fat, start_date, end_date')
+      .eq('patient_id', user.id)
+      .lte('start_date', todayStr)
+      .or(`end_date.is.null,end_date.gte.${todayStr}`)
+      .maybeSingle();
+
+    if (prescriptionData) {
+      setPrescriptionGoal({
+        calories: prescriptionData.calories || 0,
+        protein: prescriptionData.protein || 0,
+        carbs: prescriptionData.carbs || 0,
+        fat: prescriptionData.fat || 0
+      });
+    }
+
+    // 5. Calcular progresso atual (somar refeições de hoje)
+    if (mealsData && mealsData.length > 0) {
+      const progress = mealsData.reduce((acc, meal) => ({
+        calories: acc.calories + (meal.total_calories || 0),
+        protein: acc.protein + (meal.total_protein || 0),
+        carbs: acc.carbs + (meal.total_carbs || 0),
+        fat: acc.fat + (meal.total_fat || 0)
+      }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+      setCurrentProgress(progress);
+    } else {
+      // Se não há refeições, progresso é zero
+      setCurrentProgress({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+    }
+
     setLoading(false);
   }, [user]);
 
@@ -115,12 +151,26 @@ export default function PatientHomePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Coluna Principal */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Card de Progresso Diário */}
+            {prescriptionGoal && currentProgress && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+              >
+                <DailyAdherenceCard
+                  goal={prescriptionGoal}
+                  current={currentProgress}
+                />
+              </motion.div>
+            )}
+
             {/* Lembrete de Consulta */}
             {nextAppointment && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
+                transition={{ delay: 0.2 }}
               >
                 <Card className="bg-blue-50 border-blue-200 shadow-card">
                   <CardHeader className="pb-3">
@@ -148,7 +198,7 @@ export default function PatientHomePage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ delay: 0.3 }}
             >
               <Card className="shadow-card-dark rounded-xl bg-card">
                 <CardHeader className="pb-3">
@@ -187,7 +237,7 @@ export default function PatientHomePage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
+              transition={{ delay: 0.4 }}
             >
               <Card
                 className="shadow-card-dark rounded-xl bg-card cursor-pointer hover:shadow-lg transition-shadow"
