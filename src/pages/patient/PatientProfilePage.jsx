@@ -142,12 +142,12 @@ export default function PatientProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-white">
       {/* Header fixo */}
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-gradient-to-r from-gray-700 to-gray-600 text-white sticky top-0 z-10 shadow-md">
         <div className="px-4 py-4">
-          <h1 className="text-2xl font-bold text-foreground">Perfil</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold">Perfil</h1>
+          <p className="text-sm text-white/90 mt-1">
             Gerencie sua conta e preferências
           </p>
         </div>

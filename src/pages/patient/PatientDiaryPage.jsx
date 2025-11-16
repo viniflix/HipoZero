@@ -133,12 +133,12 @@ export default function PatientDiaryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-patient-secondary/5 to-white">
       {/* Header fixo */}
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-gradient-to-r from-patient-secondary to-patient-secondary/80 text-white sticky top-0 z-10 shadow-md">
         <div className="px-4 py-4">
-          <h1 className="text-2xl font-bold text-foreground">Diário Alimentar</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold">Diário Alimentar</h1>
+          <p className="text-sm text-white/90 mt-1">
             Registre suas refeições do dia
           </p>
         </div>
@@ -240,6 +240,7 @@ export default function PatientDiaryPage() {
                       </div>
                       <Button
                         size="sm"
+                        className={hasMeals ? '' : 'bg-patient-secondary hover:bg-patient-secondary/90'}
                         variant={hasMeals ? 'outline' : 'default'}
                         onClick={() => handleAddFood(mealType)}
                       >
