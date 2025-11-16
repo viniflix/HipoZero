@@ -40,7 +40,7 @@ export default function AddMealPage() {
 
   // Estado da refeição
   const [mealType, setMealType] = useState(initialMealType);
-  const [mealDateTime, setMealDateTime] = useState(mealTime || format(new Date(), 'HH:mm'));
+  const [mealDateTime, setMealDateTime] = useState(format(new Date(), 'HH:mm')); // Sempre hora atual
   const [notes, setNotes] = useState('');
   const [addedFoods, setAddedFoods] = useState([]);
   const [loading, setLoading] = useState(false);
