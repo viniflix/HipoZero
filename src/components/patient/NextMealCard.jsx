@@ -139,11 +139,11 @@ const NextMealCard = ({ mealPlanMeals, registeredMeals = [] }) => {
         {meal.meal_plan_foods && meal.meal_plan_foods.length > 0 ? (
           <ul className="space-y-2 mb-4">
             {meal.meal_plan_foods.map((foodItem, index) => (
-              <li key={index} className="flex justify-between items-center text-sm">
-                <span className="text-foreground">
+              <li key={index} className="flex justify-between items-center gap-3 text-sm">
+                <span className="text-foreground flex-1 min-w-0">
                   • {foodItem.foods?.name || 'Alimento sem nome'}
                 </span>
-                <span className="font-medium text-primary">
+                <span className="font-medium text-primary whitespace-nowrap flex-shrink-0 text-right">
                   {foodItem.quantity} {translateUnit(foodItem.unit)}
                 </span>
               </li>
