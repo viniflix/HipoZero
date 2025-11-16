@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { format, addDays, subDays, isToday, isYesterday, isTomorrow, startOfDay, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, Plus, Utensils, Trash2, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, Plus, Utensils, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, FileText, Eye } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { translateMealType } from '@/utils/mealTranslations';
+import MealPlanViewDialog from '@/components/patient/MealPlanViewDialog';
 
 /**
  * PatientDiaryPage - Aba 2: Diário
@@ -35,6 +36,7 @@ export default function PatientDiaryPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [mealToDelete, setMealToDelete] = useState(null);
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
 
   // Todos os tipos possíveis (para modal)
   const ALL_MEAL_TYPES = [
@@ -270,6 +272,46 @@ export default function PatientDiaryPage() {
             Registre suas refeições do dia
           </p>
         </div>
+
+        {/* Card: Meu Plano Alimentar */}
+        {mealPlan && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card className="bg-gradient-to-r from-[#5f6f52]/10 via-[#a9b388]/10 to-[#b99470]/10 border-[#5f6f52]/30">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-[#5f6f52] to-[#a9b388]">
+                      <FileText className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base text-[#5f6f52]">
+                        Meu Plano Alimentar
+                      </CardTitle>
+                      <CardDescription className="text-xs truncate">
+                        {mealPlan.meal_plan_meals?.length || 0} refeições planejadas •{' '}
+                        Vigente desde {format(new Date(mealPlan.start_date), "dd 'de' MMM", { locale: ptBR })}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPlanDialogOpen(true)}
+                    className="border-[#5f6f52] text-[#5f6f52] hover:bg-[#5f6f52] hover:text-white flex-shrink-0"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">Ver Plano Completo</span>
+                    <span className="sm:hidden">Ver Plano</span>
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Navegação de Data com Histórico */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -526,6 +568,14 @@ export default function PatientDiaryPage() {
         </Dialog>
 
       </div>
+
+      {/* Dialog: Ver Plano Alimentar Completo */}
+      <MealPlanViewDialog
+        open={planDialogOpen}
+        onOpenChange={setPlanDialogOpen}
+        mealPlan={mealPlan}
+        patientName={user?.profile?.name}
+      />
 
       {/* AlertDialog de Confirmação de Exclusão */}
       <AlertDialog open={!!mealToDelete} onOpenChange={() => setMealToDelete(null)}>
