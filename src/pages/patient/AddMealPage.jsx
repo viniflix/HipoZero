@@ -100,8 +100,8 @@ export default function AddMealPage() {
             food_id: item.food_id,
             food_name: item.name,
             quantity: item.quantity,
-            unit: item.unit || 'g', // Carregar unidade salva ou usar 'g' como fallback
-            measure_type: 'direct',
+            unit: 'gram', // Unidade padrão (não é salva no banco)
+            measure: null, // Será definido quando editar
             // Usar base_* do alimento original (per 100g)
             base_calories: foodData?.calories || 0,
             base_protein: foodData?.protein || 0,
@@ -318,7 +318,6 @@ export default function AddMealPage() {
           food_id: food.food_id,
           name: food.food_name,
           quantity: parseFloat(food.quantity) || 0,
-          unit: food.unit || 'g',
           calories: parseFloat(food.calories) || 0,
           protein: parseFloat(food.protein) || 0,
           carbs: parseFloat(food.carbs) || 0,
@@ -362,7 +361,6 @@ export default function AddMealPage() {
           food_id: food.food_id,
           name: food.food_name,
           quantity: parseFloat(food.quantity) || 0,
-          unit: food.unit || 'g',
           calories: parseFloat(food.calories) || 0,
           protein: parseFloat(food.protein) || 0,
           carbs: parseFloat(food.carbs) || 0,
