@@ -58,6 +58,7 @@ const PatientHomePage = lazy(() => import('@/pages/patient/PatientHomePage.jsx')
 const PatientDiaryPage = lazy(() => import('@/pages/patient/PatientDiaryPage.jsx'));
 const PatientProgressPage = lazy(() => import('@/pages/patient/PatientProgressPage.jsx'));
 const PatientProfilePage = lazy(() => import('@/pages/patient/PatientProfilePage.jsx'));
+const AddMealPage = lazy(() => import('@/pages/patient/AddMealPage.jsx'));
 
 
 // Fallback de carregamento para Suspense
@@ -164,6 +165,7 @@ const AppLayout = () => {
 
             {/* Rotas do Paciente (Fora do layout - páginas completas) */}
             <Route path="/patient/add-food/:mealId?" element={<ProtectedRoute userType="patient"><AddFoodPage /></ProtectedRoute>} />
+            <Route path="/patient/add-meal" element={<ProtectedRoute userType="patient"><AddMealPage /></ProtectedRoute>} />
 
             {/* Rotas Antigas do Paciente (mantidas para compatibilidade) */}
             <Route element={<ProtectedRoute userType="patient"><PatientLayout /></ProtectedRoute>}>

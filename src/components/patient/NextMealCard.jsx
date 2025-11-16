@@ -1,31 +1,27 @@
-import React, { useMemo } from 'react';
-import { Clock, UtensilsCrossed, CheckCircle2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Clock, UtensilsCrossed, CheckCircle2, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { translateMealType, translateUnit } from '@/utils/mealTranslations';
 import { format, parse } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * NextMealCard - Exibe a próxima refeição baseada no horário atual
- *
- * Lógica:
- * - Calcula qual refeição está mais próxima do horário atual
- * - Se já registrou no diário, mostra a próxima
- * - Exibe horário da refeição
+ * Com navegação entre refeições e CTA para registrar
  */
 const NextMealCard = ({ mealPlanMeals, registeredMeals = [] }) => {
-  const nextMeal = useMemo(() => {
-    if (!mealPlanMeals || mealPlanMeals.length === 0) return null;
+  const navigate = useNavigate();
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  // Ordenar refeições por horário
+  const sortedMeals = useMemo(() => {
+    if (!mealPlanMeals || mealPlanMeals.length === 0) return [];
 
-    // Ordenar refeições por horário
     const mealsWithTime = mealPlanMeals
-      .filter(meal => meal.meal_time) // Apenas refeições com horário definido
+      .filter(meal => meal.meal_time)
       .map(meal => {
-        // Parse do horário (formato: "HH:mm:ss" ou "HH:mm")
         const timeParts = meal.meal_time.split(':');
         const mealMinutes = parseInt(timeParts[0]) * 60 + parseInt(timeParts[1]);
-
         return {
           ...meal,
           mealMinutes,
@@ -34,80 +30,74 @@ const NextMealCard = ({ mealPlanMeals, registeredMeals = [] }) => {
       })
       .sort((a, b) => a.mealMinutes - b.mealMinutes);
 
-    if (mealsWithTime.length === 0) return null;
+    return mealsWithTime;
+  }, [mealPlanMeals]);
 
-    // Verificar quais refeições já foram registradas hoje
+  // Encontrar índice da próxima refeição
+  const nextMealIndex = useMemo(() => {
+    if (sortedMeals.length === 0) return 0;
+
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const registeredTypes = new Set(registeredMeals.map(m => m.meal_type));
 
-    // Encontrar a próxima refeição
-    let selectedMeal = null;
-    let alreadyRegistered = false;
+    for (let i = 0; i < sortedMeals.length; i++) {
+      const meal = sortedMeals[i];
 
-    // Primeiro, tentar encontrar a refeição mais próxima
-    for (let i = 0; i < mealsWithTime.length; i++) {
-      const meal = mealsWithTime[i];
-      const nextMeal = mealsWithTime[i + 1];
+      if (registeredTypes.has(meal.meal_type)) continue;
 
-      // Se a refeição já foi registrada, pular
-      if (registeredTypes.has(meal.meal_type)) {
-        continue;
-      }
+      if (meal.mealMinutes > currentMinutes) return i;
 
-      // Se ainda não passou do horário da refeição
-      if (meal.mealMinutes > currentMinutes) {
-        selectedMeal = meal;
-        break;
-      }
-
-      // Se já passou do horário, calcular qual está mais perto
+      const nextMeal = sortedMeals[i + 1];
       if (nextMeal) {
         const timeSinceMeal = currentMinutes - meal.mealMinutes;
         const timeUntilNext = nextMeal.mealMinutes - currentMinutes;
-
-        if (timeSinceMeal <= timeUntilNext) {
-          selectedMeal = meal;
-          break;
-        }
+        if (timeSinceMeal <= timeUntilNext) return i;
       } else {
-        // Última refeição do dia
-        selectedMeal = meal;
-        break;
+        return i;
       }
     }
 
-    // Se não encontrou nenhuma não registrada, pegar a primeira não registrada
-    if (!selectedMeal) {
-      selectedMeal = mealsWithTime.find(m => !registeredTypes.has(m.meal_type));
-    }
+    return 0;
+  }, [sortedMeals, registeredMeals]);
 
-    // Se todas foram registradas, pegar a primeira de amanhã
-    if (!selectedMeal) {
-      selectedMeal = mealsWithTime[0];
-      alreadyRegistered = true;
-    }
+  // Usar índice personalizado ou próximo automático
+  const displayIndex = currentIndex !== 0 ? currentIndex : nextMealIndex;
+  const meal = sortedMeals[displayIndex];
 
-    // Verificar se a refeição selecionada já foi registrada
-    if (selectedMeal && registeredTypes.has(selectedMeal.meal_type)) {
-      alreadyRegistered = true;
-      // Pegar a próxima não registrada
-      const currentIndex = mealsWithTime.findIndex(m => m.id === selectedMeal.id);
-      for (let i = currentIndex + 1; i < mealsWithTime.length; i++) {
-        if (!registeredTypes.has(mealsWithTime[i].meal_type)) {
-          selectedMeal = mealsWithTime[i];
-          alreadyRegistered = false;
-          break;
-        }
+  // Verificar se já foi registrada
+  const isRegistered = useMemo(() => {
+    if (!meal) return false;
+    const registeredTypes = new Set(registeredMeals.map(m => m.meal_type));
+    return registeredTypes.has(meal.meal_type);
+  }, [meal, registeredMeals]);
+
+  const handlePrevious = () => {
+    setCurrentIndex(prev => {
+      const newIndex = displayIndex - 1;
+      return newIndex < 0 ? sortedMeals.length - 1 : newIndex;
+    });
+  };
+
+  const handleNext = () => {
+    setCurrentIndex(prev => {
+      const newIndex = displayIndex + 1;
+      return newIndex >= sortedMeals.length ? 0 : newIndex;
+    });
+  };
+
+  const handleRegisterMeal = () => {
+    navigate('/patient/add-meal', {
+      state: {
+        mealType: meal.meal_type,
+        mealTime: meal.timeStr,
+        mealName: meal.name,
+        recommendedFoods: meal.meal_plan_foods
       }
-      // Se não encontrou, pegar a primeira de amanhã
-      if (alreadyRegistered && currentIndex < mealsWithTime.length - 1) {
-        selectedMeal = mealsWithTime[0];
-      }
-    }
+    });
+  };
 
-    return { meal: selectedMeal, alreadyRegistered };
-  }, [mealPlanMeals, registeredMeals]);
-
-  if (!nextMeal || !nextMeal.meal) {
+  if (!meal || sortedMeals.length === 0) {
     return (
       <div className="text-center py-8">
         <UtensilsCrossed className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
@@ -118,30 +108,19 @@ const NextMealCard = ({ mealPlanMeals, registeredMeals = [] }) => {
     );
   }
 
-  const { meal, alreadyRegistered } = nextMeal;
-  const previousMeal = useMemo(() => {
-    if (!alreadyRegistered) return null;
-    const registeredTypes = new Set(registeredMeals.map(m => m.meal_type));
-    // Encontrar qual refeição foi registrada
-    const registered = mealPlanMeals
-      .filter(m => m.meal_time)
-      .find(m => registeredTypes.has(m.meal_type));
-    return registered;
-  }, [alreadyRegistered, mealPlanMeals, registeredMeals]);
-
   return (
-    <div className="space-y-3">
-      {/* Header com status */}
-      {alreadyRegistered && previousMeal && (
+    <div className="space-y-4">
+      {/* Status de registro */}
+      {isRegistered && (
         <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
           <p className="text-sm text-green-800">
-            Você já registrou seu <strong>{translateMealType(previousMeal.meal_type)}</strong>
+            Você já registrou esta refeição!
           </p>
         </div>
       )}
 
-      {/* Próxima refeição */}
+      {/* Conteúdo da refeição */}
       <div className="border-l-4 border-primary pl-4">
         <div className="flex items-center justify-between mb-3">
           <h4 className="font-semibold text-lg text-foreground">
@@ -158,7 +137,7 @@ const NextMealCard = ({ mealPlanMeals, registeredMeals = [] }) => {
         )}
 
         {meal.meal_plan_foods && meal.meal_plan_foods.length > 0 ? (
-          <ul className="space-y-2">
+          <ul className="space-y-2 mb-4">
             {meal.meal_plan_foods.map((foodItem, index) => (
               <li key={index} className="flex justify-between items-center text-sm">
                 <span className="text-foreground">
@@ -171,14 +150,50 @@ const NextMealCard = ({ mealPlanMeals, registeredMeals = [] }) => {
             ))}
           </ul>
         ) : (
-          <p className="text-xs text-muted-foreground italic">Nenhum alimento cadastrado</p>
+          <p className="text-xs text-muted-foreground italic mb-4">Nenhum alimento cadastrado</p>
+        )}
+
+        {/* CTA de registro */}
+        {!isRegistered && (
+          <Button
+            onClick={handleRegisterMeal}
+            className="w-full mt-2"
+            size="sm"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Registrar Esta Refeição
+          </Button>
         )}
       </div>
 
-      {/* Info adicional */}
-      <p className="text-xs text-muted-foreground text-center pt-2">
-        {alreadyRegistered ? 'Sua próxima refeição será:' : 'Próxima refeição'}
-      </p>
+      {/* Navegação entre refeições */}
+      {sortedMeals.length > 1 && (
+        <div className="flex items-center justify-between pt-3 border-t">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handlePrevious}
+            className="text-muted-foreground hover:text-primary"
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Anterior
+          </Button>
+
+          <span className="text-xs text-muted-foreground">
+            {displayIndex + 1} de {sortedMeals.length}
+          </span>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleNext}
+            className="text-muted-foreground hover:text-primary"
+          >
+            Próxima
+            <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

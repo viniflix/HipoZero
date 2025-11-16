@@ -1,0 +1,540 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { format } from 'date-fns';
+import { ArrowLeft, Plus, Trash2, Search, Clock, MessageSquare, Save } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/customSupabaseClient';
+import { useToast } from '@/hooks/use-toast';
+import { translateMealType, translateUnit } from '@/utils/mealTranslations';
+
+/**
+ * AddMealPage - Nova página reformulada de registro de refeição
+ *
+ * Mostra alimentos recomendados do plano
+ * Permite adicionar outros alimentos
+ * Suporta medidas diretas e caseiras
+ */
+export default function AddMealPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
+
+  // Dados vindos da navegação
+  const {
+    mealType,
+    mealTime,
+    mealName,
+    recommendedFoods = []
+  } = location.state || {};
+
+  // Estado da refeição
+  const [mealDateTime, setMealDateTime] = useState(format(new Date(), 'HH:mm'));
+  const [notes, setNotes] = useState('');
+  const [addedFoods, setAddedFoods] = useState([]);
+
+  // Estado de busca de alimentos
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+
+  // Estado de medidas
+  const [measureType, setMeasureType] = useState('direct'); // 'direct' ou 'household'
+  const [householdMeasures, setHouseholdMeasures] = useState([]);
+
+  // Estado de submit
+  const [saving, setSaving] = useState(false);
+
+  // Carregar medidas caseiras
+  useEffect(() => {
+    loadHouseholdMeasures();
+  }, []);
+
+  const loadHouseholdMeasures = async () => {
+    const { data } = await supabase
+      .from('household_measures')
+      .select('*')
+      .order('name');
+
+    setHouseholdMeasures(data || []);
+  };
+
+  // Buscar alimentos
+  const handleSearchFoods = useCallback(async () => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearching(true);
+    const { data } = await supabase
+      .from('foods')
+      .select('*')
+      .ilike('name', `%${searchTerm}%`)
+      .limit(10);
+
+    setSearchResults(data || []);
+    setSearching(false);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(handleSearchFoods, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, handleSearchFoods]);
+
+  // Adicionar alimento recomendado
+  const handleAddRecommended = (recommendedFood) => {
+    const newFood = {
+      id: Date.now(),
+      food_id: recommendedFood.foods.id,
+      food_name: recommendedFood.foods.name,
+      quantity: recommendedFood.quantity,
+      unit: recommendedFood.unit,
+      measure_type: 'direct',
+      calories: recommendedFood.calories || 0,
+      protein: recommendedFood.protein || 0,
+      carbs: recommendedFood.carbs || 0,
+      fat: recommendedFood.fat || 0
+    };
+    setAddedFoods(prev => [...prev, newFood]);
+  };
+
+  // Adicionar alimento da busca
+  const handleAddFood = (food) => {
+    const newFood = {
+      id: Date.now(),
+      food_id: food.id,
+      food_name: food.name,
+      quantity: 100,
+      unit: 'g',
+      measure_type: 'direct',
+      calories: (food.calories || 0) * 1, // Calculado baseado na quantidade
+      protein: (food.protein || 0) * 1,
+      carbs: (food.carbs || 0) * 1,
+      fat: (food.fat || 0) * 1
+    };
+    setAddedFoods(prev => [...prev, newFood]);
+    setSearchTerm('');
+    setSearchResults([]);
+  };
+
+  // Atualizar quantidade/unidade
+  const handleUpdateFood = (id, field, value) => {
+    setAddedFoods(prev => prev.map(food => {
+      if (food.id === id) {
+        const updated = { ...food, [field]: value };
+
+        // Recalcular nutrientes se mudou quantidade
+        if (field === 'quantity' && value) {
+          const multiplier = parseFloat(value) / 100; // Assumindo base 100g
+          updated.calories = (food.calories / (food.quantity / 100)) * multiplier;
+          updated.protein = (food.protein / (food.quantity / 100)) * multiplier;
+          updated.carbs = (food.carbs / (food.quantity / 100)) * multiplier;
+          updated.fat = (food.fat / (food.quantity / 100)) * multiplier;
+        }
+
+        return updated;
+      }
+      return food;
+    }));
+  };
+
+  // Remover alimento
+  const handleRemoveFood = (id) => {
+    setAddedFoods(prev => prev.filter(food => food.id !== id));
+  };
+
+  // Calcular totais
+  const totals = addedFoods.reduce((acc, food) => ({
+    calories: acc.calories + (parseFloat(food.calories) || 0),
+    protein: acc.protein + (parseFloat(food.protein) || 0),
+    carbs: acc.carbs + (parseFloat(food.carbs) || 0),
+    fat: acc.fat + (parseFloat(food.fat) || 0)
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+  // Salvar refeição
+  const handleSave = async () => {
+    if (addedFoods.length === 0) {
+      toast({
+        title: 'Erro',
+        description: 'Adicione pelo menos um alimento',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+
+      // Criar refeição
+      const { data: meal, error: mealError } = await supabase
+        .from('meals')
+        .insert({
+          patient_id: user.id,
+          meal_type: mealType,
+          meal_date: today,
+          meal_time: mealDateTime,
+          notes: notes,
+          total_calories: totals.calories,
+          total_protein: totals.protein,
+          total_carbs: totals.carbs,
+          total_fat: totals.fat
+        })
+        .select()
+        .single();
+
+      if (mealError) throw mealError;
+
+      // Adicionar itens da refeição
+      const mealItems = addedFoods.map(food => ({
+        meal_id: meal.id,
+        food_id: food.food_id,
+        quantity: food.quantity,
+        unit: food.unit
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('meal_items')
+        .insert(mealItems);
+
+      if (itemsError) throw itemsError;
+
+      toast({
+        title: 'Sucesso!',
+        description: 'Refeição registrada com sucesso'
+      });
+
+      navigate('/patient/diario');
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível salvar a refeição',
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!mealType) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Tipo de refeição não especificado</p>
+          <Button onClick={() => navigate('/patient/diario')}>
+            Voltar ao Diário
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-8">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/patient/diario')}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">
+              Registrar {translateMealType(mealType)}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Adicione os alimentos consumidos
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Coluna principal */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Alimentos Recomendados */}
+            {recommendedFoods && recommendedFoods.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Alimentos Recomendados</CardTitle>
+                  <CardDescription>
+                    Seu nutricionista sugeriu estes alimentos
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {recommendedFoods.map((food, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{food.foods?.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {food.quantity} {translateUnit(food.unit)}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddRecommended(food)}
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Adicionar
+                      </Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Buscar e Adicionar Alimentos */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Adicionar Alimentos</CardTitle>
+                <CardDescription>
+                  Busque e adicione outros alimentos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Campo de busca */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar alimento..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+
+                  {/* Resultados da busca */}
+                  {searchResults.length > 0 && (
+                    <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                      {searchResults.map(food => (
+                        <div
+                          key={food.id}
+                          className="p-3 hover:bg-accent cursor-pointer flex items-center justify-between"
+                          onClick={() => handleAddFood(food)}
+                        >
+                          <span className="text-sm">{food.name}</span>
+                          <Plus className="w-4 h-4 text-primary" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Alimentos Adicionados */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Alimentos Adicionados</CardTitle>
+                <CardDescription>
+                  Configure as quantidades
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {addedFoods.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhum alimento adicionado ainda
+                  </p>
+                ) : (
+                  addedFoods.map(food => (
+                    <div key={food.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium">{food.food_name}</p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveFood(food.id)}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+
+                      {/* Tipo de medida */}
+                      <RadioGroup
+                        value={food.measure_type || 'direct'}
+                        onValueChange={(value) => handleUpdateFood(food.id, 'measure_type', value)}
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="direct" id={`direct-${food.id}`} />
+                            <Label htmlFor={`direct-${food.id}`}>Medida Direta</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="household" id={`household-${food.id}`} />
+                            <Label htmlFor={`household-${food.id}`}>Medida Caseira</Label>
+                          </div>
+                        </div>
+                      </RadioGroup>
+
+                      {/* Inputs de quantidade */}
+                      {food.measure_type === 'direct' ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Quantidade</Label>
+                            <Input
+                              type="number"
+                              value={food.quantity}
+                              onChange={(e) => handleUpdateFood(food.id, 'quantity', e.target.value)}
+                              step="0.1"
+                            />
+                          </div>
+                          <div>
+                            <Label>Unidade</Label>
+                            <Select
+                              value={food.unit}
+                              onValueChange={(value) => handleUpdateFood(food.id, 'unit', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="g">Gramas (g)</SelectItem>
+                                <SelectItem value="ml">Mililitros (ml)</SelectItem>
+                                <SelectItem value="unit">Unidades</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Medida</Label>
+                            <Select
+                              value={food.unit}
+                              onValueChange={(value) => handleUpdateFood(food.id, 'unit', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {householdMeasures.map(measure => (
+                                  <SelectItem key={measure.id} value={measure.name}>
+                                    {measure.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Quantidade</Label>
+                            <Input
+                              type="number"
+                              value={food.quantity}
+                              onChange={(e) => handleUpdateFood(food.id, 'quantity', e.target.value)}
+                              step="0.1"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Coluna lateral - Resumo */}
+          <div className="lg:col-span-1">
+            <Card className="sticky top-4">
+              <CardHeader>
+                <CardTitle className="text-lg">Resumo da Refeição</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Horário */}
+                <div>
+                  <Label className="flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4" />
+                    Horário
+                  </Label>
+                  <Input
+                    type="time"
+                    value={mealDateTime}
+                    onChange={(e) => setMealDateTime(e.target.value)}
+                  />
+                </div>
+
+                {/* Observações */}
+                <div>
+                  <Label className="flex items-center gap-2 mb-2">
+                    <MessageSquare className="w-4 h-4" />
+                    Observações
+                  </Label>
+                  <Textarea
+                    placeholder="Adicione comentários sobre esta refeição..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+
+                {/* Totais Nutricionais */}
+                <div className="space-y-2 pt-4 border-t">
+                  <h4 className="font-semibold text-sm">Totais Nutricionais</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center p-3 bg-primary/5 rounded-lg">
+                      <p className="text-2xl font-bold text-primary">
+                        {Math.round(totals.calories)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Calorias</p>
+                    </div>
+                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                      <p className="text-lg font-bold text-blue-600">
+                        {Math.round(totals.protein)}g
+                      </p>
+                      <p className="text-xs text-muted-foreground">Proteínas</p>
+                    </div>
+                    <div className="text-center p-3 bg-orange-50 rounded-lg">
+                      <p className="text-lg font-bold text-orange-600">
+                        {Math.round(totals.carbs)}g
+                      </p>
+                      <p className="text-xs text-muted-foreground">Carboidratos</p>
+                    </div>
+                    <div className="text-center p-3 bg-amber-50 rounded-lg">
+                      <p className="text-lg font-bold text-amber-600">
+                        {Math.round(totals.fat)}g
+                      </p>
+                      <p className="text-xs text-muted-foreground">Gorduras</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botão Salvar */}
+                <Button
+                  className="w-full"
+                  onClick={handleSave}
+                  disabled={saving || addedFoods.length === 0}
+                >
+                  {saving ? (
+                    <>Salvando...</>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Salvar Refeição
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
