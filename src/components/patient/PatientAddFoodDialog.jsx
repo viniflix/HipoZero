@@ -22,13 +22,17 @@ import { calculateNutrition } from '@/lib/supabase/meal-plan-queries';
  *
  * Usa sistema de medidas caseiras (CascadeMeasureSelector)
  * Compatível com sistema do nutricionista
+ *
+ * Modos:
+ * - 'add': Buscar e adicionar novo alimento
+ * - 'edit': Alterar medida de alimento existente
  */
 const PatientAddFoodDialog = ({
     isOpen,
     onClose,
     onAdd,
-    initialFood = null, // Para edição ou alimentos recomendados
-    mode = 'add' // 'add', 'edit', 'recommended'
+    initialFood = null, // Para edição
+    mode = 'add' // 'add' ou 'edit'
 }) => {
     const [selectedFood, setSelectedFood] = useState(null);
     const [quantity, setQuantity] = useState('');
@@ -44,20 +48,11 @@ const PatientAddFoodDialog = ({
     const [searching, setSearching] = useState(false);
 
     useEffect(() => {
-        if (initialFood) {
+        if (initialFood && mode === 'edit') {
             setSelectedFood(initialFood);
-
-            // Se for modo edição, preencher campos
-            if (mode === 'edit') {
-                setQuantity(initialFood.quantity?.toString() || '');
-                setUnit(initialFood.unit || '');
-                setNotes(initialFood.notes || '');
-            }
-            // Se for modo recomendado, pré-preencher com valores sugeridos
-            else if (mode === 'recommended') {
-                setQuantity(initialFood.recommended_quantity?.toString() || '');
-                setUnit(initialFood.recommended_unit || '');
-            }
+            setQuantity(initialFood.quantity?.toString() || '');
+            setUnit(initialFood.unit || '');
+            setNotes(initialFood.notes || '');
         }
     }, [initialFood, mode]);
 
@@ -135,7 +130,7 @@ const PatientAddFoodDialog = ({
         if (!validate()) return;
 
         const foodData = {
-            id: initialFood?.id || Date.now(), // Para edição, manter ID
+            id: Date.now(), // ID único para novo alimento
             food_id: selectedFood.id,
             food_name: selectedFood.name,
             quantity: parseFloat(quantity),
@@ -153,6 +148,11 @@ const PatientAddFoodDialog = ({
             fat: calculatedNutrition?.fat || 0,
             notes: notes.trim() || null
         };
+
+        // Se for edição, preservar list_item_id
+        if (mode === 'edit' && initialFood?.list_item_id) {
+            foodData.list_item_id = initialFood.list_item_id;
+        }
 
         onAdd(foodData);
         handleClose();

@@ -130,7 +130,7 @@ export default function AddMealPage() {
   };
 
   // Buscar alimentos
-  // Abrir modal para adicionar alimento recomendado
+  // Adicionar alimento recomendado DIRETO (sem modal)
   const handleAddRecommended = async (recommendedFood) => {
     // Buscar dados completos do alimento
     const { data: foodData } = await supabase
@@ -148,14 +148,34 @@ export default function AddMealPage() {
       return;
     }
 
-    // Abrir modal com dados do alimento recomendado
-    setEditingFood({
-      ...foodData,
-      recommended_quantity: recommendedFood.quantity,
-      recommended_unit: recommendedFood.unit
-    });
-    setDialogMode('recommended');
-    setShowFoodDialog(true);
+    // Calcular nutrientes usando a função do nutricionista
+    const { calculateNutrition } = await import('@/lib/supabase/meal-plan-queries');
+    const nutrition = await calculateNutrition(
+      foodData,
+      parseFloat(recommendedFood.quantity),
+      recommendedFood.unit
+    );
+
+    // Adicionar direto na lista
+    const newFood = {
+      id: Date.now(),
+      food_id: foodData.id,
+      food_name: foodData.name,
+      quantity: parseFloat(recommendedFood.quantity),
+      unit: recommendedFood.unit,
+      measure: null, // Será preenchido se necessário
+      base_calories: foodData.calories || 0,
+      base_protein: foodData.protein || 0,
+      base_carbs: foodData.carbs || 0,
+      base_fat: foodData.fat || 0,
+      calories: nutrition.calories,
+      protein: nutrition.protein,
+      carbs: nutrition.carbs,
+      fat: nutrition.fat,
+      notes: null
+    };
+
+    setAddedFoods(prev => [...prev, newFood]);
   };
 
   // Abrir modal para adicionar novo alimento
@@ -165,18 +185,37 @@ export default function AddMealPage() {
     setShowFoodDialog(true);
   };
 
-  // Abrir modal para editar alimento existente
+  // Abrir modal para editar alimento existente (alterar medida)
   const handleEditFood = (food) => {
-    setEditingFood(food);
+    // Preparar alimento para edição no formato que o modal espera
+    const foodForEdit = {
+      id: food.food_id,
+      name: food.food_name,
+      calories: food.base_calories,
+      protein: food.base_protein,
+      carbs: food.base_carbs,
+      fat: food.base_fat,
+      // Dados atuais para pré-preencher
+      quantity: food.quantity,
+      unit: food.unit,
+      measure: food.measure,
+      notes: food.notes,
+      // ID do item na lista para atualizar
+      list_item_id: food.id
+    };
+
+    setEditingFood(foodForEdit);
     setDialogMode('edit');
     setShowFoodDialog(true);
   };
 
   // Callback quando modal adicionar/atualizar alimento
   const handleFoodDialogAdd = (foodData) => {
-    if (dialogMode === 'edit') {
-      // Atualizar alimento existente
-      setAddedFoods(prev => prev.map(f => f.id === foodData.id ? foodData : f));
+    if (dialogMode === 'edit' && foodData.list_item_id) {
+      // Atualizar alimento existente - preservar list_item_id original
+      setAddedFoods(prev => prev.map(f =>
+        f.id === foodData.list_item_id ? { ...foodData, id: foodData.list_item_id } : f
+      ));
     } else {
       // Adicionar novo alimento
       setAddedFoods(prev => [...prev, foodData]);
@@ -186,6 +225,40 @@ export default function AddMealPage() {
   // Remover alimento
   const handleRemoveFood = (id) => {
     setAddedFoods(prev => prev.filter(food => food.id !== id));
+  };
+
+  // Atualizar quantidade inline (recalcula nutrientes)
+  const handleUpdateQuantity = async (id, newQuantity) => {
+    const food = addedFoods.find(f => f.id === id);
+    if (!food) return;
+
+    const qty = parseFloat(newQuantity);
+    if (isNaN(qty) || qty <= 0) return;
+
+    // Recalcular nutrientes
+    const { calculateNutrition } = await import('@/lib/supabase/meal-plan-queries');
+    const foodData = {
+      calories: food.base_calories,
+      protein: food.base_protein,
+      carbs: food.base_carbs,
+      fat: food.base_fat
+    };
+
+    const nutrition = await calculateNutrition(foodData, qty, food.unit);
+
+    setAddedFoods(prev => prev.map(f => {
+      if (f.id === id) {
+        return {
+          ...f,
+          quantity: qty,
+          calories: nutrition.calories,
+          protein: nutrition.protein,
+          carbs: nutrition.carbs,
+          fat: nutrition.fat
+        };
+      }
+      return f;
+    }));
   };
 
   // Calcular totais
@@ -436,39 +509,60 @@ export default function AddMealPage() {
                   </p>
                 ) : (
                   addedFoods.map(food => (
-                    <div key={food.id} className="border rounded-lg p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{food.food_name}</p>
-                          <p className="text-sm text-primary font-medium mt-1">
-                            {formatQuantityWithUnit(food.quantity, food.unit, food.measure)}
-                          </p>
-                          <div className="text-xs text-muted-foreground mt-2">
-                            {food.calories} kcal • P: {food.protein}g • C: {food.carbs}g • G: {food.fat}g
-                          </div>
-                          {food.notes && (
-                            <p className="text-xs text-muted-foreground italic mt-1">
-                              {food.notes}
-                            </p>
-                          )}
+                    <div key={food.id} className="border rounded-lg p-4 space-y-3">
+                      {/* Cabeçalho */}
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium">{food.food_name}</p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveFood(food.id)}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+
+                      {/* Edição inline de quantidade */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Quantidade</Label>
+                          <Input
+                            type="number"
+                            value={food.quantity}
+                            onChange={(e) => handleUpdateQuantity(food.id, e.target.value)}
+                            step="0.1"
+                            min="0"
+                            className="h-9"
+                          />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditFood(food)}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveFood(food.id)}
-                          >
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
+                        <div>
+                          <Label className="text-xs">Medida</Label>
+                          <div className="h-9 px-3 border rounded-md flex items-center bg-muted text-sm">
+                            {formatQuantityWithUnit(1, food.unit, food.measure).replace(/^\d+\s*/, '')}
+                          </div>
                         </div>
                       </div>
+
+                      {/* Nutrientes */}
+                      <div className="text-xs text-muted-foreground">
+                        {food.calories.toFixed(1)} kcal • P: {food.protein.toFixed(1)}g • C: {food.carbs.toFixed(1)}g • G: {food.fat.toFixed(1)}g
+                      </div>
+
+                      {/* Botão para editar medida completa */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleEditFood(food)}
+                      >
+                        Alterar Medida
+                      </Button>
+
+                      {food.notes && (
+                        <p className="text-xs text-muted-foreground italic">
+                          {food.notes}
+                        </p>
+                      )}
                     </div>
                   ))
                 )}
