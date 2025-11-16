@@ -2,18 +2,20 @@ import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { ArrowLeft, Plus, Trash2, Search, Clock, MessageSquare, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Search, Clock, MessageSquare, Save, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/hooks/use-toast';
-import { translateMealType, translateUnit } from '@/utils/mealTranslations';
+import { translateMealType } from '@/utils/mealTranslations';
+import { formatQuantityWithUnit } from '@/lib/utils/measureTranslations';
+import { calculateNutrition } from '@/lib/supabase/meal-plan-queries';
+import CascadeMeasureSelector from '@/components/meal-plan/CascadeMeasureSelector';
 
 /**
  * AddMealPage - Nova página reformulada de registro de refeição
