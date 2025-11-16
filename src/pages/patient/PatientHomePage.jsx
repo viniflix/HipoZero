@@ -29,7 +29,7 @@ export default function PatientHomePage() {
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
 
-    // 1. Buscar prescrição ativa com meal plan (CORRIGIDO)
+    // 1. Buscar prescrição ativa com meal plan
     const { data: presData, error: presError } = await supabase
       .from('prescriptions')
       .select('*')
@@ -38,12 +38,17 @@ export default function PatientHomePage() {
       .gte('end_date', todayStr)
       .maybeSingle();
 
+    console.log('Prescription data:', presData); // Debug
+
     if (!presError && presData?.template_id) {
       // Buscar itens do template com alimentos
-      const { data: itemsData } = await supabase
+      const { data: itemsData, error: itemsError } = await supabase
         .from('meal_plan_template_items')
         .select('*, foods(id, name)')
         .eq('template_id', presData.template_id);
+
+      console.log('Meal plan items:', itemsData); // Debug
+      console.log('Items error:', itemsError); // Debug
 
       setPrescription({ ...presData, meal_plan_items: itemsData || [] });
     } else {
@@ -89,143 +94,147 @@ export default function PatientHomePage() {
   const firstName = user?.profile?.name?.split(' ')[0] || 'Paciente';
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header com saudação */}
+    <div className="flex flex-col min-h-screen bg-background">
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white border-b sticky top-0 z-10"
+        transition={{ duration: 0.5 }}
+        className="max-w-7xl mx-auto w-full px-4 md:px-8 py-8"
       >
-        <div className="px-4 py-6">
-          <h1 className="text-2xl font-bold text-foreground">
+        {/* Header */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold font-heading uppercase tracking-wide text-primary">
             Olá, {firstName}! 👋
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          </h2>
+          <p className="text-neutral-600 mt-1">
             {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
           </p>
         </div>
-      </motion.div>
 
-      <div className="p-4 space-y-4">
-        {/* Lembrete de Consulta */}
-        {nextAppointment && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <Card className="bg-blue-50 border-blue-200">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <CalendarClock className="w-5 h-5 text-blue-600" />
-                  <CardTitle className="text-lg text-blue-900">
-                    Próxima Consulta
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm font-medium text-blue-900">
-                  {format(
-                    new Date(nextAppointment.appointment_time),
-                    "dd 'de' MMMM 'às' HH:mm",
-                    { locale: ptBR }
-                  )}
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Card Principal: Plano Alimentar do Dia */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="shadow-sm bg-white">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UtensilsCrossed className="w-5 h-5 text-primary" />
-                  <CardTitle className="text-lg">Plano Alimentar de Hoje</CardTitle>
-                </div>
-              </div>
-              <CardDescription>
-                Veja as refeições prescritas para o dia
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {prescription?.meal_plan_items ? (
-                <MealPlanView mealPlanItems={prescription.meal_plan_items} />
-              ) : (
-                <div className="text-center py-8">
-                  <UtensilsCrossed className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum plano alimentar ativo no momento.
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Entre em contato com seu nutricionista.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Widget de Métricas */}
-        <PatientMetricsWidget />
-
-        {/* Card de Atalho: Diário Alimentar */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card
-            className="cursor-pointer hover:shadow-md transition-all duration-200 bg-white"
-            onClick={() => navigate('/patient/diario')}
-          >
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <BookMarked className="w-5 h-5 text-primary" />
-                  <CardTitle className="text-base">Diário Alimentar</CardTitle>
-                </div>
-                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  todayMealsCount > 0
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {todayMealsCount > 0
-                    ? `${todayMealsCount} ${todayMealsCount === 1 ? 'refeição' : 'refeições'}`
-                    : 'Vazio'}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-3">
-                {todayMealsCount > 0
-                  ? 'Continue registrando suas refeições'
-                  : 'Comece registrando sua primeira refeição hoje'}
-              </p>
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate('/patient/diario');
-                }}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Coluna Principal */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Lembrete de Consulta */}
+            {nextAppointment && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
               >
-                <BookMarked className="w-4 h-4 mr-2" />
-                {todayMealsCount > 0 ? 'Ver diário' : 'Registrar agora'}
-              </Button>
-            </CardContent>
-          </Card>
-        </motion.div>
+                <Card className="bg-blue-50 border-blue-200 shadow-card">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <CalendarClock className="w-5 h-5 text-blue-600" />
+                      <CardTitle className="text-lg text-blue-900">
+                        Próxima Consulta
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm font-medium text-blue-900">
+                      {format(
+                        new Date(nextAppointment.appointment_time),
+                        "dd 'de' MMMM 'às' HH:mm",
+                        { locale: ptBR }
+                      )}
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
 
-        {/* Espaço para a Bottom Navigation */}
-        <div className="h-4"></div>
-      </div>
+            {/* Card: Plano Alimentar do Dia */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Card className="shadow-card-dark rounded-xl bg-card">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <UtensilsCrossed className="w-5 h-5 text-primary" />
+                      <CardTitle className="text-lg font-semibold">Plano Alimentar de Hoje</CardTitle>
+                    </div>
+                  </div>
+                  <CardDescription>
+                    Veja as refeições prescritas para o dia
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {prescription?.meal_plan_items && prescription.meal_plan_items.length > 0 ? (
+                    <MealPlanView mealPlanItems={prescription.meal_plan_items} />
+                  ) : (
+                    <div className="text-center py-8">
+                      <UtensilsCrossed className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+                      <p className="text-sm text-muted-foreground">
+                        Nenhum plano alimentar ativo no momento.
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Entre em contato com seu nutricionista.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Card: Diário Alimentar */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Card
+                className="shadow-card-dark rounded-xl bg-card cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => navigate('/patient/diario')}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BookMarked className="w-5 h-5 text-primary" />
+                      <CardTitle className="text-base font-semibold">Diário Alimentar</CardTitle>
+                    </div>
+                    <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      todayMealsCount > 0
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {todayMealsCount > 0
+                        ? `${todayMealsCount} ${todayMealsCount === 1 ? 'refeição' : 'refeições'}`
+                        : 'Vazio'}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {todayMealsCount > 0
+                      ? 'Continue registrando suas refeições'
+                      : 'Comece registrando sua primeira refeição hoje'}
+                  </p>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/patient/diario');
+                    }}
+                  >
+                    <BookMarked className="w-4 h-4 mr-2" />
+                    {todayMealsCount > 0 ? 'Ver diário' : 'Registrar agora'}
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* Coluna Lateral */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Widget de Métricas */}
+            <PatientMetricsWidget />
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
