@@ -8,14 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { translateMealType } from '@/utils/mealTranslations';
 import { formatQuantityWithUnit } from '@/lib/utils/measureTranslations';
-import { calculateNutrition } from '@/lib/supabase/meal-plan-queries';
-import CascadeMeasureSelector from '@/components/meal-plan/CascadeMeasureSelector';
+import PatientAddFoodDialog from '@/components/patient/PatientAddFoodDialog';
 
 /**
  * AddMealPage - Nova página reformulada de registro de refeição
@@ -47,22 +45,13 @@ export default function AddMealPage() {
   const [addedFoods, setAddedFoods] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Estado de busca de alimentos
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-
-  // Estado de medidas
-  const [measureType, setMeasureType] = useState('direct'); // 'direct' ou 'household'
-  const [householdMeasures, setHouseholdMeasures] = useState([]);
+  // Estado do modal de adicionar/editar alimento
+  const [showFoodDialog, setShowFoodDialog] = useState(false);
+  const [dialogMode, setDialogMode] = useState('add'); // 'add', 'edit', 'recommended'
+  const [editingFood, setEditingFood] = useState(null);
 
   // Estado de submit
   const [saving, setSaving] = useState(false);
-
-  // Carregar medidas caseiras
-  useEffect(() => {
-    loadHouseholdMeasures();
-  }, []);
 
   // Carregar dados da refeição existente se estiver em modo de edição
   useEffect(() => {
@@ -70,15 +59,6 @@ export default function AddMealPage() {
       loadExistingMeal();
     }
   }, [editMode, mealId]);
-
-  const loadHouseholdMeasures = async () => {
-    const { data } = await supabase
-      .from('household_measures')
-      .select('*')
-      .order('name');
-
-    setHouseholdMeasures(data || []);
-  };
 
   const loadExistingMeal = async () => {
     setLoading(true);
@@ -150,29 +130,7 @@ export default function AddMealPage() {
   };
 
   // Buscar alimentos
-  const handleSearchFoods = useCallback(async () => {
-    if (!searchTerm.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    setSearching(true);
-    const { data } = await supabase
-      .from('foods')
-      .select('*')
-      .ilike('name', `%${searchTerm}%`)
-      .limit(10);
-
-    setSearchResults(data || []);
-    setSearching(false);
-  }, [searchTerm]);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(handleSearchFoods, 300);
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, handleSearchFoods]);
-
-  // Adicionar alimento recomendado
+  // Abrir modal para adicionar alimento recomendado
   const handleAddRecommended = async (recommendedFood) => {
     // Buscar dados completos do alimento
     const { data: foodData } = await supabase
@@ -190,130 +148,39 @@ export default function AddMealPage() {
       return;
     }
 
-    const qty = parseFloat(recommendedFood.quantity) || 100;
+    // Abrir modal com dados do alimento recomendado
+    setEditingFood({
+      ...foodData,
+      recommended_quantity: recommendedFood.quantity,
+      recommended_unit: recommendedFood.unit
+    });
+    setDialogMode('recommended');
+    setShowFoodDialog(true);
+  };
 
-    // Normalizar unidade para os valores aceitos pelo Select
-    let unit = recommendedFood.unit || 'g';
-    const unitLower = unit.toLowerCase().trim();
+  // Abrir modal para adicionar novo alimento
+  const handleOpenAddDialog = () => {
+    setEditingFood(null);
+    setDialogMode('add');
+    setShowFoodDialog(true);
+  };
 
-    // Mapear variações para valores padronizados
-    if (unitLower.includes('gram') || unitLower === 'g') {
-      unit = 'g';
-    } else if (unitLower.includes('ml') || unitLower.includes('mililitr')) {
-      unit = 'ml';
-    } else if (unitLower.includes('unid')) {
-      unit = 'unit';
-    }
+  // Abrir modal para editar alimento existente
+  const handleEditFood = (food) => {
+    setEditingFood(food);
+    setDialogMode('edit');
+    setShowFoodDialog(true);
+  };
 
-    // Calcular nutrientes baseado na quantidade e unidade do plano
-    let multiplier;
-    if (unit === 'unit') {
-      multiplier = qty; // Para unidades, multiplicar diretamente
+  // Callback quando modal adicionar/atualizar alimento
+  const handleFoodDialogAdd = (foodData) => {
+    if (dialogMode === 'edit') {
+      // Atualizar alimento existente
+      setAddedFoods(prev => prev.map(f => f.id === foodData.id ? foodData : f));
     } else {
-      multiplier = qty / 100; // Para g/ml, base é per 100g
+      // Adicionar novo alimento
+      setAddedFoods(prev => [...prev, foodData]);
     }
-
-    const newFood = {
-      id: Date.now(),
-      food_id: foodData.id,
-      food_name: foodData.name,
-      quantity: qty,
-      unit: unit,
-      measure_type: 'direct',
-      // Valores base (per 100g da tabela foods)
-      base_calories: foodData.calories || 0,
-      base_protein: foodData.protein || 0,
-      base_carbs: foodData.carbs || 0,
-      base_fat: foodData.fat || 0,
-      // Valores calculados para a quantidade recomendada
-      calories: (foodData.calories || 0) * multiplier,
-      protein: (foodData.protein || 0) * multiplier,
-      carbs: (foodData.carbs || 0) * multiplier,
-      fat: (foodData.fat || 0) * multiplier
-    };
-    setAddedFoods(prev => [...prev, newFood]);
-  };
-
-  // Adicionar alimento da busca
-  const handleAddFood = async (food) => {
-    // Buscar nutrientes completos do alimento
-    const { data: foodData } = await supabase
-      .from('foods')
-      .select('*')
-      .eq('id', food.id)
-      .single();
-
-    if (!foodData) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar os dados do alimento',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    // Calcular nutrientes para 100g (base)
-    const baseQuantity = 100;
-    const newFood = {
-      id: Date.now(),
-      food_id: foodData.id,
-      food_name: foodData.name,
-      quantity: baseQuantity,
-      unit: 'g',
-      measure_type: 'direct',
-      // Nutrientes já vêm na base de 100g na tabela foods
-      base_calories: foodData.calories || 0,
-      base_protein: foodData.protein || 0,
-      base_carbs: foodData.carbs || 0,
-      base_fat: foodData.fat || 0,
-      // Calculados para a quantidade
-      calories: foodData.calories || 0,
-      protein: foodData.protein || 0,
-      carbs: foodData.carbs || 0,
-      fat: foodData.fat || 0
-    };
-    setAddedFoods(prev => [...prev, newFood]);
-    setSearchTerm('');
-    setSearchResults([]);
-  };
-
-  // Atualizar quantidade/unidade
-  const handleUpdateFood = (id, field, value) => {
-    setAddedFoods(prev => prev.map(food => {
-      if (food.id === id) {
-        const updated = { ...food, [field]: value };
-
-        // Recalcular nutrientes se mudou quantidade ou unidade
-        const shouldRecalculate =
-          (field === 'quantity' && value) ||
-          (field === 'unit' && food.quantity);
-
-        if (shouldRecalculate && food.base_calories !== undefined) {
-          const currentQuantity = field === 'quantity' ? parseFloat(value) : parseFloat(food.quantity);
-          const currentUnit = field === 'unit' ? value : food.unit;
-
-          let multiplier;
-
-          // Calcular multiplicador baseado na unidade
-          if (currentUnit === 'unit') {
-            // Para unidades, assumir que base é per unidade
-            // Então 1 unidade = 1x os valores base
-            multiplier = currentQuantity;
-          } else {
-            // Para g e ml, assumir que base é per 100g/ml
-            multiplier = currentQuantity / 100;
-          }
-
-          updated.calories = food.base_calories * multiplier;
-          updated.protein = food.base_protein * multiplier;
-          updated.carbs = food.base_carbs * multiplier;
-          updated.fat = food.base_fat * multiplier;
-        }
-
-        return updated;
-      }
-      return food;
-    }));
   };
 
   // Remover alimento
@@ -543,38 +410,14 @@ export default function AddMealPage() {
               <CardHeader>
                 <CardTitle>Adicionar Alimentos</CardTitle>
                 <CardDescription>
-                  Busque e adicione outros alimentos
+                  Busque e adicione outros alimentos usando medidas caseiras
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {/* Campo de busca */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar alimento..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-
-                  {/* Resultados da busca */}
-                  {searchResults.length > 0 && (
-                    <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
-                      {searchResults.map(food => (
-                        <div
-                          key={food.id}
-                          className="p-3 hover:bg-accent cursor-pointer flex items-center justify-between"
-                          onClick={() => handleAddFood(food)}
-                        >
-                          <span className="text-sm">{food.name}</span>
-                          <Plus className="w-4 h-4 text-primary" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <Button onClick={handleOpenAddDialog} className="w-full">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Buscar Alimento
+                </Button>
               </CardContent>
             </Card>
 
@@ -593,95 +436,39 @@ export default function AddMealPage() {
                   </p>
                 ) : (
                   addedFoods.map(food => (
-                    <div key={food.id} className="border rounded-lg p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{food.food_name}</p>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveFood(food.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
+                    <div key={food.id} className="border rounded-lg p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{food.food_name}</p>
+                          <p className="text-sm text-primary font-medium mt-1">
+                            {formatQuantityWithUnit(food.quantity, food.unit, food.measure)}
+                          </p>
+                          <div className="text-xs text-muted-foreground mt-2">
+                            {food.calories} kcal • P: {food.protein}g • C: {food.carbs}g • G: {food.fat}g
+                          </div>
+                          {food.notes && (
+                            <p className="text-xs text-muted-foreground italic mt-1">
+                              {food.notes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditFood(food)}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveFood(food.id)}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-
-                      {/* Tipo de medida */}
-                      <RadioGroup
-                        value={food.measure_type || 'direct'}
-                        onValueChange={(value) => handleUpdateFood(food.id, 'measure_type', value)}
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="direct" id={`direct-${food.id}`} />
-                            <Label htmlFor={`direct-${food.id}`}>Medida Direta</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="household" id={`household-${food.id}`} />
-                            <Label htmlFor={`household-${food.id}`}>Medida Caseira</Label>
-                          </div>
-                        </div>
-                      </RadioGroup>
-
-                      {/* Inputs de quantidade */}
-                      {food.measure_type === 'direct' ? (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label>Quantidade</Label>
-                            <Input
-                              type="number"
-                              value={food.quantity}
-                              onChange={(e) => handleUpdateFood(food.id, 'quantity', e.target.value)}
-                              step="0.1"
-                            />
-                          </div>
-                          <div>
-                            <Label>Unidade</Label>
-                            <Select
-                              value={food.unit || 'g'}
-                              onValueChange={(value) => handleUpdateFood(food.id, 'unit', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="g">Gramas (g)</SelectItem>
-                                <SelectItem value="ml">Mililitros (ml)</SelectItem>
-                                <SelectItem value="unit">Unidades</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label>Medida</Label>
-                            <Select
-                              value={food.unit}
-                              onValueChange={(value) => handleUpdateFood(food.id, 'unit', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {householdMeasures.map(measure => (
-                                  <SelectItem key={measure.id} value={measure.name}>
-                                    {measure.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label>Quantidade</Label>
-                            <Input
-                              type="number"
-                              value={food.quantity}
-                              onChange={(e) => handleUpdateFood(food.id, 'quantity', e.target.value)}
-                              step="0.1"
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ))
                 )}
@@ -774,6 +561,15 @@ export default function AddMealPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Adicionar/Editar Alimento */}
+      <PatientAddFoodDialog
+        isOpen={showFoodDialog}
+        onClose={() => setShowFoodDialog(false)}
+        onAdd={handleFoodDialogAdd}
+        initialFood={editingFood}
+        mode={dialogMode}
+      />
     </div>
   );
 }
