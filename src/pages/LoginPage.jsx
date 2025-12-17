@@ -28,50 +28,33 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [isAlertOpen, setIsAlertOpen] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
 
-  const { signIn, user } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Check for existing session on mount (for email confirmation links)
+  // Smart redirect logic: wait for auth to finish loading, then redirect if user has profile
   useEffect(() => {
-    const checkExistingSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error checking session:', error);
-          setCheckingSession(false);
-          return;
-        }
-
-        // If session exists, set checking to false and let the user context redirect
-        if (session?.user) {
-          console.log('Existing session found, waiting for profile to load...');
-          // Wait a bit for AuthContext to process, then stop checking
-          setTimeout(() => {
-            setCheckingSession(false);
-          }, 500);
-        } else {
-          setCheckingSession(false);
-        }
-      } catch (error) {
-        console.error('Exception checking session:', error);
-        setCheckingSession(false);
-      }
-    };
-
-    checkExistingSession();
-  }, []);
-
-  // Redirect if already logged in (from context or session check)
-  useEffect(() => {
-    if (user?.profile && !checkingSession) {
-      const redirectPath = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
-      navigate(redirectPath, { replace: true });
+    // Don't redirect while AuthContext is still loading (checking session, fetching profile, etc.)
+    if (authLoading) {
+      return;
     }
-  }, [user, navigate, checkingSession]);
+
+    // If user exists and profile is loaded, redirect based on user_type
+    if (user?.profile) {
+      const dashboard = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
+      console.log('Redirecting authenticated user to dashboard:', dashboard);
+      navigate(dashboard, { replace: true });
+      return;
+    }
+
+    // If user exists but profile is not loaded yet (self-healing in progress), wait
+    // The AuthContext will update user when profile is ready, triggering this effect again
+    if (user && !user.profile) {
+      console.log('User authenticated but profile not loaded yet, waiting...');
+      return;
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -128,13 +111,13 @@ export default function LoginPage() {
     }
   };
 
-  // Show loading state while checking session
-  if (checkingSession) {
+  // Show loading state while AuthContext is loading (checking session, fetching profile, self-healing)
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Verificando sessão...</p>
+          <p className="text-sm text-muted-foreground">Carregando...</p>
         </div>
       </div>
     );
