@@ -406,7 +406,7 @@ const ChatPage = () => {
       </main>
 
       {/* Footer fixo - acima do BottomNav no mobile */}
-      <footer className="flex-shrink-0 bg-white p-4 border-t shadow-lg z-20 mb-16 md:mb-0">
+      <footer className="flex-shrink-0 bg-white p-4 border-t shadow-lg z-20">
         {mediaPreview && (
           <div className="relative p-2 mb-2 border rounded-lg max-w-sm flex items-center gap-2 bg-slate-50">
             {mediaType === 'image' && <img src={mediaPreview} alt="Preview" className="max-h-24 rounded" />}

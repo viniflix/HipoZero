@@ -71,7 +71,7 @@ export default function PatientMobileLayout() {
     {
       to: '/patient/diario',
       icon: BookMarked,
-      label: 'Diário'
+      label: 'Plano'
     },
     {
       to: '/patient/progresso',
@@ -148,7 +148,7 @@ export default function PatientMobileLayout() {
 
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 md:ml-64 overflow-y-auto">
-        <div className="h-full pb-20 md:pb-0">
+        <div className="h-full pb-24 md:pb-0">
           <Outlet />
         </div>
       </main>
