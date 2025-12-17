@@ -204,7 +204,7 @@ export default function PatientHomePage() {
             >
               <Card
                 className="shadow-card-dark rounded-xl bg-card cursor-pointer hover:shadow-lg transition-shadow border-2 border-primary/20"
-                onClick={() => navigate('/patient/add-meal')}
+                onClick={() => navigate('/patient/diario')}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -226,7 +226,7 @@ export default function PatientHomePage() {
                     className="w-full bg-primary hover:bg-primary/90"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate('/patient/add-meal');
+                      navigate('/patient/diario');
                     }}
                   >
                     <UtensilsCrossed className="w-4 h-4 mr-2" />

@@ -422,7 +422,7 @@ export default function AddMealPage() {
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Tipo de refeição não especificado</p>
           <Button onClick={() => navigate('/patient/diario')}>
-            Voltar ao Diário
+            Voltar ao Plano Alimentar
           </Button>
         </div>
       </div>

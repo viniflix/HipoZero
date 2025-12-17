@@ -190,6 +190,7 @@ const ChatPage = () => {
   const [mediaPreview, setMediaPreview] = useState(null);
   const [mediaType, setMediaType] = useState(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const fileInputRef = useRef(null);
   const [isSending, setIsSending] = useState(false);
   // --- MUDANÇA NO ESTADO DO MODAL ---
@@ -232,7 +233,26 @@ const ChatPage = () => {
   }, [recipientId, fetchRecipient]);
 
   useEffect(() => { if (user && recipientId) fetchMessages(user.id, recipientId); }, [user, recipientId, fetchMessages]);
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }); }, [messages]);
+  
+  // Auto-scroll to bottom when messages change or on mount
+  useEffect(() => {
+    if (messagesContainerRef.current && messages.length > 0) {
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [messages]);
+
+  // Scroll to bottom on initial load
+  useEffect(() => {
+    if (messagesContainerRef.current && !messagesLoading && messages.length > 0) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }, 200);
+    }
+  }, [messagesLoading, messages.length]);
+
   useEffect(() => { if(recipientId) markChatAsRead(recipientId); }, [recipientId, markChatAsRead, messages]);
 
 
@@ -367,7 +387,7 @@ const ChatPage = () => {
       </header>
 
       {/* Message List - Scrollable area */}
-      <main className="flex-1 overflow-y-auto p-4 space-y-2">
+      <main ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2">
         {Object.entries(groupedMessages).map(([date, msgs]) => (
           <Fragment key={date}>
             <DateSeparator date={date} />
