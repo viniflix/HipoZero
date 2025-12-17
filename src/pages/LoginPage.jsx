@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, ArrowRight, Mail, Lock } from 'lucide-react';
@@ -29,9 +29,17 @@ export default function LoginPage() {
   const [resetEmail, setResetEmail] = useState('');
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
-  const { signIn } = useAuth();
+  const { signIn, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user?.profile) {
+      const redirectPath = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
+      navigate(redirectPath, { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -32,6 +32,85 @@ export function AuthProvider({ children }) {
     navigate('/login', { replace: true });
   }, [navigate]);
 
+  // Self-healing function to create profile if missing
+  const createProfileIfMissing = useCallback(async (sessionUser) => {
+    const metadata = sessionUser.user_metadata || {};
+    
+    // Extract required fields from metadata
+    const profileData = {
+      id: sessionUser.id,
+      email: sessionUser.email,
+      name: metadata.name || metadata.full_name || 'Usuário',
+      user_type: metadata.user_type || 'patient',
+      crn: metadata.crn || null,
+      birth_date: metadata.birth_date || null,
+      gender: metadata.gender || null,
+      height: metadata.height ? parseFloat(metadata.height) : null,
+      weight: metadata.weight ? parseFloat(metadata.weight) : null,
+      goal: metadata.goal || null,
+      nutritionist_id: metadata.nutritionist_id || null,
+      phone: metadata.phone || null,
+      cpf: metadata.cpf || null,
+      occupation: metadata.occupation || null,
+      civil_status: metadata.civil_status || null,
+      observations: metadata.observations || null,
+      address: metadata.address || null,
+    };
+
+    try {
+      const { data: newProfile, error: insertError } = await supabase
+        .from('user_profiles')
+        .insert(profileData)
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error creating profile (self-healing):', insertError);
+        return null;
+      }
+
+      console.log('Profile created successfully (self-healing)');
+      return newProfile;
+    } catch (error) {
+      console.error('Exception during profile creation (self-healing):', error);
+      return null;
+    }
+  }, []);
+
+  // Fetch or create profile
+  const fetchOrCreateProfile = useCallback(async (sessionUser) => {
+    // Try to fetch existing profile
+    const { data: profile, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', sessionUser.id)
+      .single();
+
+    // If profile exists, return it
+    if (profile && !error) {
+      return profile;
+    }
+
+    // If error is PGRST116 (no rows found), try self-healing
+    if (error?.code === 'PGRST116') {
+      console.warn('Profile not found (PGRST116), attempting self-healing...');
+      const newProfile = await createProfileIfMissing(sessionUser);
+      if (newProfile) {
+        return newProfile;
+      }
+      // If self-healing fails, return null (will be handled by caller)
+      return null;
+    }
+
+    // For other errors, log and return null
+    if (error) {
+      console.error('Error fetching profile:', error);
+      return null;
+    }
+
+    return null;
+  }, [createProfileIfMissing]);
+
   useEffect(() => {
     setLoading(true);
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -42,17 +121,23 @@ export function AuthProvider({ children }) {
       }
       
       if (session?.user) {
-        const { data: profile, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        const profile = await fetchOrCreateProfile(session.user);
 
-        if (error || !profile) {
-          console.error('Error fetching profile or profile does not exist, signing out:', error);
+        if (!profile) {
+          console.error('Failed to fetch or create profile, signing out');
           await signOut();
-        } else {
-          setUser({ ...session.user, profile });
+          return;
+        }
+
+        setUser({ ...session.user, profile });
+        
+        // Auto-redirect after email confirmation or sign in
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          const redirectPath = profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
+          // Use setTimeout to ensure navigation happens after state update
+          setTimeout(() => {
+            navigate(redirectPath, { replace: true });
+          }, 100);
         }
       } else {
         setUser(null);
@@ -63,7 +148,7 @@ export function AuthProvider({ children }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [signOut]);
+  }, [signOut, fetchOrCreateProfile, navigate]);
 
   const updateUserProfile = (newProfileData) => {
     setUser(currentUser => {
