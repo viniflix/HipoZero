@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Home, BookMarked, LineChart, MessagesSquare, User, Bell, LogOut } from 'lucide-react';
 import { useChat } from '@/contexts/ChatContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,9 +16,13 @@ import { useState, useEffect } from 'react';
 export default function PatientMobileLayout() {
   const { user, signOut } = useAuth();
   const { unreadSenders } = useChat();
+  const location = useLocation();
   const unreadCount = unreadSenders?.size || 0;
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Check if current route is chat page to conditionally apply padding
+  const isChatPage = location.pathname.includes('/chat');
 
   // Buscar notificações não lidas
   useEffect(() => {
@@ -148,7 +152,7 @@ export default function PatientMobileLayout() {
 
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 md:ml-64 overflow-y-auto">
-        <div className="h-full pb-24 md:pb-0">
+        <div className={`h-full md:pb-0 ${isChatPage ? 'pb-0' : 'pb-28'}`}>
           <Outlet />
         </div>
       </main>

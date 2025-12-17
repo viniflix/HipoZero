@@ -338,7 +338,7 @@ const ChatPage = () => {
   if (!recipient) return <div className="flex items-center justify-center h-screen p-4 text-center text-muted-foreground">Você não tem um {user.profile.user_type === 'patient' ? 'nutricionista' : 'paciente'} associado.</div>;
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
+    <div className="flex flex-col h-[100dvh] md:h-full bg-slate-50">
       {/* --- MUDANÇA NA CHAMADA DO MODAL --- */}
       <ImageModal
         mediaPath={modalMedia.path}
