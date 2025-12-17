@@ -80,11 +80,58 @@ export function AuthProvider({ children }) {
         .single();
 
       if (insertError) {
+        // Handle race condition: Profile was created by DB trigger just before our insert
+        const isConflictError = 
+          insertError.code === '23505' || // PostgreSQL Unique Violation
+          insertError.code === 'PGRST301' || // PostgREST Conflict
+          insertError.status === 409 || // HTTP Conflict
+          insertError.message?.includes('duplicate key') ||
+          insertError.message?.includes('already exists');
+
+        if (isConflictError) {
+          console.log('Profile already exists (Race condition won by DB), fetching profile again...', {
+            userId: sessionUser.id,
+            errorCode: insertError.code,
+            errorStatus: insertError.status,
+          });
+
+          // Retry fetching the profile - it should exist now
+          const { data: existingProfile, error: fetchError } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', sessionUser.id)
+            .single();
+
+          if (fetchError) {
+            console.error('Failed to fetch profile after conflict (self-healing):', {
+              code: fetchError.code,
+              message: fetchError.message,
+              details: fetchError.details,
+            });
+            return null;
+          }
+
+          if (existingProfile) {
+            console.log('Profile fetched successfully after race condition:', {
+              id: existingProfile.id,
+              name: existingProfile.name,
+              user_type: existingProfile.user_type,
+            });
+            return existingProfile;
+          }
+
+          // If we still can't find it, return null
+          console.error('Profile not found after conflict resolution');
+          return null;
+        }
+
+        // For other errors (not conflicts), log and return null
         console.error('Error creating profile (self-healing):', {
           code: insertError.code,
           message: insertError.message,
           details: insertError.details,
           hint: insertError.hint,
+          status: insertError.status,
           profileData: {
             id: profileData.id,
             name: profileData.name,
@@ -102,10 +149,55 @@ export function AuthProvider({ children }) {
       });
       return newProfile;
     } catch (error) {
+      // Check if it's a conflict error in the catch block too
+      const isConflictError = 
+        error.code === '23505' ||
+        error.code === 'PGRST301' ||
+        error.status === 409 ||
+        error.message?.includes('duplicate key') ||
+        error.message?.includes('already exists');
+
+      if (isConflictError) {
+        console.log('Profile already exists (Race condition won by DB - caught in exception), fetching profile again...', {
+          userId: sessionUser.id,
+          errorCode: error.code,
+          errorStatus: error.status,
+        });
+
+        // Retry fetching the profile
+        const { data: existingProfile, error: fetchError } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', sessionUser.id)
+          .single();
+
+        if (fetchError) {
+          console.error('Failed to fetch profile after conflict (self-healing - exception):', {
+            code: fetchError.code,
+            message: fetchError.message,
+          });
+          return null;
+        }
+
+        if (existingProfile) {
+          console.log('Profile fetched successfully after race condition (exception):', {
+            id: existingProfile.id,
+            name: existingProfile.name,
+            user_type: existingProfile.user_type,
+          });
+          return existingProfile;
+        }
+
+        return null;
+      }
+
+      // For other exceptions, log and return null
       console.error('Exception during profile creation (self-healing):', {
         error,
         message: error.message,
         stack: error.stack,
+        code: error.code,
+        status: error.status,
         profileData: {
           id: profileData.id,
           name: profileData.name,
