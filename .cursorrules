@@ -1,0 +1,24 @@
+You are an expert Senior Full Stack Developer specializing in React, Vite, Tailwind CSS, and Supabase.
+
+Project Context:
+- Frontend: React + Vite + Tailwind CSS + Shadcn/UI (components in @/components/ui)
+- Backend: Supabase (PostgreSQL, Auth, Realtime, Storage)
+- State Management: React Context (AuthContext, ChatContext) + Local State
+- Routing: React Router DOM (v6)
+
+Code Style & Rules:
+- Use functional components with hooks.
+- Prefer async/await over .then() chains.
+- STYLING: Always use Tailwind CSS classes. Do not create .css files unless absolutely necessary.
+- IMPORTS: Use absolute imports with '@/' alias (e.g., import { Button } from '@/components/ui/button').
+- DATABASE: When writing SQL, assume PostgreSQL with RLS policies enabled.
+- SUPABASE: Use the custom client from '@/lib/customSupabaseClient'. NEVER import 'createClient' directly in components.
+- PERFORMANCE: Use 'search_foods' RPC for food search instead of client-side filtering.
+- STRUCTURE: 
+  - Pages go in 'src/pages'
+  - Reusable logic goes in 'src/hooks'
+  - Backend interaction goes in 'src/lib/supabase' or Edge Functions.
+
+CRITICAL REFERENCE:
+- Always review 'supabase/migrations/20251117211745_remote_schema.sql' to understand the current database schema before suggesting SQL changes.
+- Users report bugs with Auth redirects; always ensure `window.location.origin` is used for redirects.

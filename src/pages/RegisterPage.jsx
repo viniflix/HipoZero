@@ -64,7 +64,7 @@ export default function RegisterPage() {
       password: formData.password,
       options: {
         data: profileData,
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: `${window.location.origin}/login`,
       }
     });
 
