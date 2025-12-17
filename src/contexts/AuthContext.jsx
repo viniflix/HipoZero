@@ -36,12 +36,18 @@ export function AuthProvider({ children }) {
   const createProfileIfMissing = useCallback(async (sessionUser) => {
     const metadata = sessionUser.user_metadata || {};
     
+    // Ensure user_type is present (CRITICAL for profile creation)
+    const userType = metadata.user_type || metadata.userType || 'patient';
+    if (!['patient', 'nutritionist'].includes(userType)) {
+      console.error('Invalid user_type in metadata:', userType, 'Defaulting to "patient"');
+    }
+    
     // Extract required fields from metadata
     const profileData = {
       id: sessionUser.id,
       email: sessionUser.email,
-      name: metadata.name || metadata.full_name || 'Usuário',
-      user_type: metadata.user_type || 'patient',
+      name: metadata.name || metadata.display_name || metadata.full_name || 'Usuário',
+      user_type: ['patient', 'nutritionist'].includes(userType) ? userType : 'patient', // Fallback to 'patient' if invalid
       crn: metadata.crn || null,
       birth_date: metadata.birth_date || null,
       gender: metadata.gender || null,
@@ -57,6 +63,15 @@ export function AuthProvider({ children }) {
       address: metadata.address || null,
     };
 
+    console.log('Attempting self-healing profile creation with data:', {
+      id: profileData.id,
+      email: profileData.email,
+      name: profileData.name,
+      user_type: profileData.user_type,
+      hasMetadata: !!metadata,
+      metadataKeys: Object.keys(metadata),
+    });
+
     try {
       const { data: newProfile, error: insertError } = await supabase
         .from('user_profiles')
@@ -65,14 +80,38 @@ export function AuthProvider({ children }) {
         .single();
 
       if (insertError) {
-        console.error('Error creating profile (self-healing):', insertError);
+        console.error('Error creating profile (self-healing):', {
+          code: insertError.code,
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          profileData: {
+            id: profileData.id,
+            name: profileData.name,
+            user_type: profileData.user_type,
+            email: profileData.email,
+          },
+        });
         return null;
       }
 
-      console.log('Profile created successfully (self-healing)');
+      console.log('Profile created successfully (self-healing):', {
+        id: newProfile.id,
+        name: newProfile.name,
+        user_type: newProfile.user_type,
+      });
       return newProfile;
     } catch (error) {
-      console.error('Exception during profile creation (self-healing):', error);
+      console.error('Exception during profile creation (self-healing):', {
+        error,
+        message: error.message,
+        stack: error.stack,
+        profileData: {
+          id: profileData.id,
+          name: profileData.name,
+          user_type: profileData.user_type,
+        },
+      });
       return null;
     }
   }, []);

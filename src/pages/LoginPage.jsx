@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, ArrowRight, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Mail, Lock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,18 +28,50 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   const { signIn, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Redirect if already logged in
+  // Check for existing session on mount (for email confirmation links)
   useEffect(() => {
-    if (user?.profile) {
+    const checkExistingSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error checking session:', error);
+          setCheckingSession(false);
+          return;
+        }
+
+        // If session exists, set checking to false and let the user context redirect
+        if (session?.user) {
+          console.log('Existing session found, waiting for profile to load...');
+          // Wait a bit for AuthContext to process, then stop checking
+          setTimeout(() => {
+            setCheckingSession(false);
+          }, 500);
+        } else {
+          setCheckingSession(false);
+        }
+      } catch (error) {
+        console.error('Exception checking session:', error);
+        setCheckingSession(false);
+      }
+    };
+
+    checkExistingSession();
+  }, []);
+
+  // Redirect if already logged in (from context or session check)
+  useEffect(() => {
+    if (user?.profile && !checkingSession) {
       const redirectPath = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
       navigate(redirectPath, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, checkingSession]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -95,6 +127,18 @@ export default function LoginPage() {
       setResetEmail('');
     }
   };
+
+  // Show loading state while checking session
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Verificando sessão...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
