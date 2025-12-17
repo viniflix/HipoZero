@@ -27,9 +27,10 @@ export async function searchFoodsPaginated(searchTerm, page = 0, source = null) 
   try {
     // Use direct query with .range() for efficient server-side pagination
     // The search_foods RPC doesn't support offset, so we use direct query for pagination
+    // Include food_measures relation for household measures
     let query = supabase
       .from('foods')
-      .select('id, name, group, description, source, calories, protein, carbs, fat, fiber, sodium', { count: 'exact' })
+      .select('id, name, group, description, source, calories, protein, carbs, fat, fiber, sodium, food_measures(*)', { count: 'exact' })
       .eq('is_active', true)
       .ilike('name', `%${searchTerm.trim()}%`)
       .order('name', { ascending: true })

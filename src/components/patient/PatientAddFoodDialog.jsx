@@ -5,6 +5,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from '@/components/ui/select';
+import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -14,8 +21,6 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/lib/customSupabaseClient';
-import CascadeMeasureSelector from '@/components/meal-plan/CascadeMeasureSelector';
-import { calculateNutrition } from '@/lib/supabase/meal-plan-queries';
 import { searchFoodsPaginated } from '@/lib/supabase/foodService';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -38,10 +43,11 @@ const PatientAddFoodDialog = ({
 }) => {
     const [selectedFood, setSelectedFood] = useState(null);
     const [quantity, setQuantity] = useState('');
-    const [unit, setUnit] = useState('');
-    const [selectedMeasure, setSelectedMeasure] = useState(null);
+    const [selectedUnit, setSelectedUnit] = useState('g'); // 'g' for grams or measure object
+    const [selectedMeasure, setSelectedMeasure] = useState(null); // Store the measure object if selected
     const [notes, setNotes] = useState('');
     const [calculatedNutrition, setCalculatedNutrition] = useState(null);
+    const [realWeight, setRealWeight] = useState(null); // Display calculated weight
     const [errors, setErrors] = useState({});
 
     // Estados para busca de alimentos com paginação
@@ -60,7 +66,19 @@ const PatientAddFoodDialog = ({
         if (initialFood && mode === 'edit') {
             setSelectedFood(initialFood);
             setQuantity(initialFood.quantity?.toString() || '');
-            setUnit(initialFood.unit || '');
+            // If unit is not 'g', try to find the measure
+            if (initialFood.unit && initialFood.unit !== 'g') {
+                // Try to match with food_measures
+                const measure = initialFood.food_measures?.find(m => m.measure_label === initialFood.unit);
+                if (measure) {
+                    setSelectedMeasure(measure);
+                    setSelectedUnit(measure.id.toString());
+                } else {
+                    setSelectedUnit('g');
+                }
+            } else {
+                setSelectedUnit('g');
+            }
             setNotes(initialFood.notes || '');
         }
     }, [initialFood, mode]);
@@ -153,13 +171,70 @@ const PatientAddFoodDialog = ({
         setSearchResults([]);
         // Resetar quantidade e unidade ao trocar alimento
         setQuantity('');
-        setUnit('');
+        setSelectedUnit('g');
+        setSelectedMeasure(null);
         setCalculatedNutrition(null);
+        setRealWeight(null);
     };
 
-    const handleNutritionCalculated = (nutrition) => {
+    // Calculate nutrition when quantity or unit changes
+    const calculateNutrition = useCallback(() => {
+        if (!selectedFood || !quantity || parseFloat(quantity) <= 0) {
+            setCalculatedNutrition(null);
+            setRealWeight(null);
+            return;
+        }
+
+        const qty = parseFloat(quantity);
+        let totalGrams = 0;
+
+        // Determine total grams based on selected unit
+        if (selectedUnit === 'g') {
+            // Direct grams input
+            totalGrams = qty;
+        } else if (selectedMeasure) {
+            // Use measure's quantity_grams
+            totalGrams = qty * parseFloat(selectedMeasure.quantity_grams);
+        } else {
+            // Fallback: assume grams
+            totalGrams = qty;
+        }
+
+        // Calculate nutrition (foods table uses base 100g)
+        const factor = totalGrams / 100;
+
+        const nutrition = {
+            calories: parseFloat((selectedFood.calories * factor).toFixed(2)),
+            protein: parseFloat((selectedFood.protein * factor).toFixed(2)),
+            carbs: parseFloat((selectedFood.carbs * factor).toFixed(2)),
+            fat: parseFloat((selectedFood.fat * factor).toFixed(2))
+        };
+
         setCalculatedNutrition(nutrition);
+        setRealWeight(totalGrams);
+    }, [selectedFood, quantity, selectedUnit, selectedMeasure]);
+
+    useEffect(() => {
+        if (selectedFood && quantity && parseFloat(quantity) > 0) {
+            calculateNutrition();
+        } else {
+            setCalculatedNutrition(null);
+            setRealWeight(null);
+        }
+    }, [selectedFood, quantity, selectedUnit, selectedMeasure, calculateNutrition]);
+
+    const handleUnitChange = (value) => {
+        setSelectedUnit(value);
+        
+        if (value === 'g') {
+            setSelectedMeasure(null);
+        } else {
+            // Find the measure object
+            const measure = selectedFood?.food_measures?.find(m => m.id.toString() === value);
+            setSelectedMeasure(measure || null);
+        }
     };
+
 
     const validate = () => {
         const newErrors = {};
@@ -172,7 +247,7 @@ const PatientAddFoodDialog = ({
             newErrors.quantity = 'Quantidade deve ser maior que zero';
         }
 
-        if (!unit) {
+        if (!selectedUnit) {
             newErrors.unit = 'Selecione uma medida';
         }
 
@@ -188,8 +263,8 @@ const PatientAddFoodDialog = ({
             food_id: selectedFood.id,
             food_name: selectedFood.name,
             quantity: parseFloat(quantity),
-            unit,
-            measure: selectedMeasure, // Objeto measure completo
+            unit: selectedUnit === 'g' ? 'g' : (selectedMeasure?.measure_label || 'g'),
+            measure: selectedMeasure, // Objeto measure completo (from food_measures)
             // Base values para recálculo futuro
             base_calories: selectedFood.calories || 0,
             base_protein: selectedFood.protein || 0,
@@ -215,9 +290,11 @@ const PatientAddFoodDialog = ({
     const handleClose = () => {
         setSelectedFood(null);
         setQuantity('');
-        setUnit('');
+        setSelectedUnit('g');
+        setSelectedMeasure(null);
         setNotes('');
         setCalculatedNutrition(null);
+        setRealWeight(null);
         setErrors({});
         setSearchTerm('');
         setSearchResults([]);
@@ -350,25 +427,84 @@ const PatientAddFoodDialog = ({
                         )}
                     </div>
 
-                    {/* Seletor de Medidas Caseiras */}
+                    {/* Seletor de Quantidade e Medida */}
                     {selectedFood && (
                         <>
-                            <div className="space-y-2">
-                                <CascadeMeasureSelector
-                                    food={selectedFood}
-                                    quantity={quantity}
-                                    unit={unit}
-                                    onQuantityChange={setQuantity}
-                                    onUnitChange={setUnit}
-                                    onMeasureChange={setSelectedMeasure}
-                                    onNutritionCalculated={handleNutritionCalculated}
-                                />
-                                {errors.quantity && (
-                                    <p className="text-xs text-destructive">{errors.quantity}</p>
-                                )}
-                                {errors.unit && (
-                                    <p className="text-xs text-destructive">{errors.unit}</p>
-                                )}
+                            <div className="space-y-4">
+                                {/* Quantidade */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="quantity">
+                                        Quantidade <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Input
+                                        id="quantity"
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        placeholder="Ex: 2"
+                                        value={quantity}
+                                        onChange={(e) => setQuantity(e.target.value)}
+                                    />
+                                    {errors.quantity && (
+                                        <p className="text-xs text-destructive">{errors.quantity}</p>
+                                    )}
+                                </div>
+
+                                {/* Seletor de Medida */}
+                                <div className="space-y-2">
+                                    <Label>
+                                        Medida <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Select
+                                        value={selectedUnit}
+                                        onValueChange={handleUnitChange}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecione a medida" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {/* Default: Gramas */}
+                                            <SelectItem value="g">
+                                                Gramas (g)
+                                            </SelectItem>
+                                            
+                                            {/* Dynamic options from food_measures */}
+                                            {selectedFood.food_measures && selectedFood.food_measures.length > 0 && (
+                                                <>
+                                                    {selectedFood.food_measures.map((measure) => (
+                                                        <SelectItem
+                                                            key={measure.id}
+                                                            value={measure.id.toString()}
+                                                        >
+                                                            {measure.measure_label} ({measure.quantity_grams}g)
+                                                        </SelectItem>
+                                                    ))}
+                                                </>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.unit && (
+                                        <p className="text-xs text-destructive">{errors.unit}</p>
+                                    )}
+                                    
+                                    {/* Show real weight if measure is selected */}
+                                    {realWeight && selectedUnit !== 'g' && selectedMeasure && quantity && (
+                                        <div className="mt-2 p-2 bg-primary/5 rounded-md border border-primary/20">
+                                            <p className="text-xs font-medium text-primary">
+                                                {quantity} {selectedMeasure.measure_label} = {realWeight.toFixed(1)}g
+                                            </p>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Show grams if direct input */}
+                                    {realWeight && selectedUnit === 'g' && quantity && (
+                                        <div className="mt-2 p-2 bg-muted/50 rounded-md">
+                                            <p className="text-xs text-muted-foreground">
+                                                Total: {realWeight.toFixed(1)}g
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Valores Nutricionais Calculados */}
@@ -422,7 +558,7 @@ const PatientAddFoodDialog = ({
                         <X className="h-4 w-4 mr-2" />
                         Cancelar
                     </Button>
-                    <Button onClick={handleAdd} disabled={!selectedFood || !quantity || !unit}>
+                    <Button onClick={handleAdd} disabled={!selectedFood || !quantity || !selectedUnit}>
                         <Plus className="h-4 w-4 mr-2" />
                         {mode === 'edit' ? 'Atualizar' : 'Adicionar'}
                     </Button>
