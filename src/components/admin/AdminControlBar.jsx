@@ -313,118 +313,120 @@ export default function AdminControlBar() {
   // Draggable FAB that expands on click
   const MobileFAB = () => {
     return (
-      <div ref={constraintsRef} className="fixed inset-0 pointer-events-none md:hidden" />
-      <div className="flex md:hidden fixed bottom-6 right-6 z-[9999]">
-        <AnimatePresence>
-          {/* Draggable FAB Bubble */}
-          <motion.div
-            drag
-            dragConstraints={constraintsRef}
-            dragElastic={0.2}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            whileDrag={{ scale: 1.1 }}
-            className="relative"
-          >
-            {/* FAB Button */}
-            <motion.button
-              onClick={() => setIsMobileExpanded(!isMobileExpanded)}
-              className={`h-14 w-14 rounded-full backdrop-blur-xl bg-gradient-to-br ${theme.bgGradient} bg-slate-950/90 shadow-2xl border ${theme.borderColor} flex items-center justify-center transition-all active:scale-95`}
-              whileTap={{ scale: 0.95 }}
+      <>
+        <div ref={constraintsRef} className="fixed inset-0 pointer-events-none md:hidden" />
+        <div className="flex md:hidden fixed bottom-6 right-6 z-[9999]">
+          <AnimatePresence>
+            {/* Draggable FAB Bubble */}
+            <motion.div
+              drag
+              dragConstraints={constraintsRef}
+              dragElastic={0.2}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              whileDrag={{ scale: 1.1 }}
+              className="relative"
             >
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={viewMode}
-                  initial={{ rotate: -180, opacity: 0 }}
-                  animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: 180, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <CurrentIcon className={`w-6 h-6 ${theme.iconColor}`} />
-                </motion.div>
-              </AnimatePresence>
-              {/* Pulse Indicator */}
-              <div className="absolute -top-1 -right-1">
-                <div className={`w-3 h-3 rounded-full ${theme.pulseColor} animate-pulse`} />
-              </div>
-            </motion.button>
-
-            {/* Expanded Menu */}
-            {isMobileExpanded && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.8, y: 20 }}
-                className="absolute bottom-16 right-0 mb-2 backdrop-blur-xl bg-slate-950/95 rounded-2xl shadow-2xl border border-white/10 p-3 min-w-[200px]"
+              {/* FAB Button */}
+              <motion.button
+                onClick={() => setIsMobileExpanded(!isMobileExpanded)}
+                className={`h-14 w-14 rounded-full backdrop-blur-xl bg-gradient-to-br ${theme.bgGradient} bg-slate-950/90 shadow-2xl border ${theme.borderColor} flex items-center justify-center transition-all active:scale-95`}
+                whileTap={{ scale: 0.95 }}
               >
-                {/* Current Mode Indicator */}
-                <div className="flex items-center gap-2 mb-3 pb-3 border-b border-white/10">
-                  <div className="relative">
-                    <div className={`w-2 h-2 rounded-full ${theme.pulseColor} animate-pulse`} />
-                  </div>
-                  <span className={`text-xs font-semibold ${theme.textColor} uppercase tracking-wider`}>
-                    {theme.label}
-                  </span>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={viewMode}
+                    initial={{ rotate: -180, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 180, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <CurrentIcon className={`w-6 h-6 ${theme.iconColor}`} />
+                  </motion.div>
+                </AnimatePresence>
+                {/* Pulse Indicator */}
+                <div className="absolute -top-1 -right-1">
+                  <div className={`w-3 h-3 rounded-full ${theme.pulseColor} animate-pulse`} />
                 </div>
+              </motion.button>
 
-                {/* Mode Switcher Buttons */}
-                <div className="space-y-2">
-                  <Button
-                    variant={viewMode === 'admin' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`w-full justify-start ${
-                      viewMode === 'admin'
-                        ? 'bg-indigo-500/30 hover:bg-indigo-500/40 text-indigo-300 border-indigo-400/50'
-                        : 'bg-white/5 hover:bg-indigo-500/20 text-slate-300 border-white/10 hover:text-indigo-300'
-                    }`}
-                    onClick={() => handleSwitchView('admin')}
-                  >
-                    <Shield className="w-4 h-4 mr-2" />
-                    <span className="text-xs">Admin</span>
-                  </Button>
-                  <Button
-                    variant={viewMode === 'nutritionist' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`w-full justify-start ${
-                      viewMode === 'nutritionist'
-                        ? 'bg-emerald-500/30 hover:bg-emerald-500/40 text-emerald-300 border-emerald-400/50'
-                        : 'bg-white/5 hover:bg-emerald-500/20 text-slate-300 border-white/10 hover:text-emerald-300'
-                    }`}
-                    onClick={() => handleSwitchView('nutritionist')}
-                  >
-                    <UserCheck className="w-4 h-4 mr-2" />
-                    <span className="text-xs">Nutricionista</span>
-                  </Button>
-                  <Button
-                    variant={viewMode === 'patient' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`w-full justify-start ${
-                      viewMode === 'patient'
-                        ? 'bg-blue-500/30 hover:bg-blue-500/40 text-blue-300 border-blue-400/50'
-                        : 'bg-white/5 hover:bg-blue-500/20 text-slate-300 border-white/10 hover:text-blue-300'
-                    }`}
-                    onClick={() => handleSwitchView('patient')}
-                  >
-                    <User className="w-4 h-4 mr-2" />
-                    <span className="text-xs">Paciente</span>
-                  </Button>
-                </div>
-
-                {/* Close Button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full mt-2 text-slate-400 hover:text-white hover:bg-white/10"
-                  onClick={() => setIsMobileExpanded(false)}
+              {/* Expanded Menu */}
+              {isMobileExpanded && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, y: 20 }}
+                  className="absolute bottom-16 right-0 mb-2 backdrop-blur-xl bg-slate-950/95 rounded-2xl shadow-2xl border border-white/10 p-3 min-w-[200px]"
                 >
-                  <X className="w-4 h-4 mr-2" />
-                  <span className="text-xs">Fechar</span>
-                </Button>
-              </motion.div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+                  {/* Current Mode Indicator */}
+                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-white/10">
+                    <div className="relative">
+                      <div className={`w-2 h-2 rounded-full ${theme.pulseColor} animate-pulse`} />
+                    </div>
+                    <span className={`text-xs font-semibold ${theme.textColor} uppercase tracking-wider`}>
+                      {theme.label}
+                    </span>
+                  </div>
+
+                  {/* Mode Switcher Buttons */}
+                  <div className="space-y-2">
+                    <Button
+                      variant={viewMode === 'admin' ? 'default' : 'outline'}
+                      size="sm"
+                      className={`w-full justify-start ${
+                        viewMode === 'admin'
+                          ? 'bg-indigo-500/30 hover:bg-indigo-500/40 text-indigo-300 border-indigo-400/50'
+                          : 'bg-white/5 hover:bg-indigo-500/20 text-slate-300 border-white/10 hover:text-indigo-300'
+                      }`}
+                      onClick={() => handleSwitchView('admin')}
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      <span className="text-xs">Admin</span>
+                    </Button>
+                    <Button
+                      variant={viewMode === 'nutritionist' ? 'default' : 'outline'}
+                      size="sm"
+                      className={`w-full justify-start ${
+                        viewMode === 'nutritionist'
+                          ? 'bg-emerald-500/30 hover:bg-emerald-500/40 text-emerald-300 border-emerald-400/50'
+                          : 'bg-white/5 hover:bg-emerald-500/20 text-slate-300 border-white/10 hover:text-emerald-300'
+                      }`}
+                      onClick={() => handleSwitchView('nutritionist')}
+                    >
+                      <UserCheck className="w-4 h-4 mr-2" />
+                      <span className="text-xs">Nutricionista</span>
+                    </Button>
+                    <Button
+                      variant={viewMode === 'patient' ? 'default' : 'outline'}
+                      size="sm"
+                      className={`w-full justify-start ${
+                        viewMode === 'patient'
+                          ? 'bg-blue-500/30 hover:bg-blue-500/40 text-blue-300 border-blue-400/50'
+                          : 'bg-white/5 hover:bg-blue-500/20 text-slate-300 border-white/10 hover:text-blue-300'
+                      }`}
+                      onClick={() => handleSwitchView('patient')}
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      <span className="text-xs">Paciente</span>
+                    </Button>
+                  </div>
+
+                  {/* Close Button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-2 text-slate-400 hover:text-white hover:bg-white/10"
+                    onClick={() => setIsMobileExpanded(false)}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    <span className="text-xs">Fechar</span>
+                  </Button>
+                </motion.div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </>
     );
   };
 
