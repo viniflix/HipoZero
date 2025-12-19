@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ChatProvider } from '@/contexts/ChatContext';
+import { AdminModeProvider } from '@/contexts/AdminModeContext';
 import { Loader2 } from 'lucide-react';
 
 // Mantém imports críticos para auth e layouts (não lazy load)
@@ -260,11 +261,13 @@ const App = () => {
   return (
     <Router>
       <AuthProvider>
-        <Helmet>
-          <title>HipoZero - Controle Nutricional Inteligente</title>
-          <meta name="description" content="Plataforma moderna para nutricionistas e pacientes com controle alimentar, prescrição de dietas e acompanhamento nutricional baseado na Tabela TACO." />
-        </Helmet>
-        <AppLayout />
+        <AdminModeProvider>
+          <Helmet>
+            <title>HipoZero - Controle Nutricional Inteligente</title>
+            <meta name="description" content="Plataforma moderna para nutricionistas e pacientes com controle alimentar, prescrição de dietas e acompanhamento nutricional baseado na Tabela TACO." />
+          </Helmet>
+          <AppLayout />
+        </AdminModeProvider>
       </AuthProvider>
     </Router>
   );
