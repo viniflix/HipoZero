@@ -27,15 +27,25 @@ export const AdminModeProvider = ({ children }) => {
     return 'admin'; // Default
   };
   
-  const [viewMode, setViewMode] = useState(() => getViewModeFromPath(location.pathname));
+  // Initialize view mode - default to 'admin' if admin, otherwise null
+  const [viewMode, setViewMode] = useState(() => {
+    if (!isAdmin) return null;
+    return getViewModeFromPath(location.pathname);
+  });
 
-  // Update view mode when route changes
+  // Update view mode when route changes (but only if admin)
   useEffect(() => {
     if (isAdmin) {
       const newMode = getViewModeFromPath(location.pathname);
-      if (newMode !== viewMode) {
-        setViewMode(newMode);
-      }
+      setViewMode(prevMode => {
+        if (prevMode !== newMode) {
+          console.log('[AdminModeContext] View mode updated:', prevMode, '->', newMode);
+          return newMode;
+        }
+        return prevMode;
+      });
+    } else {
+      setViewMode(null);
     }
   }, [location.pathname, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -43,32 +53,34 @@ export const AdminModeProvider = ({ children }) => {
    * Switch view mode and navigate to appropriate route
    */
   const switchView = useCallback((mode) => {
+    console.log('[AdminModeContext] switchView called:', mode, 'isAdmin:', isAdmin);
+    
     if (!isAdmin) {
-      console.warn('switchView called but user is not admin');
+      console.warn('[AdminModeContext] switchView called but user is not admin');
       return;
     }
 
     if (!['admin', 'nutritionist', 'patient'].includes(mode)) {
-      console.error('Invalid view mode:', mode);
+      console.error('[AdminModeContext] Invalid view mode:', mode);
       return;
     }
 
+    // Update state first
     setViewMode(mode);
+    console.log('[AdminModeContext] View mode set to:', mode);
 
     // Navigate to appropriate route based on mode
-    switch (mode) {
-      case 'admin':
-        navigate('/admin/dashboard', { replace: true });
-        break;
-      case 'nutritionist':
-        navigate('/nutritionist', { replace: true });
-        break;
-      case 'patient':
-        navigate('/patient', { replace: true });
-        break;
-      default:
-        break;
-    }
+    const routes = {
+      'admin': '/admin/dashboard',
+      'nutritionist': '/nutritionist',
+      'patient': '/patient'
+    };
+
+    const targetRoute = routes[mode];
+    console.log('[AdminModeContext] Navigating to:', targetRoute);
+    
+    // Use replace: true to avoid back button issues
+    navigate(targetRoute, { replace: true });
   }, [isAdmin, navigate]);
 
   /**

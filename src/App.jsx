@@ -139,18 +139,23 @@ const ProtectedRoute = ({ children, userType, requireAdmin = false, allowAnyUser
     return <Navigate to="/login" replace />;
   }
 
-  // Admin-only routes: allow any user_type if they are admin
-  if (requireAdmin) {
-    if (!user.profile.is_admin) {
-      const correctDashboard = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
-      return <Navigate to={correctDashboard} replace />;
-    }
-    // If admin, allow access regardless of user_type
+  const isAdmin = user.profile.is_admin === true;
+
+  // CRITICAL: If user is admin, allow access to ANY route (God Mode)
+  // The AdminModeContext will handle the visual masking
+  if (isAdmin) {
+    console.log('[ProtectedRoute] Admin access granted, bypassing user_type check');
     return children;
   }
 
-  // Regular routes: check user_type unless allowAnyUserType is true
-  if (!allowAnyUserType && userType && user.profile.user_type !== userType) {
+  // Admin-only routes: require admin flag
+  if (requireAdmin) {
+    const correctDashboard = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
+    return <Navigate to={correctDashboard} replace />;
+  }
+
+  // Regular routes: check user_type
+  if (userType && user.profile.user_type !== userType) {
     const correctDashboard = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
     return <Navigate to={correctDashboard} replace />;
   }

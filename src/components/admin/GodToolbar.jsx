@@ -42,17 +42,35 @@ export default function GodToolbar() {
   }
 
   const handleSwitchView = (mode) => {
-    switchView(mode);
-    setIsExpanded(false);
-    const modeLabels = {
-      'admin': 'Admin',
-      'nutritionist': 'Nutricionista',
-      'patient': 'Paciente'
-    };
-    toast({
-      title: 'Modo alterado',
-      description: `Visualizando como ${modeLabels[mode] || mode}`,
-    });
+    console.log('[GodToolbar] handleSwitchView called with mode:', mode);
+    console.log('[GodToolbar] Current viewMode:', viewMode);
+    console.log('[GodToolbar] isAdmin:', isAdmin);
+    
+    if (!isAdmin) {
+      console.warn('[GodToolbar] Attempted to switch view but user is not admin');
+      return;
+    }
+
+    try {
+      switchView(mode);
+      setIsExpanded(false);
+      const modeLabels = {
+        'admin': 'Admin',
+        'nutritionist': 'Nutricionista',
+        'patient': 'Paciente'
+      };
+      toast({
+        title: 'Modo alterado',
+        description: `Visualizando como ${modeLabels[mode] || mode}`,
+      });
+    } catch (error) {
+      console.error('[GodToolbar] Error switching view:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível alterar o modo de visualização.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleDemoAction = (action) => {
@@ -114,6 +132,7 @@ export default function GodToolbar() {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
         className="fixed bottom-4 right-4 z-[9999]"
+        style={{ zIndex: 9999 }}
       >
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl shadow-2xl border-2 border-amber-400/50 overflow-hidden">
           {/* Header */}

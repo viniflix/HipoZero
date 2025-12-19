@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { LogOut, User, Menu, X } from 'lucide-react';
+import { useAdminMode } from '@/contexts/AdminModeContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,23 +19,19 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 
-// Links de navegação principal
-const getNavigationLinks = (isAdmin = false) => {
-  const links = [
+// Links de navegação principal (Nutritionist)
+const getNutritionistLinks = () => {
+  return [
     { name: 'Dashboard', path: '/nutritionist' },
     { name: 'Pacientes', path: '/nutritionist/patients' },
     { name: 'Agenda', path: '/nutritionist/agenda' },
     { name: 'Financeiro', path: '/nutritionist/financial' },
     { name: 'Banco de Alimentos', path: '/nutritionist/food-bank' },
   ];
-
-  return links;
 };
 
 // Admin navigation links (separate group)
-const getAdminLinks = (isAdmin = false) => {
-  if (!isAdmin) return [];
-  
+const getAdminLinks = () => {
   return [
     { name: 'Admin Dashboard', path: '/admin/dashboard' },
     { name: 'Admin: Alimentos', path: '/nutritionist/foods' },
@@ -45,13 +42,35 @@ const getAdminLinks = (isAdmin = false) => {
 const DashboardHeader = ({ user, logout }) => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { viewMode, isAdmin } = useAdminMode();
 
   if (!user) return null;
 
   const initials = (user.profile?.name || 'U').substring(0, 2).toUpperCase();
-  const isAdmin = user.profile?.is_admin === true;
-  const navigationLinks = getNavigationLinks(isAdmin);
-  const adminLinks = getAdminLinks(isAdmin);
+  
+  // Determine which links to show based on viewMode (for admins) or user_type (for regular users)
+  let navigationLinks = [];
+  let adminLinks = [];
+  
+  if (isAdmin && viewMode) {
+    // Admin in God Mode: show links based on viewMode
+    if (viewMode === 'admin') {
+      adminLinks = getAdminLinks();
+    } else if (viewMode === 'nutritionist') {
+      navigationLinks = getNutritionistLinks();
+      // Also show admin links if admin wants to access admin features
+      adminLinks = getAdminLinks();
+    }
+    // If viewMode === 'patient', don't show nutritionist links (patient uses different layout)
+  } else {
+    // Regular user: show links based on user_type
+    if (user.profile?.user_type === 'nutritionist') {
+      navigationLinks = getNutritionistLinks();
+      if (isAdmin) {
+        adminLinks = getAdminLinks();
+      }
+    }
+  }
 
   // Handler para logout que previne comportamentos inesperados
   const handleLogout = async (e) => {
