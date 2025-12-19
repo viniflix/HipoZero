@@ -1,15 +1,12 @@
 import { Toaster } from '@/components/ui/toaster';
-import { useAdminMode } from '@/contexts/AdminModeContext';
 
 /**
- * SmartToaster - Toaster com posicionamento inteligente baseado no estado admin
+ * SmartToaster - Toaster simplificado
  * 
- * - Admins: top-center (não sobrepõe toolbar)
- * - Usuários regulares: bottom-right (padrão)
+ * Posicionamento é controlado internamente pelo ToastViewport
+ * baseado no estado admin
  */
 export default function SmartToaster() {
-  const { isAdmin } = useAdminMode();
-  
-  return <Toaster position={isAdmin ? "top-center" : "bottom-right"} />;
+  return <Toaster />;
 }
 
