@@ -629,9 +629,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             )}
         </div>
     );
-}
-
-    return null;
 });
 
 export default SmartFoodForm;
