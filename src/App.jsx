@@ -91,7 +91,43 @@ const AuthWrapper = ({ children }) => {
     return children;
 };
 
-const ProtectedRoute = ({ children, userType, requireAdmin = false }) => {
+// Wrapper component for Admin Dashboard that selects the correct layout
+const AdminDashboardWrapper = () => {
+  const { user } = useAuth();
+  
+  if (!user || !user.profile) {
+    return <PageLoadingFallback />;
+  }
+
+  const isAdmin = user.profile.is_admin === true;
+  const isNutritionist = user.profile.user_type === 'nutritionist';
+
+  if (!isAdmin) {
+    const correctDashboard = isNutritionist ? '/nutritionist' : '/patient';
+    return <Navigate to={correctDashboard} replace />;
+  }
+
+  // Render with appropriate layout based on user_type
+  if (isNutritionist) {
+    return (
+      <ProtectedRoute userType="nutritionist" requireAdmin={true}>
+        <MainLayout>
+          <AdminDashboard />
+        </MainLayout>
+      </ProtectedRoute>
+    );
+  } else {
+    return (
+      <ProtectedRoute userType="patient" requireAdmin={true}>
+        <PatientMobileLayout>
+          <AdminDashboard />
+        </PatientMobileLayout>
+      </ProtectedRoute>
+    );
+  }
+};
+
+const ProtectedRoute = ({ children, userType, requireAdmin = false, allowAnyUserType = false }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -102,13 +138,18 @@ const ProtectedRoute = ({ children, userType, requireAdmin = false }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (userType && user.profile.user_type !== userType) {
-    const correctDashboard = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
-    return <Navigate to={correctDashboard} replace />;
+  // Admin-only routes: allow any user_type if they are admin
+  if (requireAdmin) {
+    if (!user.profile.is_admin) {
+      const correctDashboard = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
+      return <Navigate to={correctDashboard} replace />;
+    }
+    // If admin, allow access regardless of user_type
+    return children;
   }
 
-  // Admin-only routes
-  if (requireAdmin && !user.profile.is_admin) {
+  // Regular routes: check user_type unless allowAnyUserType is true
+  if (!allowAnyUserType && userType && user.profile.user_type !== userType) {
     const correctDashboard = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
     return <Navigate to={correctDashboard} replace />;
   }
@@ -166,20 +207,12 @@ const AppLayout = () => {
               <Route path="/nutritionist/food-bank" element={<FoodBankPage />} />
               <Route path="/nutritionist/financial" element={<FinancialPage />} />
               <Route path="/nutritionist/agenda" element={<AgendaPage />} />
-              {/* Admin-only routes */}
+              {/* Admin-only routes (nutritionist layout) */}
               <Route 
                 path="/nutritionist/foods" 
                 element={
                   <ProtectedRoute userType="nutritionist" requireAdmin={true}>
                     <NutritionistFoodsPage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/admin/dashboard" 
-                element={
-                  <ProtectedRoute userType="nutritionist" requireAdmin={true}>
-                    <AdminDashboard />
                   </ProtectedRoute>
                 } 
               />
@@ -195,6 +228,18 @@ const AppLayout = () => {
               <Route path="/patient/editar-perfil" element={<PatientEditProfilePage />} />
               <Route path="/patient/conquistas" element={<PatientAchievementsPage />} />
             </Route>
+
+            {/* --- ROTAS ADMIN (Acessíveis para qualquer user_type se is_admin = true) --- */}
+            <Route 
+              path="/admin" 
+              element={<Navigate to="/admin/dashboard" replace />} 
+            />
+            <Route 
+              path="/admin/dashboard" 
+              element={
+                <AdminDashboardWrapper />
+              } 
+            />
 
             {/* Rotas do Paciente (Fora do layout - páginas completas) */}
             <Route path="/patient/add-food/:mealId?" element={<ProtectedRoute userType="patient"><AddFoodPage /></ProtectedRoute>} />

@@ -219,6 +219,14 @@ export function AuthProvider({ children }) {
 
     // If profile exists, return it
     if (profile && !error) {
+      // Debug: Log is_admin status
+      console.log('[AuthContext] Profile loaded:', {
+        id: profile.id,
+        email: profile.email,
+        user_type: profile.user_type,
+        is_admin: profile.is_admin,
+        hasIsAdmin: 'is_admin' in profile
+      });
       return profile;
     }
 
