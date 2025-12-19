@@ -43,7 +43,7 @@ async function searchFood(term) {
   try {
     const { data, error } = await supabase
       .from('foods')
-      .select('id, name, calories, protein, carbs, fat, base_qty')
+      .select('id, name, calories, protein, carbs, fat, portion_size')
       .ilike('name', `%${term}%`)
       .limit(1)
       .single();
@@ -149,7 +149,7 @@ export async function fillDailyDiary(patientId) {
     // Buscar 4-5 alimentos aleatórios do banco
     const { data: foods, error: foodsError } = await supabase
       .from('foods')
-      .select('id, name, calories, protein, carbs, fat, base_qty')
+      .select('id, name, calories, protein, carbs, fat, portion_size')
       .limit(50); // Pegar um pool maior para ter mais variedade
 
     if (foodsError) {
@@ -206,7 +206,7 @@ export async function fillDailyDiary(patientId) {
         const quantity = 50 + Math.floor(Math.random() * 150);
         
         // Calcular valores nutricionais baseado na quantidade
-        const multiplier = quantity / (food.base_qty || 100); // base_qty geralmente é 100g
+        const multiplier = quantity / (food.portion_size || 100); // portion_size geralmente é 100g
         
         const itemCalories = (food.calories || 0) * multiplier;
         const itemProtein = (food.protein || 0) * multiplier;
@@ -329,7 +329,7 @@ export async function fillMealHistory(userId, daysBack = 7) {
       // Fallback: buscar qualquer alimento do banco
       const { data: fallbackFoods } = await supabase
         .from('foods')
-        .select('id, name, calories, protein, carbs, fat, base_qty')
+        .select('id, name, calories, protein, carbs, fat, portion_size')
         .limit(10);
 
       if (!fallbackFoods || fallbackFoods.length === 0) {
@@ -400,7 +400,7 @@ export async function fillMealHistory(userId, daysBack = 7) {
 
           const food = foodItem.food;
           const quantity = Math.max(10, foodItem.quantity); // Mínimo 10g
-          const multiplier = quantity / (food.base_qty || 100);
+          const multiplier = quantity / (food.portion_size || 100);
 
           // Aplicar variação de ±10% para realismo
           const variation = 0.9 + (Math.random() * 0.2); // 0.9 a 1.1
@@ -794,6 +794,17 @@ export async function cleanupDemoData(nutritionistId) {
       errors.push(todayMealsError);
     }
 
+    // 8. Limpar conquistas do usuário atual (reset gamificação)
+    const { error: achievementsError } = await supabase
+      .from('user_achievements')
+      .delete()
+      .eq('user_id', nutritionistId);
+
+    if (achievementsError) {
+      console.error('[demoDataService] Erro ao limpar conquistas:', achievementsError);
+      errors.push(achievementsError);
+    }
+
     if (errors.length > 0) {
       return {
         data: { deletedPatients: deletedCount },
@@ -817,6 +828,104 @@ export async function cleanupDemoData(nutritionistId) {
   } catch (error) {
     console.error('[demoDataService] Erro inesperado na limpeza:', error);
     return { data: null, error };
+  }
+}
+
+/**
+ * Desbloqueia uma conquista aleatória para o usuário
+ * @param {string} userId - UUID do usuário
+ * @returns {Promise<{success: boolean, achievement: object|null, message: string}>}
+ */
+export async function unlockRandomAchievement(userId) {
+  try {
+    // 1. Buscar TODAS as conquistas disponíveis
+    const { data: allAchievements, error: achievementsError } = await supabase
+      .from('achievements')
+      .select('id, name, description, icon_name')
+      .order('id', { ascending: true });
+
+    if (achievementsError) {
+      console.error('[demoDataService] Erro ao buscar conquistas:', achievementsError);
+      return {
+        success: false,
+        achievement: null,
+        message: 'Erro ao buscar conquistas disponíveis'
+      };
+    }
+
+    if (!allAchievements || allAchievements.length === 0) {
+      return {
+        success: false,
+        achievement: null,
+        message: 'Nenhuma conquista disponível no sistema'
+      };
+    }
+
+    // 2. Buscar conquistas já desbloqueadas pelo usuário
+    const { data: userAchievements, error: userAchievementsError } = await supabase
+      .from('user_achievements')
+      .select('achievement_id')
+      .eq('user_id', userId);
+
+    if (userAchievementsError) {
+      console.error('[demoDataService] Erro ao buscar conquistas do usuário:', userAchievementsError);
+      return {
+        success: false,
+        achievement: null,
+        message: 'Erro ao verificar conquistas do usuário'
+      };
+    }
+
+    const unlockedIds = new Set((userAchievements || []).map(a => a.achievement_id));
+
+    // 3. Filtrar conquistas disponíveis (não desbloqueadas)
+    const availableAchievements = allAchievements.filter(
+      achievement => !unlockedIds.has(achievement.id)
+    );
+
+    if (availableAchievements.length === 0) {
+      return {
+        success: false,
+        achievement: null,
+        message: 'Todas as conquistas já foram desbloqueadas!'
+      };
+    }
+
+    // 4. Selecionar uma conquista aleatória
+    const randomIndex = Math.floor(Math.random() * availableAchievements.length);
+    const selectedAchievement = availableAchievements[randomIndex];
+
+    // 5. Inserir na tabela user_achievements
+    const { error: insertError } = await supabase
+      .from('user_achievements')
+      .insert({
+        user_id: userId,
+        achievement_id: selectedAchievement.id
+      });
+
+    if (insertError) {
+      console.error('[demoDataService] Erro ao desbloquear conquista:', insertError);
+      return {
+        success: false,
+        achievement: null,
+        message: 'Erro ao salvar a conquista'
+      };
+    }
+
+    console.log('[demoDataService] Conquista desbloqueada:', selectedAchievement.name);
+
+    return {
+      success: true,
+      achievement: selectedAchievement,
+      message: `Conquista "${selectedAchievement.name}" desbloqueada!`
+    };
+  } catch (error) {
+    console.error('[demoDataService] Erro inesperado ao desbloquear conquista:', error);
+    return {
+      success: false,
+      achievement: null,
+      message: 'Erro inesperado ao desbloquear conquista'
+    };
   }
 }
 

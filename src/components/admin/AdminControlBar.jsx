@@ -18,7 +18,7 @@ import { useAdminMode } from '@/contexts/AdminModeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createGhostPatient, fillDailyDiary, fillMealHistory, createGhostSquad, cleanupDemoData } from '@/services/demoDataService';
+import { createGhostPatient, fillDailyDiary, fillMealHistory, createGhostSquad, cleanupDemoData, unlockRandomAchievement } from '@/services/demoDataService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 /**
@@ -39,6 +39,7 @@ export default function AdminControlBar() {
   const [isFillingHistory, setIsFillingHistory] = useState(false);
   const [isCreatingSquad, setIsCreatingSquad] = useState(false);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [isUnlockingAchievement, setIsUnlockingAchievement] = useState(false);
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const constraintsRef = useRef(null);
 
@@ -297,14 +298,56 @@ export default function AdminControlBar() {
     setIsMobileExpanded(false);
   };
 
-  const handleUnlockAchievement = () => {
-    toast({
-      title: '🏆 Conquista Desbloqueada!',
-      description: 'Parabéns! Você atingiu a meta de proteínas por 3 dias seguidos.',
-      duration: 6000,
-    });
+  const handleUnlockAchievement = async () => {
+    if (!user?.id) {
+      toast({
+        title: 'Erro',
+        description: 'Usuário não identificado.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsUnlockingAchievement(true);
     setIsExpanded(false);
     setIsMobileExpanded(false);
+
+    try {
+      const result = await unlockRandomAchievement(user.id);
+
+      if (!result.success) {
+        if (result.message.includes('Todas as conquistas')) {
+          toast({
+            title: 'Todas as conquistas já foram desbloqueadas! 🏆',
+            description: 'Você já possui todas as conquistas disponíveis.',
+            duration: 5000,
+          });
+        } else {
+          toast({
+            title: 'Erro',
+            description: result.message || 'Não foi possível desbloquear a conquista.',
+            variant: 'destructive'
+          });
+        }
+        return;
+      }
+
+      // Sucesso: mostrar toast com dados reais da conquista
+      toast({
+        title: '🏆 Conquista Desbloqueada!',
+        description: result.achievement.name,
+        duration: 6000,
+      });
+    } catch (error) {
+      console.error('[AdminControlBar] Erro inesperado:', error);
+      toast({
+        title: 'Erro',
+        description: 'Ocorreu um erro inesperado ao desbloquear a conquista.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsUnlockingAchievement(false);
+    }
   };
 
   const handleCleanupDemoData = async () => {
@@ -631,11 +674,18 @@ export default function AdminControlBar() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full justify-start bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 border-yellow-400/30"
+                        className="w-full justify-start bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 border-yellow-400/30 disabled:opacity-50"
                         onClick={handleUnlockAchievement}
+                        disabled={isUnlockingAchievement}
                       >
-                        <Trophy className="w-3.5 h-3.5 mr-2" />
-                        <span className="text-xs">Desbloquear Conquista</span>
+                        {isUnlockingAchievement ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                        ) : (
+                          <Trophy className="w-3.5 h-3.5 mr-2" />
+                        )}
+                        <span className="text-xs">
+                          {isUnlockingAchievement ? 'Desbloqueando...' : 'Desbloquear Conquista'}
+                        </span>
                       </Button>
                     </div>
                   </div>
