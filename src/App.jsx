@@ -1,7 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { Toaster } from '@/components/ui/toaster';
+import SmartToaster from '@/components/SmartToaster';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ChatProvider } from '@/contexts/ChatContext';
 import { AdminModeProvider } from '@/contexts/AdminModeContext';
@@ -243,8 +243,8 @@ const App = () => {
             <meta name="description" content="Plataforma moderna para nutricionistas e pacientes com controle alimentar, prescrição de dietas e acompanhamento nutricional baseado na Tabela TACO." />
           </Helmet>
           <AppLayout />
-          {/* Toaster must be inside AdminModeProvider to access admin state */}
-          <Toaster />
+          {/* Smart Toaster with dynamic positioning based on admin state */}
+          <SmartToaster />
         </AdminModeProvider>
       </AuthProvider>
     </Router>
