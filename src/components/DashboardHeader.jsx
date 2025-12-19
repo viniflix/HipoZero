@@ -30,10 +30,9 @@ const getNutritionistLinks = () => {
   ];
 };
 
-// Admin navigation links (separate group)
+// Admin navigation links (only shown when in admin viewMode)
 const getAdminLinks = () => {
   return [
-    { name: 'Admin Dashboard', path: '/admin/dashboard' },
     { name: 'Admin: Alimentos', path: '/nutritionist/foods' },
   ];
 };

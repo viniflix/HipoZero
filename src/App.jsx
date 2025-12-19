@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react';
 // Mantém imports críticos para auth e layouts (não lazy load)
 import MainLayout from '@/components/MainLayout.jsx';
 import PatientMobileLayout from '@/components/patient/PatientMobileLayout.jsx';
+import AdminLayout from '@/components/admin/AdminLayout.jsx';
 
 // CODE SPLITTING: Lazy load de todas as páginas
 const LoginPage = lazy(() => import('@/pages/LoginPage.jsx'));
@@ -92,41 +93,6 @@ const AuthWrapper = ({ children }) => {
     return children;
 };
 
-// Wrapper component for Admin Dashboard that selects the correct layout
-const AdminDashboardWrapper = () => {
-  const { user } = useAuth();
-  
-  if (!user || !user.profile) {
-    return <PageLoadingFallback />;
-  }
-
-  const isAdmin = user.profile.is_admin === true;
-  const isNutritionist = user.profile.user_type === 'nutritionist';
-
-  if (!isAdmin) {
-    const correctDashboard = isNutritionist ? '/nutritionist' : '/patient';
-    return <Navigate to={correctDashboard} replace />;
-  }
-
-  // Render with appropriate layout based on user_type
-  if (isNutritionist) {
-    return (
-      <ProtectedRoute userType="nutritionist" requireAdmin={true}>
-        <MainLayout>
-          <AdminDashboard />
-        </MainLayout>
-      </ProtectedRoute>
-    );
-  } else {
-    return (
-      <ProtectedRoute userType="patient" requireAdmin={true}>
-        <PatientMobileLayout>
-          <AdminDashboard />
-        </PatientMobileLayout>
-      </ProtectedRoute>
-    );
-  }
-};
 
 const ProtectedRoute = ({ children, userType, requireAdmin = false, allowAnyUserType = false }) => {
   const { user, loading } = useAuth();
@@ -235,17 +201,23 @@ const AppLayout = () => {
               <Route path="/patient/conquistas" element={<PatientAchievementsPage />} />
             </Route>
 
-            {/* --- ROTAS ADMIN (Acessíveis para qualquer user_type se is_admin = true) --- */}
+            {/* --- ROTAS ADMIN (Layout dedicado, não aninhado em outros layouts) --- */}
             <Route 
               path="/admin" 
               element={<Navigate to="/admin/dashboard" replace />} 
             />
             <Route 
-              path="/admin/dashboard" 
               element={
-                <AdminDashboardWrapper />
-              } 
-            />
+                <ProtectedRoute requireAdmin={true}>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route 
+                path="/admin/dashboard" 
+                element={<AdminDashboard />} 
+              />
+            </Route>
 
             {/* Rotas do Paciente (Fora do layout - páginas completas) */}
             <Route path="/patient/add-food/:mealId?" element={<ProtectedRoute userType="patient"><AddFoodPage /></ProtectedRoute>} />

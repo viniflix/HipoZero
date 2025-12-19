@@ -4,7 +4,7 @@ import {
   Shield, 
   User, 
   UserCheck, 
-  Sparkles, 
+  Settings,
   ChevronUp,
   ChevronDown,
   X
@@ -24,9 +24,10 @@ import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
- * GodToolbar - Toolbar flutuante para admins
+ * GodToolbar (AdminControlBar) - Barra de controle profissional para admins
  * 
  * Permite alternar entre modos de visualização e executar ações de demo
+ * Design profissional para apresentações a investidores
  */
 export default function GodToolbar() {
   const { user } = useAuth();
@@ -81,32 +82,6 @@ export default function GodToolbar() {
     setIsExpanded(false);
   };
 
-  const getViewIcon = (mode) => {
-    switch (mode) {
-      case 'admin':
-        return Shield;
-      case 'nutritionist':
-        return UserCheck;
-      case 'patient':
-        return User;
-      default:
-        return Shield;
-    }
-  };
-
-  const getViewColor = (mode) => {
-    switch (mode) {
-      case 'admin':
-        return 'text-amber-500';
-      case 'nutritionist':
-        return 'text-blue-500';
-      case 'patient':
-        return 'text-green-500';
-      default:
-        return 'text-gray-500';
-    }
-  };
-
   if (isMinimized) {
     return (
       <motion.div
@@ -116,10 +91,10 @@ export default function GodToolbar() {
       >
         <Button
           onClick={() => setIsMinimized(false)}
-          className="h-12 w-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 shadow-2xl border-2 border-amber-300 hover:scale-110 transition-transform"
+          className="h-10 w-10 rounded-lg bg-slate-900 hover:bg-slate-800 shadow-lg border border-slate-700 transition-all"
           size="icon"
         >
-          <Sparkles className="w-6 h-6 text-white" />
+          <Settings className="w-5 h-5 text-slate-300" />
         </Button>
       </motion.div>
     );
@@ -134,14 +109,16 @@ export default function GodToolbar() {
         className="fixed bottom-4 right-4 z-[9999]"
         style={{ zIndex: 9999 }}
       >
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl shadow-2xl border-2 border-amber-400/50 overflow-hidden">
+        <div className="bg-white rounded-lg shadow-2xl border border-slate-200 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-amber-500/20 border-b border-amber-400/30">
+          <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-400" />
-              <span className="text-sm font-bold text-white">God Mode</span>
+              <Settings className="w-4 h-4 text-slate-600" />
+              <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                Ambiente de Controle
+              </span>
               {viewMode && (
-                <span className={`text-xs px-2 py-1 rounded-full bg-slate-700 ${getViewColor(viewMode)}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium`}>
                   {getViewModeLabel()}
                 </span>
               )}
@@ -150,22 +127,22 @@ export default function GodToolbar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-white hover:bg-amber-500/20"
+                className="h-6 w-6 text-slate-600 hover:bg-slate-200"
                 onClick={() => setIsExpanded(!isExpanded)}
               >
                 {isExpanded ? (
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="w-3.5 h-3.5" />
                 ) : (
-                  <ChevronUp className="w-4 h-4" />
+                  <ChevronUp className="w-3.5 h-3.5" />
                 )}
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-white hover:bg-amber-500/20"
+                className="h-6 w-6 text-slate-600 hover:bg-slate-200"
                 onClick={() => setIsMinimized(true)}
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </Button>
             </div>
           </div>
@@ -178,87 +155,87 @@ export default function GodToolbar() {
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="p-4 space-y-3 min-w-[280px]">
+              <div className="p-4 space-y-4 min-w-[300px]">
                 {/* View Mode Switcher */}
                 <div>
-                  <p className="text-xs font-semibold text-amber-400/80 mb-2 uppercase tracking-wider">
+                  <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wider">
                     Modo de Visualização
                   </p>
                   <div className="grid grid-cols-3 gap-2">
                     <Button
                       variant={viewMode === 'admin' ? 'default' : 'outline'}
                       size="sm"
-                      className={`h-auto py-2 flex flex-col items-center gap-1 ${
+                      className={`h-auto py-2.5 flex flex-col items-center gap-1.5 ${
                         viewMode === 'admin'
-                          ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                          : 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600'
+                          ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                       }`}
                       onClick={() => handleSwitchView('admin')}
                     >
                       <Shield className="w-4 h-4" />
-                      <span className="text-xs">Admin</span>
+                      <span className="text-xs font-medium">Admin</span>
                     </Button>
                     <Button
                       variant={viewMode === 'nutritionist' ? 'default' : 'outline'}
                       size="sm"
-                      className={`h-auto py-2 flex flex-col items-center gap-1 ${
+                      className={`h-auto py-2.5 flex flex-col items-center gap-1.5 ${
                         viewMode === 'nutritionist'
-                          ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                          : 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600'
+                          ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                       }`}
                       onClick={() => handleSwitchView('nutritionist')}
                     >
                       <UserCheck className="w-4 h-4" />
-                      <span className="text-xs">Nutri</span>
+                      <span className="text-xs font-medium">Nutri</span>
                     </Button>
                     <Button
                       variant={viewMode === 'patient' ? 'default' : 'outline'}
                       size="sm"
-                      className={`h-auto py-2 flex flex-col items-center gap-1 ${
+                      className={`h-auto py-2.5 flex flex-col items-center gap-1.5 ${
                         viewMode === 'patient'
-                          ? 'bg-green-500 hover:bg-green-600 text-white'
-                          : 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600'
+                          ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                       }`}
                       onClick={() => handleSwitchView('patient')}
                     >
                       <User className="w-4 h-4" />
-                      <span className="text-xs">Paciente</span>
+                      <span className="text-xs font-medium">Paciente</span>
                     </Button>
                   </div>
                 </div>
 
                 {/* Demo Actions */}
                 <div>
-                  <p className="text-xs font-semibold text-amber-400/80 mb-2 uppercase tracking-wider">
+                  <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wider">
                     Ações de Demo
                   </p>
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full justify-start bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
+                      className="w-full justify-start bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
                       onClick={() => handleDemoAction('Adicionar Paciente Fantasma')}
                     >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Adicionar Paciente Fantasma
+                      <User className="w-3.5 h-3.5 mr-2" />
+                      <span className="text-xs">Adicionar Paciente Fantasma</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full justify-start bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
+                      className="w-full justify-start bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
                       onClick={() => handleDemoAction('Preencher Diário')}
                     >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Preencher Diário
+                      <UserCheck className="w-3.5 h-3.5 mr-2" />
+                      <span className="text-xs">Preencher Diário</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full justify-start bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
+                      className="w-full justify-start bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
                       onClick={() => handleDemoAction('Gerar Dados Aleatórios')}
                     >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Gerar Dados Aleatórios
+                      <Settings className="w-3.5 h-3.5 mr-2" />
+                      <span className="text-xs">Gerar Dados Aleatórios</span>
                     </Button>
                   </div>
                 </div>
@@ -268,28 +245,31 @@ export default function GodToolbar() {
 
           {/* Collapsed Quick Actions */}
           {!isExpanded && (
-            <div className="p-3 flex items-center justify-center gap-2">
+            <div className="p-2.5 flex items-center justify-center gap-1.5">
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-white hover:bg-amber-500/20"
+                className={`h-8 w-8 p-0 ${viewMode === 'admin' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
                 onClick={() => handleSwitchView('admin')}
+                title="Modo Admin"
               >
                 <Shield className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-white hover:bg-amber-500/20"
+                className={`h-8 w-8 p-0 ${viewMode === 'nutritionist' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
                 onClick={() => handleSwitchView('nutritionist')}
+                title="Modo Nutricionista"
               >
                 <UserCheck className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-white hover:bg-amber-500/20"
+                className={`h-8 w-8 p-0 ${viewMode === 'patient' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
                 onClick={() => handleSwitchView('patient')}
+                title="Modo Paciente"
               >
                 <User className="w-4 h-4" />
               </Button>
