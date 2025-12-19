@@ -51,18 +51,23 @@ import { getDashboardStats } from '@/services/adminService';
 // Cores para o gráfico de pizza
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-// Eventos simulados para o Live Log
+// Eventos simulados para o Live Log (mais profissionais e diversos)
 const FAKE_EVENTS = [
-  { type: 'info', message: 'Paciente registrou refeição', user: 'Maria Silva' },
-  { type: 'info', message: 'Novo login detectado', user: 'Dr. João Santos' },
-  { type: 'info', message: 'Paciente registrou água', user: 'Ana Costa' },
-  { type: 'info', message: 'Nutricionista acessou o painel', user: 'Dr. Pedro Lima' },
-  { type: 'info', message: 'Paciente atualizou peso', user: 'Carlos Souza' },
-  { type: 'warning', message: 'Tentativa de login falhou', user: 'usuário desconhecido' },
-  { type: 'info', message: 'Nova mensagem no chat', user: 'Julia Ferreira' },
-  { type: 'error', message: 'Erro 500 em /api/meals', user: 'Sistema' },
-  { type: 'info', message: 'Paciente completou questionário', user: 'Roberto Alves' },
-  { type: 'info', message: 'Consulta agendada', user: 'Dr. Fernanda Rocha' },
+  { type: 'info', message: 'Registro de refeição: Café da manhã completo', user: 'Maria Silva' },
+  { type: 'info', message: 'Sessão iniciada: Nutricionista autenticado', user: 'Dr. João Santos' },
+  { type: 'info', message: 'Hidratação registrada: 500ml de água', user: 'Ana Costa' },
+  { type: 'info', message: 'Acesso ao painel: Dashboard de pacientes', user: 'Dr. Pedro Lima' },
+  { type: 'info', message: 'Atualização antropométrica: Peso registrado', user: 'Carlos Souza' },
+  { type: 'warning', message: 'Tentativa de autenticação falhou: Credenciais inválidas', user: 'Sistema' },
+  { type: 'info', message: 'Nova mensagem: Chat entre paciente e nutricionista', user: 'Julia Ferreira' },
+  { type: 'error', message: 'Erro de servidor: Timeout na requisição /api/meals', user: 'Sistema' },
+  { type: 'info', message: 'Questionário completado: Anamnese nutricional', user: 'Roberto Alves' },
+  { type: 'info', message: 'Agendamento criado: Consulta para próxima semana', user: 'Dr. Fernanda Rocha' },
+  { type: 'info', message: 'Plano alimentar atualizado: Nova prescrição', user: 'Dr. Lucas Mendes' },
+  { type: 'info', message: 'Progresso registrado: Meta de proteínas atingida', user: 'Patricia Oliveira' },
+  { type: 'info', message: 'Upload realizado: Foto de progresso adicionada', user: 'Ricardo Almeida' },
+  { type: 'warning', message: 'Alerta: Paciente sem registro há 7 dias', user: 'Sistema' },
+  { type: 'info', message: 'Exportação de dados: Relatório gerado', user: 'Dr. Camila Rodrigues' },
 ];
 
 /**
@@ -79,7 +84,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [liveLogs, setLiveLogs] = useState([]);
-  const logsEndRef = useRef(null);
+  const scrollAreaRef = useRef(null);
   const [activeTab, setActiveTab] = useState('overview');
 
   // Security check: Only admins can access
@@ -101,6 +106,23 @@ export default function AdminDashboard() {
     }
   }, [user, isAdmin, navigate, toast]);
 
+  // Função para verificar se está no final do scroll
+  const isAtBottom = (element, margin = 50) => {
+    if (!element) return false;
+    const { scrollHeight, scrollTop, clientHeight } = element;
+    return scrollHeight - scrollTop - clientHeight <= margin;
+  };
+
+  // Função para scroll suave até o final
+  const scrollToBottom = () => {
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTo({
+        top: scrollAreaRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   // Live Log Simulation (only when on System tab)
   useEffect(() => {
     if (activeTab !== 'system' || !isAdmin) return;
@@ -115,8 +137,14 @@ export default function AdminDashboard() {
     }));
     setLiveLogs(initialLogs);
 
-    // Adicionar novos logs aleatórios a cada 5-10 segundos
+    // Scroll inicial para o final
+    setTimeout(() => scrollToBottom(), 100);
+
+    // Adicionar novos logs aleatórios a cada 8-12 segundos (mais lento)
     const interval = setInterval(() => {
+      // Verificar se o usuário está no final ANTES de adicionar o log
+      const wasAtBottom = isAtBottom(scrollAreaRef.current, 50);
+
       const randomEvent = FAKE_EVENTS[Math.floor(Math.random() * FAKE_EVENTS.length)];
       const newLog = {
         id: `log-${Date.now()}`,
@@ -128,19 +156,18 @@ export default function AdminDashboard() {
       
       setLiveLogs(prev => {
         const updated = [newLog, ...prev].slice(0, 50); // Manter apenas os últimos 50
+        
+        // Só fazer scroll se o usuário estava no final
+        if (wasAtBottom) {
+          setTimeout(() => scrollToBottom(), 50);
+        }
+        
         return updated;
       });
-    }, Math.random() * 5000 + 5000); // Entre 5-10 segundos
+    }, Math.random() * 4000 + 8000); // Entre 8-12 segundos (mais lento)
 
     return () => clearInterval(interval);
   }, [activeTab, isAdmin]);
-
-  // Auto-scroll logs to bottom
-  useEffect(() => {
-    if (logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [liveLogs]);
 
   const loadStats = async () => {
     setIsLoading(true);
@@ -148,22 +175,79 @@ export default function AdminDashboard() {
       const { data, error } = await getDashboardStats();
 
       if (error) {
-        console.error('Erro ao carregar estatísticas:', error);
+        console.error('[AdminDashboard] Erro ao carregar estatísticas:', error);
         toast({
           title: 'Erro',
           description: 'Não foi possível carregar as estatísticas do dashboard.',
           variant: 'destructive'
         });
+        // Set default stats to avoid crashes
+        setStats({
+          kpis: { totalNutritionists: 0, totalPatients: 0, totalMeals: 0, activePatients: 0 },
+          growthData: [],
+          goalsDistribution: [],
+          recentUsers: []
+        });
         return;
       }
 
-      setStats(data);
+      // Debug: Log the received data structure
+      console.log('[AdminDashboard] Received stats data:', data);
+
+      // Handle different possible response structures
+      let processedData = null;
+      
+      if (data) {
+        // If data is already in the expected format
+        if (data.kpis || data.counts || data.totalNutritionists !== undefined) {
+          // Try to extract from different possible structures
+          processedData = {
+            kpis: {
+              totalNutritionists: data.kpis?.totalNutritionists || data.counts?.nutritionists || data.totalNutritionists || 0,
+              totalPatients: data.kpis?.totalPatients || data.counts?.patients || data.totalPatients || 0,
+              totalMeals: data.kpis?.totalMeals || data.counts?.meals || data.totalMeals || 0,
+              activePatients: data.kpis?.activePatients || data.counts?.activePatients || data.activePatients || 0
+            },
+            growthData: data.growthData || data.growth || data.userGrowth || [],
+            goalsDistribution: data.goalsDistribution || data.goals || data.patientGoals || [],
+            recentUsers: data.recentUsers || data.users || data.newUsers || []
+          };
+        } else {
+          // If data is the object itself (flat structure)
+          processedData = {
+            kpis: {
+              totalNutritionists: data.totalNutritionists || data.nutritionists || 0,
+              totalPatients: data.totalPatients || data.patients || 0,
+              totalMeals: data.totalMeals || data.meals || 0,
+              activePatients: data.activePatients || 0
+            },
+            growthData: data.growthData || [],
+            goalsDistribution: data.goalsDistribution || [],
+            recentUsers: data.recentUsers || []
+          };
+        }
+      }
+
+      console.log('[AdminDashboard] Processed stats:', processedData);
+      setStats(processedData || {
+        kpis: { totalNutritionists: 0, totalPatients: 0, totalMeals: 0, activePatients: 0 },
+        growthData: [],
+        goalsDistribution: [],
+        recentUsers: []
+      });
     } catch (error) {
-      console.error('Erro inesperado:', error);
+      console.error('[AdminDashboard] Erro inesperado:', error);
       toast({
         title: 'Erro',
         description: 'Ocorreu um erro inesperado ao carregar os dados.',
         variant: 'destructive'
+      });
+      // Set default stats to avoid crashes
+      setStats({
+        kpis: { totalNutritionists: 0, totalPatients: 0, totalMeals: 0, activePatients: 0 },
+        growthData: [],
+        goalsDistribution: [],
+        recentUsers: []
       });
     } finally {
       setIsLoading(false);
@@ -865,7 +949,10 @@ export default function AdminDashboard() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="bg-slate-950 rounded-lg p-4 h-[400px] overflow-y-auto font-mono text-xs">
+                    <div 
+                      ref={scrollAreaRef}
+                      className="bg-slate-950 rounded-lg p-4 h-[400px] overflow-y-auto font-mono text-xs"
+                    >
                       {liveLogs.length === 0 ? (
                         <div className="text-muted-foreground text-center py-8">
                           <Terminal className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -893,7 +980,6 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                           ))}
-                          <div ref={logsEndRef} />
                         </div>
                       )}
                     </div>
