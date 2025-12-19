@@ -83,9 +83,9 @@ export async function createGhostPatient(nutritionistId) {
     const randomName = RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)];
     const randomGender = GENDERS[Math.floor(Math.random() * GENDERS.length)];
     
-    // Gerar email fake único
-    const randomSuffix = Math.floor(Math.random() * 10000);
-    const fakeEmail = `paciente.${randomSuffix}@demo.hipozero.com.br`;
+    // Gerar email fake único com padrão de segurança (@demo.hipozero)
+    const emailSuffix = patientId.slice(0, 8); // Primeiros 8 caracteres do UUID
+    const fakeEmail = `demo.${emailSuffix}@demo.hipozero`;
     
     // Gerar data de nascimento aleatória (entre 18 e 65 anos)
     const today = new Date();
@@ -105,6 +105,8 @@ export async function createGhostPatient(nutritionistId) {
       weight: 50 + Math.floor(Math.random() * 50), // 50-100 kg
       goal: ['Perder peso', 'Ganhar massa', 'Manter peso', 'Melhorar saúde'][Math.floor(Math.random() * 4)],
       is_active: true,
+      // Flag de segurança: Marcar como demo no preferences JSONB
+      preferences: { is_demo: true },
       // Campos opcionais para evitar erros de constraint
       cpf: null, // Não preencher CPF para evitar conflitos
       phone: null,
@@ -508,7 +510,8 @@ export async function createGhostSquad(nutritionistId) {
 
     // 1. ROBERTO SILVA (Hipertrofia - Ganho de peso)
     const robertoId = generateUUID();
-    const robertoEmail = `roberto.${Date.now()}@demo.hipozero.com.br`;
+    const robertoEmailSuffix = robertoId.slice(0, 8);
+    const robertoEmail = `demo.${robertoEmailSuffix}@demo.hipozero`;
     const robertoBirthDate = new Date(1990, 5, 15);
 
     const { data: roberto, error: robertoError } = await supabase
@@ -525,6 +528,7 @@ export async function createGhostSquad(nutritionistId) {
         weight: 70, // Peso inicial
         goal: 'Ganhar massa',
         is_active: true,
+        preferences: { is_demo: true }, // Flag de segurança
         cpf: null,
         phone: null,
         occupation: null,
@@ -559,7 +563,8 @@ export async function createGhostSquad(nutritionistId) {
 
     // 2. JULIA COSTA (Emagrecimento - Perda de peso)
     const juliaId = generateUUID();
-    const juliaEmail = `julia.${Date.now()}@demo.hipozero.com.br`;
+    const juliaEmailSuffix = juliaId.slice(0, 8);
+    const juliaEmail = `demo.${juliaEmailSuffix}@demo.hipozero`;
     const juliaBirthDate = new Date(1988, 3, 22);
 
     const { data: julia, error: juliaError } = await supabase
@@ -576,6 +581,7 @@ export async function createGhostSquad(nutritionistId) {
         weight: 70, // Peso inicial
         goal: 'Perder peso',
         is_active: true,
+        preferences: { is_demo: true }, // Flag de segurança
         cpf: null,
         phone: null,
         occupation: null,
@@ -619,7 +625,8 @@ export async function createGhostSquad(nutritionistId) {
 
     // 3. MARCOS SANTOS (Manutenção - Inativo)
     const marcosId = generateUUID();
-    const marcosEmail = `marcos.${Date.now()}@demo.hipozero.com.br`;
+    const marcosEmailSuffix = marcosId.slice(0, 8);
+    const marcosEmail = `demo.${marcosEmailSuffix}@demo.hipozero`;
     const marcosBirthDate = new Date(1992, 8, 10);
 
     const { data: marcos, error: marcosError } = await supabase
@@ -636,6 +643,7 @@ export async function createGhostSquad(nutritionistId) {
         weight: 80,
         goal: 'Manter peso',
         is_active: false, // INATIVO (churned)
+        preferences: { is_demo: true }, // Flag de segurança
         cpf: null,
         phone: null,
         occupation: null,
@@ -684,16 +692,16 @@ export async function createGhostSquad(nutritionistId) {
  */
 export async function cleanupDemoData(nutritionistId) {
   try {
-    const ghostNames = ['Roberto Silva', 'Julia Costa', 'Marcos Santos'];
     let deletedCount = 0;
     const errors = [];
 
-    // 1. Buscar pacientes fantasmas criados pelo squad
+    // SAFETY: Buscar pacientes fantasmas APENAS por email pattern (@demo.hipozero)
+    // Isso garante que mesmo se um paciente real tiver o mesmo nome, ele NÃO será deletado
     const { data: ghostPatients, error: fetchError } = await supabase
       .from('user_profiles')
-      .select('id, name')
+      .select('id, name, email')
       .eq('nutritionist_id', nutritionistId)
-      .in('name', ghostNames);
+      .ilike('email', '%@demo.hipozero'); // SAFETY FILTER: Apenas emails de demo
 
     if (fetchError) {
       console.error('[demoDataService] Erro ao buscar pacientes fantasmas:', fetchError);
@@ -701,12 +709,14 @@ export async function cleanupDemoData(nutritionistId) {
     }
 
     if (!ghostPatients || ghostPatients.length === 0) {
-      console.log('[demoDataService] Nenhum paciente fantasma encontrado para limpeza');
+      console.log('[demoDataService] Nenhum paciente fantasma encontrado para limpeza (email pattern: @demo.hipozero)');
       return {
         data: { deletedPatients: 0, deletedMeals: 0, deletedRecords: 0 },
         error: null
       };
     }
+
+    console.log('[demoDataService] Pacientes de demo encontrados para limpeza:', ghostPatients.map(p => ({ name: p.name, email: p.email })));
 
     const ghostPatientIds = ghostPatients.map(p => p.id);
 
@@ -776,13 +786,15 @@ export async function cleanupDemoData(nutritionistId) {
     }
 
     // 7. Limpar refeições do usuário atual criadas hoje (reset "Perfect Day")
+    // SAFETY: Apenas refeições geradas automaticamente de HOJE são deletadas
+    // Isso atua como "Daily Reset" sem afetar histórico real do usuário
     const today = format(new Date(), 'yyyy-MM-dd');
     const { error: todayMealsError } = await supabase
       .from('meals')
       .delete()
       .eq('patient_id', nutritionistId)
       .eq('meal_date', today)
-      .like('notes', '%gerada automaticamente%');
+      .or('notes.ilike.%gerada automaticamente%,notes.ilike.%Refeição gerada automaticamente%');
 
     if (todayMealsError) {
       console.error('[demoDataService] Erro ao limpar refeições de hoje:', todayMealsError);
