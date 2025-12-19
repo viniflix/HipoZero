@@ -68,3 +68,26 @@ export async function searchFoods(searchTerm, limit = 20) {
   return result.data.slice(0, limit);
 }
 
+/**
+ * Create a new custom food
+ * @param {Object} foodData - Food data (name, calories, protein, carbs, fat, etc.)
+ * @returns {Promise<{data: Object, error: Object}>}
+ */
+export async function createFood(foodData) {
+  try {
+    // Select all fields that FoodSelector expects
+    const { data, error } = await supabase
+      .from('foods')
+      .insert([foodData])
+      .select('id, name, group, description, source, calories, protein, carbs, fat, fiber, sodium, portion_size')
+      .single();
+
+    if (error) throw error;
+
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error creating food:', error);
+    return { data: null, error };
+  }
+}
+

@@ -12,6 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getLatestAnthropometryRecord } from '@/lib/supabase/anthropometry-queries';
 import PhotoGallery from './PhotoGallery';
 import { differenceInYears } from 'date-fns';
+import {
+  calculateFrameSize,
+  calculateSomatotype,
+  getSomatotypeDescription
+} from '@/lib/utils/anthropometry-calculations';
 
 const AnthropometryForm = ({
     patientId,
@@ -61,7 +66,11 @@ const AnthropometryForm = ({
             axilar: ''
         },
         // Diâmetros ósseos
-        bone_diameters: {},
+        bone_diameters: {
+            punho: '',      // Styloid process
+            femur: '',      // Biepicondylar
+            umero: ''       // Biepicondylar
+        },
         // Bioimpedância
         bioimpedance: {
             percent_gordura: '',
@@ -80,6 +89,8 @@ const AnthropometryForm = ({
     const [errors, setErrors] = useState({});
     const [protocol, setProtocol] = useState('pollock7');
     const [compositionResults, setCompositionResults] = useState(null);
+    const [frameSize, setFrameSize] = useState(null);
+    const [somatotype, setSomatotype] = useState(null);
 
     // Buscar último registro para usar como placeholder
     useEffect(() => {
@@ -104,7 +115,11 @@ const AnthropometryForm = ({
                 notes: initialData.notes || '',
                 circumferences: initialData.circumferences || formData.circumferences,
                 skinfolds: initialData.skinfolds || formData.skinfolds,
-                bone_diameters: initialData.bone_diameters || {},
+                bone_diameters: initialData.bone_diameters || {
+                punho: '',
+                femur: '',
+                umero: ''
+            },
                 bioimpedance: initialData.bioimpedance || formData.bioimpedance,
                 photos: initialData.photos || []
             });
@@ -249,6 +264,67 @@ const AnthropometryForm = ({
         }
     }, [formData.weight, formData.height, formData.skinfolds, formData.bioimpedance, protocol, patientGender, patientBirthDate]);
 
+    // Calcular Frame Size (Compleição Óssea)
+    useEffect(() => {
+        const height = parseFloat(formData.height);
+        const wrist = parseFloat(formData.bone_diameters?.punho);
+        const gender = patientGender?.toLowerCase() || '';
+        const isMale = gender.includes('m') || gender === 'masculino' || gender === 'male';
+
+        if (height && wrist) {
+            const frame = calculateFrameSize(height, wrist, isMale);
+            setFrameSize(frame);
+        } else {
+            setFrameSize(null);
+        }
+    }, [formData.height, formData.bone_diameters?.punho, patientGender]);
+
+    // Calcular Somatotipo (Heath-Carter)
+    useEffect(() => {
+        const height = parseFloat(formData.height);
+        const weight = parseFloat(formData.weight);
+        const triceps = parseFloat(formData.skinfolds.triceps);
+        const subscapular = parseFloat(formData.skinfolds.subescapular);
+        const suprailiac = parseFloat(formData.skinfolds.suprailiaca);
+        const humerusWidth = parseFloat(formData.bone_diameters?.umero);
+        const femurWidth = parseFloat(formData.bone_diameters?.femur);
+        const armCirc = formData.circumferences.braco_contraido_e || formData.circumferences.braco_contraido_d;
+        const calfCirc = formData.circumferences.panturrilha_e || formData.circumferences.panturrilha_d;
+        const gender = patientGender?.toLowerCase() || '';
+        const isMale = gender.includes('m') || gender === 'masculino' || gender === 'male';
+
+        if (height && weight) {
+            const somatotypeResult = calculateSomatotype({
+                height,
+                weight,
+                triceps,
+                subscapular,
+                suprailiac,
+                humerusWidth,
+                femurWidth,
+                armCirc: parseFloat(armCirc),
+                calfCirc: parseFloat(calfCirc),
+                isMale
+            });
+            setSomatotype(somatotypeResult);
+        } else {
+            setSomatotype(null);
+        }
+    }, [
+        formData.height,
+        formData.weight,
+        formData.skinfolds.triceps,
+        formData.skinfolds.subescapular,
+        formData.skinfolds.suprailiaca,
+        formData.bone_diameters?.umero,
+        formData.bone_diameters?.femur,
+        formData.circumferences.braco_contraido_e,
+        formData.circumferences.braco_contraido_d,
+        formData.circumferences.panturrilha_e,
+        formData.circumferences.panturrilha_d,
+        patientGender
+    ]);
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -316,9 +392,16 @@ const AnthropometryForm = ({
             notes: formData.notes.trim() || null,
             circumferences: Object.keys(cleanCircumferences).length > 0 ? cleanCircumferences : null,
             skinfolds: Object.keys(cleanSkinfolds).length > 0 ? cleanSkinfolds : null,
+            bone_diameters: Object.keys(formData.bone_diameters || {}).filter(k => formData.bone_diameters[k] && formData.bone_diameters[k] !== '').length > 0 
+                ? Object.fromEntries(Object.entries(formData.bone_diameters).filter(([_, v]) => v && v !== ''))
+                : null,
             bioimpedance: Object.keys(cleanBioimpedance).length > 0 ? cleanBioimpedance : null,
             photos: formData.photos.length > 0 ? formData.photos : null,
-            results: compositionResults || null
+            results: {
+                ...(compositionResults || {}),
+                ...(frameSize && { frame_size: frameSize.size, frame_ratio: frameSize.ratio }),
+                ...(somatotype && { somatotype })
+            } || null
         };
 
         onSubmit(submitData, initialData?.id);
@@ -342,7 +425,11 @@ const AnthropometryForm = ({
                 triceps: '', biceps: '', subescapular: '', suprailiaca: '',
                 abdominal: '', coxa: '', panturrilha: ''
             },
-            bone_diameters: {},
+            bone_diameters: {
+                punho: '',
+                femur: '',
+                umero: ''
+            },
             bioimpedance: {
                 percent_gordura: '', percent_massa_magra: '', gordura_visceral: ''
             },
@@ -630,6 +717,75 @@ const AnthropometryForm = ({
                                         </AlertDescription>
                                     </Alert>
                                 )}
+
+                                {/* Diâmetros Ósseos */}
+                                <div>
+                                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                        <Ruler className="w-4 h-4" />
+                                        Diâmetros Ósseos (cm)
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="bone_punho">Punho (Estiloide) (cm)</Label>
+                                            <Input
+                                                id="bone_punho"
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                placeholder="0.0"
+                                                value={formData.bone_diameters?.punho || ''}
+                                                onChange={(e) => handleNestedChange('bone_diameters', 'punho', e.target.value)}
+                                                disabled={loading}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="bone_femur">Fêmur (Biepicondilar) (cm)</Label>
+                                            <Input
+                                                id="bone_femur"
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                placeholder="0.0"
+                                                value={formData.bone_diameters?.femur || ''}
+                                                onChange={(e) => handleNestedChange('bone_diameters', 'femur', e.target.value)}
+                                                disabled={loading}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="bone_umero">Úmero (Biepicondilar) (cm)</Label>
+                                            <Input
+                                                id="bone_umero"
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                placeholder="0.0"
+                                                value={formData.bone_diameters?.umero || ''}
+                                                onChange={(e) => handleNestedChange('bone_diameters', 'umero', e.target.value)}
+                                                disabled={loading}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Frame Size Calculado */}
+                                    {frameSize && (
+                                        <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 mt-4">
+                                            <Calculator className="h-4 w-4 text-blue-600" />
+                                            <AlertDescription>
+                                                <div className="space-y-1">
+                                                    <div className="font-semibold text-blue-900 dark:text-blue-100">
+                                                        Compleição Óssea (Frame Size):
+                                                    </div>
+                                                    <div className="text-lg font-bold text-blue-800 dark:text-blue-200">
+                                                        {frameSize.label}
+                                                    </div>
+                                                    <div className="text-xs text-blue-700 dark:text-blue-300">
+                                                        Ratio Altura/Punho: {frameSize.ratio.toFixed(2)}
+                                                    </div>
+                                                </div>
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
+                                </div>
                             </div>
                         </TabsContent>
 
@@ -850,6 +1006,59 @@ const AnthropometryForm = ({
                                         </p>
                                     </AlertDescription>
                                 </Alert>
+                            )}
+
+                            {/* Resultados Avançados: Somatotipo */}
+                            {somatotype && (
+                                <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 border-purple-200 dark:border-purple-800">
+                                    <CardHeader>
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <Calculator className="w-5 h-5 text-purple-600" />
+                                            Somatotipo (Heath-Carter)
+                                        </CardTitle>
+                                        <p className="text-sm text-muted-foreground">
+                                            Classificação da composição corporal
+                                        </p>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="space-y-1 text-center p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                                                    <p className="text-xs text-muted-foreground">Endomorfia</p>
+                                                    <p className="text-3xl font-bold text-red-600 dark:text-red-400">
+                                                        {somatotype.endo}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">Gordura relativa</p>
+                                                </div>
+                                                <div className="space-y-1 text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                                                    <p className="text-xs text-muted-foreground">Mesomorfia</p>
+                                                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                                                        {somatotype.meso}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">Massa muscular/óssea</p>
+                                                </div>
+                                                <div className="space-y-1 text-center p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                                                    <p className="text-xs text-muted-foreground">Ectomorfia</p>
+                                                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                                                        {somatotype.ecto}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">Linearidade</p>
+                                                </div>
+                                            </div>
+                                            <div className="pt-4 border-t border-purple-200 dark:border-purple-800">
+                                                <p className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-2">
+                                                    Classificação:
+                                                </p>
+                                                <p className="text-lg font-bold text-purple-800 dark:text-purple-200">
+                                                    {getSomatotypeDescription(somatotype.endo, somatotype.meso, somatotype.ecto)}
+                                                </p>
+                                                <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">
+                                                    Coordenadas para Somatochart: X = {somatotype.x}, Y = {somatotype.y}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             )}
                         </TabsContent>
 

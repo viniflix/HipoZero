@@ -1,15 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Edit, Loader2, Database, ShieldAlert } from 'lucide-react';
+import { Search, Edit, Loader2, Database, ShieldAlert, Plus, Package } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter
+} from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { searchFoodsPaginated } from '@/lib/supabase/foodService';
 import { useDebounce } from '@/hooks/useDebounce';
 import FoodMeasureManager from '@/components/nutritionist/FoodMeasureManager';
+import SmartFoodForm from '@/components/nutrition/SmartFoodForm';
+import { supabase } from '@/lib/customSupabaseClient';
 
 /**
  * NutritionistFoodsPage - Gerenciar Alimentos e Medidas Caseiras
@@ -68,10 +79,32 @@ export default function NutritionistFoodsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedFood, setSelectedFood] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [stats, setStats] = useState({ total: 0, custom: 0 });
   const observerTarget = useRef(null);
   
   // Debounce search term (500ms)
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+  // Fetch stats (total foods, custom foods)
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [totalResult, customResult] = await Promise.all([
+          supabase.from('foods').select('id', { count: 'exact', head: true }).eq('is_active', true),
+          supabase.from('foods').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('source', 'custom')
+        ]);
+        setStats({
+          total: totalResult.count || 0,
+          custom: customResult.count || 0
+        });
+      } catch (error) {
+        console.error('Erro ao buscar estatísticas:', error);
+      }
+    };
+    fetchStats();
+  }, []);
 
   // Search foods with pagination
   const handleSearchFoods = useCallback(async (targetPage = 0, append = false) => {
@@ -162,7 +195,7 @@ export default function NutritionistFoodsPage() {
 
   const handleEditFood = (food) => {
     setSelectedFood(food);
-    setDialogOpen(true);
+    setEditDialogOpen(true);
   };
 
   const handleDialogClose = () => {
@@ -174,23 +207,92 @@ export default function NutritionistFoodsPage() {
     }
   };
 
+  const handleCreateSuccess = (food) => {
+    setCreateDialogOpen(false);
+    toast({
+      title: 'Sucesso!',
+      description: 'Alimento criado com sucesso.',
+    });
+    // Refresh stats
+    const fetchStats = async () => {
+      try {
+        const [totalResult, customResult] = await Promise.all([
+          supabase.from('foods').select('id', { count: 'exact', head: true }).eq('is_active', true),
+          supabase.from('foods').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('source', 'custom')
+        ]);
+        setStats({
+          total: totalResult.count || 0,
+          custom: customResult.count || 0
+        });
+      } catch (error) {
+        console.error('Erro ao atualizar estatísticas:', error);
+      }
+    };
+    fetchStats();
+  };
+
+  const handleEditSuccess = (food) => {
+    setEditDialogOpen(false);
+    setSelectedFood(null);
+    toast({
+      title: 'Sucesso!',
+      description: 'Alimento atualizado com sucesso.',
+    });
+    // Refresh search
+    if (debouncedSearchTerm.trim().length >= 2) {
+      handleSearchFoods(0, false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-8 space-y-6">
         {/* Header */}
         <div className="mb-2">
-          <div className="flex items-center gap-3 mb-2">
-            <Database className="w-8 h-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Admin: Alimentos</h1>
-              <span className="inline-flex items-center px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium mt-1">
-                Administrador
-              </span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Database className="w-8 h-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">Admin: Alimentos</h1>
+                <span className="inline-flex items-center px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium mt-1">
+                  Administrador
+                </span>
+              </div>
             </div>
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Alimento
+            </Button>
           </div>
           <p className="text-muted-foreground mt-2">
-            Busque e gerencie medidas caseiras dos alimentos (Backoffice)
+            Busque e gerencie alimentos e medidas caseiras (Backoffice)
           </p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total de Alimentos</p>
+                  <p className="text-2xl font-bold mt-1">{stats.total.toLocaleString()}</p>
+                </div>
+                <Package className="w-8 h-8 text-primary opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Alimentos Personalizados</p>
+                  <p className="text-2xl font-bold mt-1">{stats.custom.toLocaleString()}</p>
+                </div>
+                <Database className="w-8 h-8 text-primary opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Search Bar */}
@@ -332,7 +434,48 @@ export default function NutritionistFoodsPage() {
         )}
       </div>
 
-      {/* Food Measure Manager Dialog */}
+      {/* Create Food Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Novo Alimento
+            </DialogTitle>
+            <DialogDescription>
+              Crie um alimento customizado com busca por código de barras e cálculo automático
+            </DialogDescription>
+          </DialogHeader>
+          <SmartFoodForm
+            mode="full"
+            onSuccess={handleCreateSuccess}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Food Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Editar Alimento
+            </DialogTitle>
+            <DialogDescription>
+              Edite as informações nutricionais e medidas caseiras
+            </DialogDescription>
+          </DialogHeader>
+          {selectedFood && (
+            <SmartFoodForm
+              mode="full"
+              initialData={selectedFood}
+              onSuccess={handleEditSuccess}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Food Measure Manager Dialog (Legacy - for quick measure editing) */}
       {selectedFood && (
         <FoodMeasureManager
           food={selectedFood}
