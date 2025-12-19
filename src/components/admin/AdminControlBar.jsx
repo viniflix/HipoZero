@@ -555,7 +555,7 @@ export default function AdminControlBar() {
                         size="sm"
                         className="w-full justify-start bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 disabled:opacity-50"
                         onClick={handleCreateGhostPatient}
-                        disabled={isCreatingPatient || isFillingDiary}
+                        disabled={isCreatingPatient || isFillingDiary || isFillingHistory || isCreatingSquad || isCleaningUp}
                       >
                         {isCreatingPatient ? (
                           <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
@@ -571,7 +571,7 @@ export default function AdminControlBar() {
                         size="sm"
                         className="w-full justify-start bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 disabled:opacity-50"
                         onClick={handleFillMealHistory}
-                        disabled={isCreatingPatient || isFillingDiary || isFillingHistory || isCreatingSquad}
+                        disabled={isCreatingPatient || isFillingDiary || isFillingHistory || isCreatingSquad || isCleaningUp}
                       >
                         {isFillingHistory ? (
                           <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
@@ -587,7 +587,7 @@ export default function AdminControlBar() {
                         size="sm"
                         className="w-full justify-start bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 disabled:opacity-50"
                         onClick={handleCreateSquad}
-                        disabled={isCreatingPatient || isFillingDiary || isFillingHistory || isCreatingSquad}
+                        disabled={isCreatingPatient || isFillingDiary || isFillingHistory || isCreatingSquad || isCleaningUp}
                       >
                         {isCreatingSquad ? (
                           <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
@@ -596,6 +596,56 @@ export default function AdminControlBar() {
                         )}
                         <span className="text-xs">
                           {isCreatingSquad ? 'Criando...' : 'Gerar Squad de Pacientes'}
+                        </span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-400 mb-3 uppercase tracking-wider">
+                      Interações (Ao Vivo)
+                    </p>
+                    <div className="space-y-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-400/30"
+                        onClick={handleSimulateNotification}
+                      >
+                        <Bell className="w-3.5 h-3.5 mr-2" />
+                        <span className="text-xs">Simular Notificação</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 border-yellow-400/30"
+                        onClick={handleUnlockAchievement}
+                      >
+                        <Trophy className="w-3.5 h-3.5 mr-2" />
+                        <span className="text-xs">Desbloquear Conquista</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold text-red-400 mb-3 uppercase tracking-wider">
+                      Manutenção
+                    </p>
+                    <div className="space-y-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-400/30 disabled:opacity-50"
+                        onClick={() => setShowCleanupDialog(true)}
+                        disabled={isCleaningUp || isCreatingPatient || isFillingDiary || isFillingHistory || isCreatingSquad}
+                      >
+                        {isCleaningUp ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5 mr-2" />
+                        )}
+                        <span className="text-xs">
+                          {isCleaningUp ? 'Limpando...' : 'Limpar Dados de Demo'}
                         </span>
                       </Button>
                     </div>
