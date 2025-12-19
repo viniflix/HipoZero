@@ -28,6 +28,10 @@ const NotificationsPage = lazy(() => import('@/pages/NotificationsPage.jsx'));
 const CalculationInfoPage = lazy(() => import('@/pages/CalculationInfoPage.jsx'));
 const AgendaPage = lazy(() => import('@/pages/AgendaPage.jsx'));
 const FinancialPage = lazy(() => import('@/pages/FinancialPage.jsx'));
+const NutritionistFoodsPage = lazy(() => import('@/pages/nutritionist/NutritionistFoodsPage.jsx'));
+
+// Páginas Admin
+const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard.jsx'));
 
 // Anamnese
 const PatientAnamnesePage = lazy(() => import('@/pages/PatientAnamnesePage.jsx'));
@@ -87,7 +91,7 @@ const AuthWrapper = ({ children }) => {
     return children;
 };
 
-const ProtectedRoute = ({ children, userType }) => {
+const ProtectedRoute = ({ children, userType, requireAdmin = false }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -99,6 +103,12 @@ const ProtectedRoute = ({ children, userType }) => {
   }
 
   if (userType && user.profile.user_type !== userType) {
+    const correctDashboard = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
+    return <Navigate to={correctDashboard} replace />;
+  }
+
+  // Admin-only routes
+  if (requireAdmin && !user.profile.is_admin) {
     const correctDashboard = user.profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
     return <Navigate to={correctDashboard} replace />;
   }
@@ -156,6 +166,23 @@ const AppLayout = () => {
               <Route path="/nutritionist/food-bank" element={<FoodBankPage />} />
               <Route path="/nutritionist/financial" element={<FinancialPage />} />
               <Route path="/nutritionist/agenda" element={<AgendaPage />} />
+              {/* Admin-only routes */}
+              <Route 
+                path="/nutritionist/foods" 
+                element={
+                  <ProtectedRoute userType="nutritionist" requireAdmin={true}>
+                    <NutritionistFoodsPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin/dashboard" 
+                element={
+                  <ProtectedRoute userType="nutritionist" requireAdmin={true}>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
             </Route>
 
             {/* --- ROTAS DO PACIENTE (Nova Arquitetura Mobile-First) --- */}

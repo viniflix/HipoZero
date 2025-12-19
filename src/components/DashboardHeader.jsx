@@ -19,13 +19,27 @@ import {
 } from '@/components/ui/sheet';
 
 // Links de navegação principal
-const navigationLinks = [
-  { name: 'Dashboard', path: '/nutritionist' },
-  { name: 'Pacientes', path: '/nutritionist/patients' },
-  { name: 'Agenda', path: '/nutritionist/agenda' },
-  { name: 'Financeiro', path: '/nutritionist/financial' },
-  { name: 'Banco de Alimentos', path: '/nutritionist/food-bank' },
-];
+const getNavigationLinks = (isAdmin = false) => {
+  const links = [
+    { name: 'Dashboard', path: '/nutritionist' },
+    { name: 'Pacientes', path: '/nutritionist/patients' },
+    { name: 'Agenda', path: '/nutritionist/agenda' },
+    { name: 'Financeiro', path: '/nutritionist/financial' },
+    { name: 'Banco de Alimentos', path: '/nutritionist/food-bank' },
+  ];
+
+  return links;
+};
+
+// Admin navigation links (separate group)
+const getAdminLinks = (isAdmin = false) => {
+  if (!isAdmin) return [];
+  
+  return [
+    { name: 'Admin Dashboard', path: '/admin/dashboard' },
+    { name: 'Admin: Alimentos', path: '/nutritionist/foods' },
+  ];
+};
 
 // --- Componente Principal do Header (Nova Versão CLEAN) ---
 const DashboardHeader = ({ user, logout }) => {
@@ -35,6 +49,9 @@ const DashboardHeader = ({ user, logout }) => {
   if (!user) return null;
 
   const initials = (user.profile?.name || 'U').substring(0, 2).toUpperCase();
+  const isAdmin = user.profile?.is_admin === true;
+  const navigationLinks = getNavigationLinks(isAdmin);
+  const adminLinks = getAdminLinks(isAdmin);
 
   // Handler para logout que previne comportamentos inesperados
   const handleLogout = async (e) => {
@@ -79,6 +96,32 @@ const DashboardHeader = ({ user, logout }) => {
                       {link.name}
                     </NavLink>
                   ))}
+                  {adminLinks.length > 0 && (
+                    <>
+                      <div className="px-4 py-2 mt-4 border-t">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Administração
+                        </p>
+                      </div>
+                      {adminLinks.map((link) => (
+                        <NavLink
+                          key={link.path}
+                          to={link.path}
+                          end={link.path === '/admin/dashboard'}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={({ isActive }) =>
+                            `px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+                              isActive
+                                ? 'text-primary bg-primary/10'
+                                : 'text-muted-foreground hover:text-primary hover:bg-accent'
+                            }`
+                          }
+                        >
+                          {link.name}
+                        </NavLink>
+                      ))}
+                    </>
+                  )}
                 </nav>
               </SheetContent>
             </Sheet>
@@ -110,6 +153,27 @@ const DashboardHeader = ({ user, logout }) => {
                   {link.name}
                 </NavLink>
               ))}
+              {adminLinks.length > 0 && (
+                <>
+                  <div className="h-6 w-px bg-border mx-2" />
+                  {adminLinks.map((link) => (
+                    <NavLink
+                      key={link.path}
+                      to={link.path}
+                      end={link.path === '/admin/dashboard'}
+                      className={({ isActive }) =>
+                        `px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          isActive
+                            ? 'text-primary bg-primary/10'
+                            : 'text-muted-foreground hover:text-primary hover:bg-accent'
+                        }`
+                      }
+                    >
+                      {link.name}
+                    </NavLink>
+                  ))}
+                </>
+              )}
             </nav>
           </div>
 
