@@ -1,10 +1,11 @@
 import { supabase } from '@/lib/customSupabaseClient';
+import { subDays, format } from 'date-fns';
 
 /**
- * Demo Data Service
+ * Demo Data Service (Enterprise Version)
  * 
- * Funções para gerar dados de demonstração no Supabase
- * para uso em apresentações e demos para investidores
+ * Funções avançadas para gerar dados de demonstração no Supabase
+ * com histórico temporal e perfis realistas para demos de investidores
  */
 
 /**
@@ -21,6 +22,41 @@ function generateUUID() {
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+/**
+ * Gera um número inteiro aleatório entre min e max (inclusive)
+ * @param {number} min 
+ * @param {number} max 
+ * @returns {number}
+ */
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/**
+ * Busca um alimento no banco de dados
+ * @param {string} term - Termo de busca
+ * @returns {Promise<object|null>} Primeiro alimento encontrado ou null
+ */
+async function searchFood(term) {
+  try {
+    const { data, error } = await supabase
+      .from('foods')
+      .select('id, name, calories, protein, carbs, fat, base_qty')
+      .ilike('name', `%${term}%`)
+      .limit(1)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('[demoDataService] Erro ao buscar alimento:', error);
+    return null;
+  }
 }
 
 // Nomes brasileiros aleatórios para pacientes fantasma
@@ -263,6 +299,518 @@ export async function fillDailyDiary(patientId) {
     };
   } catch (error) {
     console.error('[demoDataService] Erro inesperado ao preencher diário:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Preenche o histórico de refeições dos últimos N dias
+ * Cria um "dia saudável padrão" com variação realista para gráficos
+ * @param {string} userId - UUID do paciente
+ * @param {number} daysBack - Número de dias para preencher (padrão: 7)
+ * @returns {Promise<{data: object|null, error: object|null}>}
+ */
+export async function fillMealHistory(userId, daysBack = 7) {
+  try {
+    // Buscar alimentos padrão para um dia saudável
+    const coffee = await searchFood('café');
+    const chicken = await searchFood('frango');
+    const rice = await searchFood('arroz');
+    const eggs = await searchFood('ovo');
+    const banana = await searchFood('banana');
+    const bread = await searchFood('pão');
+
+    // Pool de alimentos (usar os encontrados ou buscar alternativas)
+    const standardFoods = [coffee, chicken, rice, eggs, banana, bread].filter(Boolean);
+
+    if (standardFoods.length === 0) {
+      // Fallback: buscar qualquer alimento do banco
+      const { data: fallbackFoods } = await supabase
+        .from('foods')
+        .select('id, name, calories, protein, carbs, fat, base_qty')
+        .limit(10);
+
+      if (!fallbackFoods || fallbackFoods.length === 0) {
+        return {
+          data: null,
+          error: { message: 'Nenhum alimento encontrado no banco de dados' }
+        };
+      }
+
+      standardFoods.push(...fallbackFoods);
+    }
+
+    const mealsCreated = [];
+    const mealItemsCreated = [];
+
+    // Loop pelos últimos N dias
+    for (let i = 0; i < daysBack; i++) {
+      const targetDate = subDays(new Date(), i);
+      const dateStr = format(targetDate, 'yyyy-MM-dd');
+
+      // Definir refeições padrão com variação
+      const mealPlan = [
+        {
+          type: 'breakfast',
+          time: '08:00:00',
+          foods: [
+            { food: coffee || standardFoods[0], quantity: 200 + getRandomInt(-20, 20) }, // 180-220ml
+            { food: bread || standardFoods[1] || standardFoods[0], quantity: 50 + getRandomInt(-10, 10) }, // 40-60g
+            { food: eggs || standardFoods[2] || standardFoods[0], quantity: 100 + getRandomInt(-20, 20) } // 80-120g
+          ]
+        },
+        {
+          type: 'lunch',
+          time: '12:30:00',
+          foods: [
+            { food: chicken || standardFoods[0], quantity: 150 + getRandomInt(-30, 30) }, // 120-180g
+            { food: rice || standardFoods[1] || standardFoods[0], quantity: 200 + getRandomInt(-40, 40) } // 160-240g
+          ]
+        },
+        {
+          type: 'snack',
+          time: '16:00:00',
+          foods: [
+            { food: banana || standardFoods[2] || standardFoods[0], quantity: 100 + getRandomInt(-20, 20) } // 80-120g
+          ]
+        },
+        {
+          type: 'dinner',
+          time: '19:30:00',
+          foods: [
+            { food: chicken || standardFoods[0], quantity: 120 + getRandomInt(-25, 25) }, // 95-145g
+            { food: rice || standardFoods[1] || standardFoods[0], quantity: 150 + getRandomInt(-30, 30) } // 120-180g
+          ]
+        }
+      ];
+
+      // Criar refeições para este dia
+      for (const mealPlanItem of mealPlan) {
+        let totalCalories = 0;
+        let totalProtein = 0;
+        let totalCarbs = 0;
+        let totalFat = 0;
+
+        const itemsForMeal = [];
+
+        for (const foodItem of mealPlanItem.foods) {
+          if (!foodItem.food) continue;
+
+          const food = foodItem.food;
+          const quantity = Math.max(10, foodItem.quantity); // Mínimo 10g
+          const multiplier = quantity / (food.base_qty || 100);
+
+          // Aplicar variação de ±10% para realismo
+          const variation = 0.9 + (Math.random() * 0.2); // 0.9 a 1.1
+          const itemCalories = (food.calories || 0) * multiplier * variation;
+          const itemProtein = (food.protein || 0) * multiplier * variation;
+          const itemCarbs = (food.carbs || 0) * multiplier * variation;
+          const itemFat = (food.fat || 0) * multiplier * variation;
+
+          totalCalories += itemCalories;
+          totalProtein += itemProtein;
+          totalCarbs += itemCarbs;
+          totalFat += itemFat;
+
+          itemsForMeal.push({
+            food_id: food.id,
+            name: food.name,
+            quantity: Math.round(quantity),
+            unit: 'gram',
+            calories: Math.round(itemCalories * 100) / 100,
+            protein: Math.round(itemProtein * 100) / 100,
+            carbs: Math.round(itemCarbs * 100) / 100,
+            fat: Math.round(itemFat * 100) / 100,
+          });
+        }
+
+        if (itemsForMeal.length === 0) continue;
+
+        // Criar a refeição
+        const { data: meal, error: mealError } = await supabase
+          .from('meals')
+          .insert({
+            patient_id: userId,
+            meal_date: dateStr,
+            meal_time: mealPlanItem.time,
+            meal_type: mealPlanItem.type,
+            notes: `Refeição gerada automaticamente - ${dateStr}`,
+            total_calories: Math.round(totalCalories * 100) / 100,
+            total_protein: Math.round(totalProtein * 100) / 100,
+            total_carbs: Math.round(totalCarbs * 100) / 100,
+            total_fat: Math.round(totalFat * 100) / 100,
+          })
+          .select()
+          .single();
+
+        if (mealError) {
+          console.error(`[demoDataService] Erro ao criar refeição ${mealPlanItem.type} para ${dateStr}:`, mealError);
+          continue;
+        }
+
+        mealsCreated.push(meal);
+
+        // Inserir itens
+        const itemsToInsert = itemsForMeal.map(item => ({
+          meal_id: meal.id,
+          food_id: item.food_id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fat: item.fat,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('meal_items')
+          .insert(itemsToInsert);
+
+        if (itemsError) {
+          console.error(`[demoDataService] Erro ao inserir itens para ${dateStr}:`, itemsError);
+        } else {
+          mealItemsCreated.push(...itemsToInsert);
+        }
+      }
+    }
+
+    console.log('[demoDataService] Histórico preenchido:', {
+      days: daysBack,
+      meals: mealsCreated.length,
+      items: mealItemsCreated.length
+    });
+
+    return {
+      data: {
+        daysBack,
+        meals: mealsCreated,
+        items: mealItemsCreated,
+        totalMeals: mealsCreated.length,
+        totalItems: mealItemsCreated.length
+      },
+      error: null
+    };
+  } catch (error) {
+    console.error('[demoDataService] Erro inesperado ao preencher histórico:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Cria um "squad" de 3 pacientes com perfis diferentes e históricos
+ * @param {string} nutritionistId - UUID do nutricionista admin
+ * @returns {Promise<{data: object|null, error: object|null}>}
+ */
+export async function createGhostSquad(nutritionistId) {
+  try {
+    const patientsCreated = [];
+
+    // 1. ROBERTO SILVA (Hipertrofia - Ganho de peso)
+    const robertoId = generateUUID();
+    const robertoEmail = `roberto.${Date.now()}@demo.hipozero.com.br`;
+    const robertoBirthDate = new Date(1990, 5, 15);
+
+    const { data: roberto, error: robertoError } = await supabase
+      .from('user_profiles')
+      .insert({
+        id: robertoId,
+        name: 'Roberto Silva',
+        email: robertoEmail,
+        user_type: 'patient',
+        nutritionist_id: nutritionistId,
+        gender: 'M',
+        birth_date: format(robertoBirthDate, 'yyyy-MM-dd'),
+        height: 175,
+        weight: 70, // Peso inicial
+        goal: 'Ganhar massa',
+        is_active: true,
+        cpf: null,
+        phone: null,
+        occupation: null,
+        civil_status: null,
+        observations: null,
+        address: null,
+      })
+      .select()
+      .single();
+
+    if (robertoError) {
+      console.error('[demoDataService] Erro ao criar Roberto:', robertoError);
+    } else {
+      patientsCreated.push(roberto);
+
+      // Histórico de peso: 70kg -> 71kg -> 72kg -> 73.5kg (crescimento)
+      const weightHistory = [
+        { date: subDays(new Date(), 60), weight: 70.0 },
+        { date: subDays(new Date(), 40), weight: 71.0 },
+        { date: subDays(new Date(), 20), weight: 72.0 },
+        { date: subDays(new Date(), 5), weight: 73.5 },
+      ];
+
+      for (const record of weightHistory) {
+        await supabase.from('growth_records').insert({
+          patient_id: robertoId,
+          record_date: format(record.date, 'yyyy-MM-dd'),
+          weight: record.weight,
+        });
+      }
+    }
+
+    // 2. JULIA COSTA (Emagrecimento - Perda de peso)
+    const juliaId = generateUUID();
+    const juliaEmail = `julia.${Date.now()}@demo.hipozero.com.br`;
+    const juliaBirthDate = new Date(1988, 3, 22);
+
+    const { data: julia, error: juliaError } = await supabase
+      .from('user_profiles')
+      .insert({
+        id: juliaId,
+        name: 'Julia Costa',
+        email: juliaEmail,
+        user_type: 'patient',
+        nutritionist_id: nutritionistId,
+        gender: 'F',
+        birth_date: format(juliaBirthDate, 'yyyy-MM-dd'),
+        height: 165,
+        weight: 70, // Peso inicial
+        goal: 'Perder peso',
+        is_active: true,
+        cpf: null,
+        phone: null,
+        occupation: null,
+        civil_status: null,
+        observations: null,
+        address: null,
+      })
+      .select()
+      .single();
+
+    if (juliaError) {
+      console.error('[demoDataService] Erro ao criar Julia:', juliaError);
+    } else {
+      patientsCreated.push(julia);
+
+      // Histórico de peso: 70kg -> 68kg -> 66kg -> 64kg (sucesso)
+      const weightHistory = [
+        { date: subDays(new Date(), 60), weight: 70.0 },
+        { date: subDays(new Date(), 40), weight: 68.0 },
+        { date: subDays(new Date(), 20), weight: 66.0 },
+        { date: subDays(new Date(), 5), weight: 64.0 },
+      ];
+
+      for (const record of weightHistory) {
+        await supabase.from('growth_records').insert({
+          patient_id: juliaId,
+          record_date: format(record.date, 'yyyy-MM-dd'),
+          weight: record.weight,
+        });
+      }
+
+      // Mensagem de chat não lida
+      await supabase.from('chats').insert({
+        from_id: juliaId,
+        to_id: nutritionistId,
+        message: 'Bom dia nutri! Estou adorando os resultados. Já perdi 6kg! 🎉',
+        message_type: 'text',
+        created_at: subDays(new Date(), 1).toISOString(),
+      });
+    }
+
+    // 3. MARCOS SANTOS (Manutenção - Inativo)
+    const marcosId = generateUUID();
+    const marcosEmail = `marcos.${Date.now()}@demo.hipozero.com.br`;
+    const marcosBirthDate = new Date(1992, 8, 10);
+
+    const { data: marcos, error: marcosError } = await supabase
+      .from('user_profiles')
+      .insert({
+        id: marcosId,
+        name: 'Marcos Santos',
+        email: marcosEmail,
+        user_type: 'patient',
+        nutritionist_id: nutritionistId,
+        gender: 'M',
+        birth_date: format(marcosBirthDate, 'yyyy-MM-dd'),
+        height: 180,
+        weight: 80,
+        goal: 'Manter peso',
+        is_active: false, // INATIVO (churned)
+        cpf: null,
+        phone: null,
+        occupation: null,
+        civil_status: null,
+        observations: null,
+        address: null,
+      })
+      .select()
+      .single();
+
+    if (marcosError) {
+      console.error('[demoDataService] Erro ao criar Marcos:', marcosError);
+    } else {
+      patientsCreated.push(marcos);
+    }
+
+    if (patientsCreated.length === 0) {
+      return {
+        data: null,
+        error: { message: 'Não foi possível criar nenhum paciente' }
+      };
+    }
+
+    console.log('[demoDataService] Squad criado:', {
+      patients: patientsCreated.length,
+      names: patientsCreated.map(p => p.name)
+    });
+
+    return {
+      data: {
+        patients: patientsCreated,
+        totalPatients: patientsCreated.length
+      },
+      error: null
+    };
+  } catch (error) {
+    console.error('[demoDataService] Erro inesperado ao criar squad:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Limpa todos os dados de demonstração gerados
+ * @param {string} nutritionistId - UUID do nutricionista admin
+ * @returns {Promise<{data: object|null, error: object|null}>}
+ */
+export async function cleanupDemoData(nutritionistId) {
+  try {
+    const ghostNames = ['Roberto Silva', 'Julia Costa', 'Marcos Santos'];
+    let deletedCount = 0;
+    const errors = [];
+
+    // 1. Buscar pacientes fantasmas criados pelo squad
+    const { data: ghostPatients, error: fetchError } = await supabase
+      .from('user_profiles')
+      .select('id, name')
+      .eq('nutritionist_id', nutritionistId)
+      .in('name', ghostNames);
+
+    if (fetchError) {
+      console.error('[demoDataService] Erro ao buscar pacientes fantasmas:', fetchError);
+      return { data: null, error: fetchError };
+    }
+
+    if (!ghostPatients || ghostPatients.length === 0) {
+      console.log('[demoDataService] Nenhum paciente fantasma encontrado para limpeza');
+      return {
+        data: { deletedPatients: 0, deletedMeals: 0, deletedRecords: 0 },
+        error: null
+      };
+    }
+
+    const ghostPatientIds = ghostPatients.map(p => p.id);
+
+    // 2. Deletar registros de peso (growth_records)
+    const { error: recordsError } = await supabase
+      .from('growth_records')
+      .delete()
+      .in('patient_id', ghostPatientIds);
+
+    if (recordsError) {
+      console.error('[demoDataService] Erro ao deletar growth_records:', recordsError);
+      errors.push(recordsError);
+    }
+
+    // 3. Deletar mensagens de chat
+    const { error: chatsError } = await supabase
+      .from('chats')
+      .delete()
+      .in('from_id', ghostPatientIds);
+
+    if (chatsError) {
+      console.error('[demoDataService] Erro ao deletar chats:', chatsError);
+      errors.push(chatsError);
+    }
+
+    // 4. Deletar itens de refeições
+    const { data: mealsData } = await supabase
+      .from('meals')
+      .select('id')
+      .in('patient_id', ghostPatientIds);
+
+    if (mealsData && mealsData.length > 0) {
+      const mealIds = mealsData.map(m => m.id);
+      const { error: itemsError } = await supabase
+        .from('meal_items')
+        .delete()
+        .in('meal_id', mealIds);
+
+      if (itemsError) {
+        console.error('[demoDataService] Erro ao deletar meal_items:', itemsError);
+        errors.push(itemsError);
+      }
+    }
+
+    // 5. Deletar refeições
+    const { error: mealsError } = await supabase
+      .from('meals')
+      .delete()
+      .in('patient_id', ghostPatientIds);
+
+    if (mealsError) {
+      console.error('[demoDataService] Erro ao deletar meals:', mealsError);
+      errors.push(mealsError);
+    }
+
+    // 6. Deletar pacientes fantasmas
+    const { error: patientsError } = await supabase
+      .from('user_profiles')
+      .delete()
+      .in('id', ghostPatientIds);
+
+    if (patientsError) {
+      console.error('[demoDataService] Erro ao deletar pacientes:', patientsError);
+      errors.push(patientsError);
+    } else {
+      deletedCount = ghostPatients.length;
+    }
+
+    // 7. Limpar refeições do usuário atual criadas hoje (reset "Perfect Day")
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const { error: todayMealsError } = await supabase
+      .from('meals')
+      .delete()
+      .eq('patient_id', nutritionistId)
+      .eq('meal_date', today)
+      .like('notes', '%gerada automaticamente%');
+
+    if (todayMealsError) {
+      console.error('[demoDataService] Erro ao limpar refeições de hoje:', todayMealsError);
+      errors.push(todayMealsError);
+    }
+
+    if (errors.length > 0) {
+      return {
+        data: { deletedPatients: deletedCount },
+        error: { message: `Alguns erros ocorreram: ${errors.length}`, errors }
+      };
+    }
+
+    console.log('[demoDataService] Limpeza concluída:', {
+      deletedPatients: deletedCount,
+      deletedMeals: mealsData?.length || 0
+    });
+
+    return {
+      data: {
+        deletedPatients: deletedCount,
+        deletedMeals: mealsData?.length || 0,
+        deletedRecords: ghostPatientIds.length
+      },
+      error: null
+    };
+  } catch (error) {
+    console.error('[demoDataService] Erro inesperado na limpeza:', error);
     return { data: null, error };
   }
 }

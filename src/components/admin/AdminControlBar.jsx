@@ -7,14 +7,19 @@ import {
   ChevronUp,
   ChevronDown,
   X,
-  Loader2
+  Loader2,
+  Bell,
+  Trophy,
+  Trash2,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdminMode } from '@/contexts/AdminModeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createGhostPatient, fillDailyDiary } from '@/services/demoDataService';
+import { createGhostPatient, fillDailyDiary, fillMealHistory, createGhostSquad, cleanupDemoData } from '@/services/demoDataService';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 /**
  * AdminControlBar - Premium Command Center
@@ -31,6 +36,10 @@ export default function AdminControlBar() {
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [isCreatingPatient, setIsCreatingPatient] = useState(false);
   const [isFillingDiary, setIsFillingDiary] = useState(false);
+  const [isFillingHistory, setIsFillingHistory] = useState(false);
+  const [isCreatingSquad, setIsCreatingSquad] = useState(false);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const constraintsRef = useRef(null);
 
   // Only render if user is admin
@@ -168,6 +177,168 @@ export default function AdminControlBar() {
       });
     } finally {
       setIsFillingDiary(false);
+    }
+  };
+
+  const handleFillMealHistory = async () => {
+    if (!user?.id) {
+      toast({
+        title: 'Erro',
+        description: 'Usuário não identificado.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsFillingHistory(true);
+    setIsExpanded(false);
+    setIsMobileExpanded(false);
+
+    try {
+      const { data, error } = await fillMealHistory(user.id, 7);
+
+      if (error) {
+        console.error('[AdminControlBar] Erro ao preencher histórico:', error);
+        toast({
+          title: 'Erro',
+          description: error.message || 'Não foi possível preencher o histórico.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      toast({
+        title: 'Últimos 7 dias preenchidos!',
+        description: `${data.totalMeals} refeições criadas. Gráficos atualizados. 📈`,
+      });
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('[AdminControlBar] Erro inesperado:', error);
+      toast({
+        title: 'Erro',
+        description: 'Ocorreu um erro inesperado ao preencher o histórico.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsFillingHistory(false);
+    }
+  };
+
+  const handleCreateSquad = async () => {
+    if (!user?.id) {
+      toast({
+        title: 'Erro',
+        description: 'Usuário não identificado.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsCreatingSquad(true);
+    setIsExpanded(false);
+    setIsMobileExpanded(false);
+
+    try {
+      const { data, error } = await createGhostSquad(user.id);
+
+      if (error) {
+        console.error('[AdminControlBar] Erro ao criar squad:', error);
+        toast({
+          title: 'Erro',
+          description: error.message || 'Não foi possível criar o squad de pacientes.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      toast({
+        title: '3 Pacientes com Histórico criados!',
+        description: `Verifique a aba Pacientes. 👥`,
+      });
+
+      setTimeout(() => {
+        window.location.href = '/nutritionist/patients';
+      }, 1500);
+    } catch (error) {
+      console.error('[AdminControlBar] Erro inesperado:', error);
+      toast({
+        title: 'Erro',
+        description: 'Ocorreu um erro inesperado ao criar o squad.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsCreatingSquad(false);
+    }
+  };
+
+  const handleSimulateNotification = () => {
+    toast({
+      title: '🔔 Nova Atividade',
+      description: "Paciente 'Julia Costa' registrou o jantar (350kcal).",
+      duration: 5000,
+    });
+    setIsExpanded(false);
+    setIsMobileExpanded(false);
+  };
+
+  const handleUnlockAchievement = () => {
+    toast({
+      title: '🏆 Conquista Desbloqueada!',
+      description: 'Parabéns! Você atingiu a meta de proteínas por 3 dias seguidos.',
+      duration: 6000,
+    });
+    setIsExpanded(false);
+    setIsMobileExpanded(false);
+  };
+
+  const handleCleanupDemoData = async () => {
+    if (!user?.id) {
+      toast({
+        title: 'Erro',
+        description: 'Usuário não identificado.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsCleaningUp(true);
+    setShowCleanupDialog(false);
+    setIsExpanded(false);
+    setIsMobileExpanded(false);
+
+    try {
+      const { data, error } = await cleanupDemoData(user.id);
+
+      if (error) {
+        console.error('[AdminControlBar] Erro ao limpar dados:', error);
+        toast({
+          title: 'Erro',
+          description: error.message || 'Não foi possível limpar os dados de demo.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      toast({
+        title: 'Ambiente limpo!',
+        description: `Pronto para nova demo. 🧹`,
+      });
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('[AdminControlBar] Erro inesperado:', error);
+      toast({
+        title: 'Erro',
+        description: 'Ocorreu um erro inesperado ao limpar os dados.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsCleaningUp(false);
     }
   };
 
@@ -399,26 +570,33 @@ export default function AdminControlBar() {
                         variant="outline"
                         size="sm"
                         className="w-full justify-start bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 disabled:opacity-50"
-                        onClick={handleFillDiary}
-                        disabled={isCreatingPatient || isFillingDiary}
+                        onClick={handleFillMealHistory}
+                        disabled={isCreatingPatient || isFillingDiary || isFillingHistory || isCreatingSquad}
                       >
-                        {isFillingDiary ? (
+                        {isFillingHistory ? (
                           <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
                         ) : (
                           <UserCheck className="w-3.5 h-3.5 mr-2" />
                         )}
                         <span className="text-xs">
-                          {isFillingDiary ? 'Preenchendo...' : 'Preencher Diário'}
+                          {isFillingHistory ? 'Preenchendo...' : 'Simular Semana (Eu)'}
                         </span>
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full justify-start bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
-                        onClick={() => handleDemoAction('Gerar Dados Aleatórios')}
+                        className="w-full justify-start bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 disabled:opacity-50"
+                        onClick={handleCreateSquad}
+                        disabled={isCreatingPatient || isFillingDiary || isFillingHistory || isCreatingSquad}
                       >
-                        <Settings className="w-3.5 h-3.5 mr-2" />
-                        <span className="text-xs">Gerar Dados Aleatórios</span>
+                        {isCreatingSquad ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                        ) : (
+                          <Settings className="w-3.5 h-3.5 mr-2" />
+                        )}
+                        <span className="text-xs">
+                          {isCreatingSquad ? 'Criando...' : 'Gerar Squad de Pacientes'}
+                        </span>
                       </Button>
                     </div>
                   </div>
@@ -556,6 +734,34 @@ export default function AdminControlBar() {
     <>
       <DesktopToolbar />
       <MobileFAB />
+      
+      {/* Cleanup Confirmation Dialog */}
+      <AlertDialog open={showCleanupDialog} onOpenChange={setShowCleanupDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Limpar Dados de Demo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja limpar todos os dados de demonstração? Isso apagará:
+              <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                <li>Pacientes fantasmas (Roberto, Julia, Marcos)</li>
+                <li>Histórico de peso e refeições</li>
+                <li>Mensagens de chat de demo</li>
+                <li>Refeições geradas automaticamente de hoje</li>
+              </ul>
+              <span className="block mt-2 font-semibold text-red-400">Esta ação não pode ser desfeita.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCleanupDemoData}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Limpar Tudo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
