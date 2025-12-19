@@ -3,19 +3,40 @@ import * as ToastPrimitives from '@radix-ui/react-toast';
 import { cva } from 'class-variance-authority';
 import { X } from 'lucide-react';
 import React from 'react';
+import { useAdminMode } from '@/contexts/AdminModeContext';
 
 const ToastProvider = ToastPrimitives.Provider;
 
-const ToastViewport = React.forwardRef(({ className, ...props }, ref) => (
-	<ToastPrimitives.Viewport
-		ref={ref}
-		className={cn(
-			'fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]',
-			className,
-		)}
-		{...props}
-	/>
-));
+const ToastViewport = React.forwardRef(({ className, ...props }, ref) => {
+	// Safely get admin state (may not be available in all contexts)
+	let isAdmin = false;
+	try {
+		const adminMode = useAdminMode();
+		isAdmin = adminMode?.isAdmin || false;
+	} catch (error) {
+		// Context not available, use default positioning
+		isAdmin = false;
+	}
+	
+	// Dynamic positioning: If admin toolbar is visible, lift toasts up
+	// Mobile: Always at top, Desktop: bottom-right (or lifted if admin)
+	const adminOffset = isAdmin ? 'sm:bottom-[90px]' : 'sm:bottom-0';
+	
+	return (
+		<ToastPrimitives.Viewport
+			ref={ref}
+			className={cn(
+				'fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4',
+				adminOffset,
+				'sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]',
+				// Mobile safe area
+				'safe-area-inset-bottom',
+				className,
+			)}
+			{...props}
+		/>
+	);
+});
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName;
 
 const toastVariants = cva(

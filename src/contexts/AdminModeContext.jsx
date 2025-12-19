@@ -99,11 +99,62 @@ export const AdminModeProvider = ({ children }) => {
     }
   }, [viewMode]);
 
+  /**
+   * Get theme based on current view mode
+   */
+  const getTheme = useCallback(() => {
+    switch (viewMode) {
+      case 'admin':
+        return {
+          color: 'indigo',
+          label: 'MODO ADMINISTRADOR',
+          bgGradient: 'from-indigo-500/20 to-purple-500/20',
+          borderColor: 'border-indigo-400/50',
+          textColor: 'text-indigo-300',
+          iconColor: 'text-indigo-400',
+          pulseColor: 'bg-indigo-400'
+        };
+      case 'nutritionist':
+        return {
+          color: 'emerald',
+          label: 'VISÃO NUTRICIONISTA',
+          bgGradient: 'from-emerald-500/20 to-green-500/20',
+          borderColor: 'border-emerald-400/50',
+          textColor: 'text-emerald-300',
+          iconColor: 'text-emerald-400',
+          pulseColor: 'bg-emerald-400'
+        };
+      case 'patient':
+        return {
+          color: 'blue',
+          label: 'VISÃO PACIENTE',
+          bgGradient: 'from-blue-500/20 to-cyan-500/20',
+          borderColor: 'border-blue-400/50',
+          textColor: 'text-blue-300',
+          iconColor: 'text-blue-400',
+          pulseColor: 'bg-blue-400'
+        };
+      default:
+        return {
+          color: 'slate',
+          label: 'AMBIENTE DE CONTROLE',
+          bgGradient: 'from-slate-500/20 to-slate-500/20',
+          borderColor: 'border-slate-400/50',
+          textColor: 'text-slate-300',
+          iconColor: 'text-slate-400',
+          pulseColor: 'bg-slate-400'
+        };
+    }
+  }, [viewMode]);
+
+  const theme = getTheme();
+
   const value = {
     viewMode,
     switchView,
     getViewModeLabel,
     isAdmin,
+    theme,
   };
 
   return (
@@ -122,6 +173,15 @@ export const useAdminMode = () => {
       switchView: () => {},
       getViewModeLabel: () => null,
       isAdmin: false,
+      theme: {
+        color: 'slate',
+        label: 'AMBIENTE DE CONTROLE',
+        bgGradient: 'from-slate-500/20 to-slate-500/20',
+        borderColor: 'border-slate-400/50',
+        textColor: 'text-slate-300',
+        iconColor: 'text-slate-400',
+        pulseColor: 'bg-slate-400'
+      },
     };
   }
   return context;

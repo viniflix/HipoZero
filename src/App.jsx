@@ -228,7 +228,6 @@ const AppLayout = () => {
             <Route path="*" element={<Navigate to={getHomePath()} replace />} />
           </Routes>
           </Suspense>
-          <Toaster position="top-center" />
         </div>
     </ChatProvider>
   );
@@ -244,6 +243,8 @@ const App = () => {
             <meta name="description" content="Plataforma moderna para nutricionistas e pacientes com controle alimentar, prescrição de dietas e acompanhamento nutricional baseado na Tabela TACO." />
           </Helmet>
           <AppLayout />
+          {/* Toaster must be inside AdminModeProvider to access admin state */}
+          <Toaster />
         </AdminModeProvider>
       </AuthProvider>
     </Router>
