@@ -507,180 +507,173 @@ export async function fillMealHistory(userId, daysBack = 7) {
 export async function createGhostSquad(nutritionistId) {
   try {
     const patientsCreated = [];
-
-    // 1. ROBERTO SILVA (Hipertrofia - Ganho de peso)
-    const robertoId = generateUUID();
-    const robertoEmailSuffix = robertoId.slice(0, 8);
-    const robertoEmail = `demo.${robertoEmailSuffix}@demo.hipozero`;
-    const robertoBirthDate = new Date(1990, 5, 15);
-
-    const { data: roberto, error: robertoError } = await supabase
-      .from('user_profiles')
-      .insert({
-        id: robertoId,
+    const patientsFailed = [];
+    
+    // Definir configuração do squad
+    const squadConfig = [
+      {
         name: 'Roberto Silva',
-        email: robertoEmail,
-        user_type: 'patient',
-        nutritionist_id: nutritionistId,
         gender: 'M',
-        birth_date: format(robertoBirthDate, 'yyyy-MM-dd'),
+        birthDate: new Date(1990, 5, 15),
         height: 175,
-        weight: 70, // Peso inicial
+        weight: 70,
         goal: 'Ganhar massa',
-        is_active: true,
-        preferences: { is_demo: true }, // Flag de segurança
-        cpf: null,
-        phone: null,
-        occupation: null,
-        civil_status: null,
-        observations: null,
-        address: null,
-      })
-      .select()
-      .single();
-
-    if (robertoError) {
-      console.error('[demoDataService] Erro ao criar Roberto:', robertoError);
-    } else {
-      patientsCreated.push(roberto);
-
-      // Histórico de peso: 70kg -> 71kg -> 72kg -> 73.5kg (crescimento)
-      const weightHistory = [
-        { date: subDays(new Date(), 60), weight: 70.0 },
-        { date: subDays(new Date(), 40), weight: 71.0 },
-        { date: subDays(new Date(), 20), weight: 72.0 },
-        { date: subDays(new Date(), 5), weight: 73.5 },
-      ];
-
-      for (const record of weightHistory) {
-        await supabase.from('growth_records').insert({
-          patient_id: robertoId,
-          record_date: format(record.date, 'yyyy-MM-dd'),
-          weight: record.weight,
-        });
-      }
-    }
-
-    // 2. JULIA COSTA (Emagrecimento - Perda de peso)
-    const juliaId = generateUUID();
-    const juliaEmailSuffix = juliaId.slice(0, 8);
-    const juliaEmail = `demo.${juliaEmailSuffix}@demo.hipozero`;
-    const juliaBirthDate = new Date(1988, 3, 22);
-
-    const { data: julia, error: juliaError } = await supabase
-      .from('user_profiles')
-      .insert({
-        id: juliaId,
+        isActive: true,
+        weightHistory: [
+          { date: subDays(new Date(), 60), weight: 70.0 },
+          { date: subDays(new Date(), 40), weight: 71.0 },
+          { date: subDays(new Date(), 20), weight: 72.0 },
+          { date: subDays(new Date(), 5), weight: 73.5 },
+        ],
+        chatMessage: null,
+      },
+      {
         name: 'Julia Costa',
-        email: juliaEmail,
-        user_type: 'patient',
-        nutritionist_id: nutritionistId,
         gender: 'F',
-        birth_date: format(juliaBirthDate, 'yyyy-MM-dd'),
+        birthDate: new Date(1988, 3, 22),
         height: 165,
-        weight: 70, // Peso inicial
+        weight: 70,
         goal: 'Perder peso',
-        is_active: true,
-        preferences: { is_demo: true }, // Flag de segurança
-        cpf: null,
-        phone: null,
-        occupation: null,
-        civil_status: null,
-        observations: null,
-        address: null,
-      })
-      .select()
-      .single();
-
-    if (juliaError) {
-      console.error('[demoDataService] Erro ao criar Julia:', juliaError);
-    } else {
-      patientsCreated.push(julia);
-
-      // Histórico de peso: 70kg -> 68kg -> 66kg -> 64kg (sucesso)
-      const weightHistory = [
-        { date: subDays(new Date(), 60), weight: 70.0 },
-        { date: subDays(new Date(), 40), weight: 68.0 },
-        { date: subDays(new Date(), 20), weight: 66.0 },
-        { date: subDays(new Date(), 5), weight: 64.0 },
-      ];
-
-      for (const record of weightHistory) {
-        await supabase.from('growth_records').insert({
-          patient_id: juliaId,
-          record_date: format(record.date, 'yyyy-MM-dd'),
-          weight: record.weight,
-        });
-      }
-
-      // Mensagem de chat não lida
-      await supabase.from('chats').insert({
-        from_id: juliaId,
-        to_id: nutritionistId,
-        message: 'Bom dia nutri! Estou adorando os resultados. Já perdi 6kg! 🎉',
-        message_type: 'text',
-        created_at: subDays(new Date(), 1).toISOString(),
-      });
-    }
-
-    // 3. MARCOS SANTOS (Manutenção - Inativo)
-    const marcosId = generateUUID();
-    const marcosEmailSuffix = marcosId.slice(0, 8);
-    const marcosEmail = `demo.${marcosEmailSuffix}@demo.hipozero`;
-    const marcosBirthDate = new Date(1992, 8, 10);
-
-    const { data: marcos, error: marcosError } = await supabase
-      .from('user_profiles')
-      .insert({
-        id: marcosId,
+        isActive: true,
+        weightHistory: [
+          { date: subDays(new Date(), 60), weight: 70.0 },
+          { date: subDays(new Date(), 40), weight: 68.0 },
+          { date: subDays(new Date(), 20), weight: 66.0 },
+          { date: subDays(new Date(), 5), weight: 64.0 },
+        ],
+        chatMessage: {
+          message: 'Bom dia nutri! Estou adorando os resultados. Já perdi 6kg! 🎉',
+          created_at: subDays(new Date(), 1).toISOString(),
+        },
+      },
+      {
         name: 'Marcos Santos',
-        email: marcosEmail,
-        user_type: 'patient',
-        nutritionist_id: nutritionistId,
         gender: 'M',
-        birth_date: format(marcosBirthDate, 'yyyy-MM-dd'),
+        birthDate: new Date(1992, 8, 10),
         height: 180,
         weight: 80,
-        goal: 'Manter peso',
-        is_active: false, // INATIVO (churned)
-        preferences: { is_demo: true }, // Flag de segurança
-        cpf: null,
-        phone: null,
-        occupation: null,
-        civil_status: null,
-        observations: null,
-        address: null,
-      })
-      .select()
-      .single();
+        goal: 'Manter peso', // Goal seguro
+        isActive: true, // FIX: Mudado para true (pode ser desativado depois se necessário)
+        weightHistory: [],
+        chatMessage: null,
+      },
+    ];
 
-    if (marcosError) {
-      console.error('[demoDataService] Erro ao criar Marcos:', marcosError);
-    } else {
-      patientsCreated.push(marcos);
+    // Processar cada paciente individualmente com isolamento de erros
+    for (const config of squadConfig) {
+      try {
+        const patientId = generateUUID();
+        const emailSuffix = patientId.slice(0, 8);
+        const email = `demo.${emailSuffix}@demo.hipozero`;
+
+        // Criar perfil do paciente
+        const { data: patient, error: patientError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: patientId,
+            name: config.name,
+            email: email,
+            user_type: 'patient',
+            nutritionist_id: nutritionistId,
+            gender: config.gender,
+            birth_date: format(config.birthDate, 'yyyy-MM-dd'),
+            height: config.height,
+            weight: config.weight,
+            goal: config.goal,
+            is_active: config.isActive,
+            preferences: { is_demo: true },
+            cpf: null,
+            phone: null,
+            occupation: null,
+            civil_status: null,
+            observations: null,
+            address: null,
+          })
+          .select()
+          .single();
+
+        if (patientError) {
+          console.error(`[demoDataService] Erro ao criar ${config.name}:`, patientError);
+          patientsFailed.push({ name: config.name, error: patientError.message });
+          continue; // Continuar para o próximo paciente
+        }
+
+        patientsCreated.push(patient);
+
+        // Adicionar histórico de peso (se houver)
+        if (config.weightHistory && config.weightHistory.length > 0) {
+          for (const record of config.weightHistory) {
+            try {
+              await supabase.from('growth_records').insert({
+                patient_id: patientId,
+                record_date: format(record.date, 'yyyy-MM-dd'),
+                weight: record.weight,
+              });
+            } catch (weightError) {
+              console.error(`[demoDataService] Erro ao adicionar peso para ${config.name}:`, weightError);
+              // Não falha o processo, apenas loga o erro
+            }
+          }
+        }
+
+        // Adicionar mensagem de chat (se houver)
+        if (config.chatMessage) {
+          try {
+            await supabase.from('chats').insert({
+              from_id: patientId,
+              to_id: nutritionistId,
+              message: config.chatMessage.message,
+              message_type: 'text',
+              created_at: config.chatMessage.created_at,
+            });
+          } catch (chatError) {
+            console.error(`[demoDataService] Erro ao adicionar chat para ${config.name}:`, chatError);
+            // Não falha o processo, apenas loga o erro
+          }
+        }
+
+        console.log(`[demoDataService] ✅ ${config.name} criado com sucesso`);
+      } catch (error) {
+        console.error(`[demoDataService] ❌ Erro inesperado ao criar ${config.name}:`, error);
+        patientsFailed.push({ name: config.name, error: error.message || 'Erro desconhecido' });
+        // Continuar para o próximo paciente mesmo se houver erro
+      }
     }
+
+    // Retornar resultado com estatísticas
+    const result = {
+      created: patientsCreated.length,
+      failed: patientsFailed.length,
+      patients: patientsCreated,
+      failures: patientsFailed,
+    };
 
     if (patientsCreated.length === 0) {
       return {
         data: null,
-        error: { message: 'Não foi possível criar nenhum paciente' }
+        error: { 
+          message: 'Não foi possível criar nenhum paciente',
+          details: patientsFailed
+        }
       };
     }
 
-    console.log('[demoDataService] Squad criado:', {
-      patients: patientsCreated.length,
-      names: patientsCreated.map(p => p.name)
+    console.log('[demoDataService] Squad processado:', {
+      created: result.created,
+      failed: result.failed,
+      names: patientsCreated.map(p => p.name),
+      failures: patientsFailed.map(f => f.name)
     });
 
     return {
-      data: {
-        patients: patientsCreated,
-        totalPatients: patientsCreated.length
-      },
-      error: null
+      data: result,
+      error: result.failed > 0 ? { 
+        message: `${result.created} pacientes criados, ${result.failed} falharam`,
+        details: patientsFailed
+      } : null
     };
   } catch (error) {
-    console.error('[demoDataService] Erro inesperado ao criar squad:', error);
+    console.error('[demoDataService] Erro crítico ao criar squad:', error);
     return { data: null, error };
   }
 }

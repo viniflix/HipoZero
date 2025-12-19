@@ -244,20 +244,33 @@ export default function AdminControlBar() {
     try {
       const { data, error } = await createGhostSquad(user.id);
 
-      if (error) {
+      if (!data) {
         console.error('[AdminControlBar] Erro ao criar squad:', error);
         toast({
           title: 'Erro',
-          description: error.message || 'Não foi possível criar o squad de pacientes.',
+          description: error?.message || 'Não foi possível criar nenhum paciente.',
           variant: 'destructive'
         });
         return;
       }
 
-      toast({
-        title: '3 Pacientes com Histórico criados!',
-        description: `Verifique a aba Pacientes. 👥`,
-      });
+      // Mostrar feedback com estatísticas
+      const { created, failed } = data;
+      
+      if (failed > 0) {
+        // Sucesso parcial
+        toast({
+          title: `${created} Pacientes criados. ${failed} falhas.`,
+          description: failed > 0 ? 'Alguns pacientes não puderam ser criados. Verifique o console para detalhes.' : 'Verifique a aba Pacientes. 👥',
+          variant: failed === 3 ? 'destructive' : 'default',
+        });
+      } else {
+        // Sucesso total
+        toast({
+          title: `${created} Pacientes com Histórico criados!`,
+          description: 'Verifique a aba Pacientes. 👥',
+        });
+      }
 
       setTimeout(() => {
         window.location.href = '/nutritionist/patients';
@@ -636,7 +649,12 @@ export default function AdminControlBar() {
                         variant="outline"
                         size="sm"
                         className="w-full justify-start bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-400/30 disabled:opacity-50"
-                        onClick={() => setShowCleanupDialog(true)}
+                        onClick={() => {
+                          // Fechar toolbar antes de abrir o diálogo
+                          setIsExpanded(false);
+                          setIsMobileExpanded(false);
+                          setShowCleanupDialog(true);
+                        }}
                         disabled={isCleaningUp || isCreatingPatient || isFillingDiary || isFillingHistory || isCreatingSquad}
                       >
                         {isCleaningUp ? (
