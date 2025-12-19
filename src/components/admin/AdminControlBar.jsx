@@ -6,13 +6,15 @@ import {
   Settings,
   ChevronUp,
   ChevronDown,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdminMode } from '@/contexts/AdminModeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createGhostPatient, fillDailyDiary } from '@/services/demoDataService';
 
 /**
  * AdminControlBar - Premium Command Center
@@ -27,6 +29,8 @@ export default function AdminControlBar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
+  const [isCreatingPatient, setIsCreatingPatient] = useState(false);
+  const [isFillingDiary, setIsFillingDiary] = useState(false);
   const constraintsRef = useRef(null);
 
   // Only render if user is admin
@@ -60,6 +64,110 @@ export default function AdminControlBar() {
         description: 'Não foi possível alterar o modo de visualização.',
         variant: 'destructive'
       });
+    }
+  };
+
+  const handleCreateGhostPatient = async () => {
+    if (!user?.id) {
+      toast({
+        title: 'Erro',
+        description: 'Usuário não identificado.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsCreatingPatient(true);
+    setIsExpanded(false);
+    setIsMobileExpanded(false);
+
+    try {
+      const { data, error } = await createGhostPatient(user.id);
+
+      if (error) {
+        console.error('[AdminControlBar] Erro ao criar paciente fantasma:', error);
+        toast({
+          title: 'Erro',
+          description: error.message || 'Não foi possível criar o paciente fantasma.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      toast({
+        title: 'Paciente Fantasma Criado!',
+        description: `${data.name} foi adicionado à sua lista de pacientes.`,
+      });
+
+      // Opcional: Recarregar a página após 1 segundo para atualizar listas
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('[AdminControlBar] Erro inesperado:', error);
+      toast({
+        title: 'Erro',
+        description: 'Ocorreu um erro inesperado ao criar o paciente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsCreatingPatient(false);
+    }
+  };
+
+  const handleFillDiary = async () => {
+    if (!user?.id) {
+      toast({
+        title: 'Erro',
+        description: 'Usuário não identificado.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsFillingDiary(true);
+    setIsExpanded(false);
+    setIsMobileExpanded(false);
+
+    try {
+      // Se estiver no modo paciente, usar o próprio ID
+      // Se estiver no modo admin/nutri, usar o próprio ID (admin atuando como paciente)
+      const patientId = user.id;
+
+      const { data, error } = await fillDailyDiary(patientId);
+
+      if (error) {
+        console.error('[AdminControlBar] Erro ao preencher diário:', error);
+        toast({
+          title: 'Erro',
+          description: error.message || 'Não foi possível preencher o diário.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      toast({
+        title: 'Diário Preenchido!',
+        description: `${data.totalMeals} refeições adicionadas com ${data.totalItems} alimentos.`,
+      });
+
+      // Opcional: Navegar para o diário ou recarregar
+      setTimeout(() => {
+        if (viewMode === 'patient') {
+          window.location.href = '/patient/diario';
+        } else {
+          window.location.reload();
+        }
+      }, 1500);
+    } catch (error) {
+      console.error('[AdminControlBar] Erro inesperado:', error);
+      toast({
+        title: 'Erro',
+        description: 'Ocorreu um erro inesperado ao preencher o diário.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsFillingDiary(false);
     }
   };
 
@@ -274,20 +382,34 @@ export default function AdminControlBar() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full justify-start bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
-                        onClick={() => handleDemoAction('Adicionar Paciente Fantasma')}
+                        className="w-full justify-start bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 disabled:opacity-50"
+                        onClick={handleCreateGhostPatient}
+                        disabled={isCreatingPatient || isFillingDiary}
                       >
-                        <User className="w-3.5 h-3.5 mr-2" />
-                        <span className="text-xs">Adicionar Paciente Fantasma</span>
+                        {isCreatingPatient ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                        ) : (
+                          <User className="w-3.5 h-3.5 mr-2" />
+                        )}
+                        <span className="text-xs">
+                          {isCreatingPatient ? 'Criando...' : 'Adicionar Paciente Fantasma'}
+                        </span>
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full justify-start bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
-                        onClick={() => handleDemoAction('Preencher Diário')}
+                        className="w-full justify-start bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 disabled:opacity-50"
+                        onClick={handleFillDiary}
+                        disabled={isCreatingPatient || isFillingDiary}
                       >
-                        <UserCheck className="w-3.5 h-3.5 mr-2" />
-                        <span className="text-xs">Preencher Diário</span>
+                        {isFillingDiary ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                        ) : (
+                          <UserCheck className="w-3.5 h-3.5 mr-2" />
+                        )}
+                        <span className="text-xs">
+                          {isFillingDiary ? 'Preenchendo...' : 'Preencher Diário'}
+                        </span>
                       </Button>
                       <Button
                         variant="outline"
