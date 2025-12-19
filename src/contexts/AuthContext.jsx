@@ -270,14 +270,20 @@ export function AuthProvider({ children }) {
 
         setUser({ ...session.user, profile });
         
-        // Auto-redirect after email confirmation or sign in
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          const redirectPath = profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
-          // Use setTimeout to ensure navigation happens after state update
-          setTimeout(() => {
-            navigate(redirectPath, { replace: true });
-          }, 100);
+        // Auto-redirect ONLY on initial sign in (not on token refresh)
+        // Token refresh should NOT cause redirects - user is already on a valid route
+        if (event === 'SIGNED_IN') {
+          // Only redirect if user is on login page
+          const currentPath = window.location.pathname;
+          if (currentPath === '/login' || currentPath === '/register') {
+            const redirectPath = profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
+            // Use setTimeout to ensure navigation happens after state update
+            setTimeout(() => {
+              navigate(redirectPath, { replace: true });
+            }, 100);
+          }
         }
+        // TOKEN_REFRESHED: Do nothing - user is already authenticated and on a valid route
       } else {
         setUser(null);
       }

@@ -30,11 +30,9 @@ const getNutritionistLinks = () => {
   ];
 };
 
-// Admin navigation links (only shown when in admin viewMode)
+// Admin navigation links (removed - access only via Control Bar)
 const getAdminLinks = () => {
-  return [
-    { name: 'Admin: Alimentos', path: '/nutritionist/foods' },
-  ];
+  return [];
 };
 
 // --- Componente Principal do Header (Nova Versão CLEAN) ---

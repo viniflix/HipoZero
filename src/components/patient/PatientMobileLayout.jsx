@@ -4,7 +4,7 @@ import { useChat } from '@/contexts/ChatContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import NotificationsPanel from '@/components/NotificationsPanel';
-import GodToolbar from '@/components/admin/GodToolbar';
+import AdminControlBar from '@/components/admin/AdminControlBar';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useState, useEffect } from 'react';
 
@@ -208,8 +208,8 @@ export default function PatientMobileLayout() {
       {/* PAINEL DE NOTIFICAÇÕES */}
       <NotificationsPanel isOpen={showNotifications} setIsOpen={setShowNotifications} />
 
-      {/* GOD TOOLBAR (apenas para admins) */}
-      <GodToolbar />
+      {/* ADMIN CONTROL BAR (apenas para admins) */}
+      <AdminControlBar />
     </div>
   );
 }

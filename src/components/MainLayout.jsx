@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardHeader from '@/components/DashboardHeader';
 import { Toaster } from '@/components/ui/toaster';
-import GodToolbar from '@/components/admin/GodToolbar';
+import AdminControlBar from '@/components/admin/AdminControlBar';
 
 const MainLayout = () => {
   const { user, signOut } = useAuth();
@@ -28,8 +28,8 @@ const MainLayout = () => {
       {/* 3. Toaster para notificações */}
       <Toaster />
 
-      {/* 4. God Toolbar (apenas para admins) */}
-      <GodToolbar />
+      {/* 4. Admin Control Bar (apenas para admins) */}
+      <AdminControlBar />
     </div>
   );
 };

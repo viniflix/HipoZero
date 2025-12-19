@@ -228,7 +228,7 @@ const AppLayout = () => {
             <Route path="*" element={<Navigate to={getHomePath()} replace />} />
           </Routes>
           </Suspense>
-          <Toaster />
+          <Toaster position="top-center" />
         </div>
     </ChatProvider>
   );
