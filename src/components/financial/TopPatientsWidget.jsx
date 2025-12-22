@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, User } from 'lucide-react';
+import { Trophy, Medal, Award } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { supabase } from '@/lib/customSupabaseClient';
 
@@ -58,10 +58,10 @@ export default function TopPatientsWidget({ nutritionistId }) {
                 patientTotals[patientId].total += parseFloat(transaction.amount || 0);
             });
 
-            // Convert to array, sort by total, and take top 5
+            // Convert to array, sort by total, and take top 3
             const sorted = Object.values(patientTotals)
                 .sort((a, b) => b.total - a.total)
-                .slice(0, 5);
+                .slice(0, 3);
 
             setTopPatients(sorted);
         } catch (error) {
@@ -80,11 +80,41 @@ export default function TopPatientsWidget({ nutritionistId }) {
         return name.substring(0, 2).toUpperCase();
     };
 
-    const getRankIcon = (rank) => {
-        if (rank === 0) return '🥇';
-        if (rank === 1) return '🥈';
-        if (rank === 2) return '🥉';
-        return `#${rank + 1}`;
+    const getRankConfig = (rank) => {
+        if (rank === 0) {
+            return { 
+                icon: Trophy, 
+                color: 'text-yellow-600', 
+                bgColor: 'bg-yellow-50 dark:bg-yellow-950',
+                borderColor: 'border-yellow-300 dark:border-yellow-700',
+                label: '1º'
+            };
+        }
+        if (rank === 1) {
+            return { 
+                icon: Medal, 
+                color: 'text-gray-400', 
+                bgColor: 'bg-gray-50 dark:bg-gray-950',
+                borderColor: 'border-gray-300 dark:border-gray-700',
+                label: '2º'
+            };
+        }
+        if (rank === 2) {
+            return { 
+                icon: Award, 
+                color: 'text-amber-700', 
+                bgColor: 'bg-amber-50 dark:bg-amber-950',
+                borderColor: 'border-amber-300 dark:border-amber-700',
+                label: '3º'
+            };
+        }
+        return { 
+            icon: Trophy, 
+            color: 'text-muted-foreground', 
+            bgColor: 'bg-muted',
+            borderColor: 'border-border',
+            label: `${rank + 1}º`
+        };
     };
 
     if (loading) {
@@ -131,26 +161,24 @@ export default function TopPatientsWidget({ nutritionistId }) {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-yellow-600" />
-                    Top Pacientes
+                    Top 3 Pacientes
                 </CardTitle>
                 <CardDescription>
-                    Maiores contribuidores (LTV - Lifetime Value)
+                    Maiores contribuidores (LTV)
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="space-y-3">
-                    {topPatients.map((item, index) => (
+                    {topPatients.map((item, index) => {
+                        const rankConfig = getRankConfig(index);
+                        const RankIcon = rankConfig.icon;
+                        return (
                         <div
                             key={item.patient?.id || index}
-                            className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                            className={`flex items-center gap-3 p-3 rounded-lg border-2 ${rankConfig.bgColor} ${rankConfig.borderColor} hover:shadow-md transition-all`}
                         >
-                            <div className="flex-shrink-0">
-                                <Badge 
-                                    variant={index < 3 ? "default" : "secondary"}
-                                    className="w-8 h-8 flex items-center justify-center p-0 text-xs font-bold"
-                                >
-                                    {getRankIcon(index)}
-                                </Badge>
+                            <div className={`flex-shrink-0 w-10 h-10 rounded-full ${rankConfig.bgColor} ${rankConfig.borderColor} border-2 flex items-center justify-center`}>
+                                <RankIcon className={`w-5 h-5 ${rankConfig.color}`} />
                             </div>
                             <Avatar className="h-10 w-10 flex-shrink-0">
                                 <AvatarImage src={item.patient?.avatar_url} alt={item.patient?.name} />
@@ -159,20 +187,25 @@ export default function TopPatientsWidget({ nutritionistId }) {
                                 </AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-sm truncate">
-                                    {item.patient?.name || 'Paciente não identificado'}
-                                </p>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className={`text-xs font-bold ${rankConfig.color}`}>
+                                        {rankConfig.label}
+                                    </span>
+                                    <p className="font-semibold text-sm truncate">
+                                        {item.patient?.name || 'Paciente não identificado'}
+                                    </p>
+                                </div>
                                 <p className="text-xs text-muted-foreground">
                                     Total investido
                                 </p>
                             </div>
                             <div className="flex-shrink-0 text-right">
-                                <p className="font-bold text-lg text-primary">
+                                <p className={`font-bold text-lg ${rankConfig.color}`}>
                                     {formatCurrency(item.total)}
                                 </p>
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             </CardContent>
         </Card>

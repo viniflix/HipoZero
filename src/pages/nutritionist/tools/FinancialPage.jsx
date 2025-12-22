@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, FileText, Download, Target, Settings, FileSpreadsheet } from 'lucide-react';
+import { Plus, Target, Settings, FileSpreadsheet, Download, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -8,6 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
 import { format, startOfMonth } from 'date-fns';
 import Papa from 'papaparse';
@@ -39,6 +45,7 @@ import {
 import { exportFinancialsToPdf } from '@/lib/pdfUtils';
 import { generateReceipt } from '@/lib/pdf/receiptGenerator';
 import { exportFinancialReport } from '@/lib/utils/exportUtils';
+import { getClinicSettings } from '@/lib/supabase/profile-queries';
 
 export default function FinancialPage() {
     const { user } = useAuth();
@@ -60,6 +67,17 @@ export default function FinancialPage() {
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [filters, setFilters] = useState({ type: null, status: null, search: null });
     const [monthlyGoal, setMonthlyGoal] = useState(10000); // R$ 10.000,00 (editable)
+    
+    // Load monthly goal from clinic settings
+    useEffect(() => {
+        if (user?.id) {
+            getClinicSettings(user.id).then(settings => {
+                if (settings.monthlyFinancialGoal) {
+                    setMonthlyGoal(settings.monthlyFinancialGoal);
+                }
+            }).catch(console.error);
+        }
+    }, [user?.id]);
 
     // Load all data
     const loadData = useCallback(async () => {
@@ -69,8 +87,8 @@ export default function FinancialPage() {
         try {
             const monthStart = startOfMonth(selectedMonth);
             
-            // Load summary
-            const summaryData = await getFinancialSummary(monthStart);
+            // Load summary (pass nutritionistId for RLS)
+            const summaryData = await getFinancialSummary(monthStart, user.id);
             setSummary(summaryData);
 
             // Load transactions
@@ -328,11 +346,30 @@ export default function FinancialPage() {
                                 <span className="hidden sm:inline">Gerenciar Serviços</span>
                                 <span className="sm:hidden">Serviços</span>
                             </Button>
-                            <Button onClick={handleExportReport} variant="outline" size="lg">
-                                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                                <span className="hidden sm:inline">Exportar Relatório</span>
-                                <span className="sm:hidden">Relatório</span>
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="lg">
+                                        <Download className="w-4 h-4 mr-2" />
+                                        <span className="hidden sm:inline">Exportar</span>
+                                        <span className="sm:hidden">Exportar</span>
+                                        <ChevronDown className="w-4 h-4 ml-2" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={handleExportPDF}>
+                                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                                        Exportar PDF
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleExportCSV}>
+                                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                                        Exportar CSV
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleExportReport}>
+                                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                                        Relatório Completo (CSV)
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                             <Button onClick={handleNewTransaction} size="lg">
                                 <Plus className="w-4 h-4 mr-2" />
                                 Nova Transação
@@ -346,26 +383,63 @@ export default function FinancialPage() {
                         onUpdate={loadData}
                     />
 
-                    {/* Month Selector & Export */}
-                    <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                    {/* Month Selector */}
+                    <div className="mb-6">
                         <Input
                             type="month"
                             value={format(selectedMonth, 'yyyy-MM')}
                             onChange={(e) => setSelectedMonth(new Date(e.target.value + '-02'))}
                             className="w-full sm:w-auto"
                         />
-                        <div className="flex gap-2">
-                            <Button onClick={handleExportPDF} variant="outline" className="flex-1 sm:flex-initial">
-                                <FileText className="w-4 h-4 mr-2" />
-                                <span className="hidden sm:inline">Exportar PDF</span>
-                                <span className="sm:hidden">PDF</span>
-                            </Button>
-                            <Button onClick={handleExportCSV} variant="outline" className="flex-1 sm:flex-initial">
-                                <Download className="w-4 h-4 mr-2" />
-                                <span className="hidden sm:inline">Exportar CSV</span>
-                                <span className="sm:hidden">CSV</span>
-                            </Button>
-                        </div>
+                    </div>
+
+                    {/* Financial Goal Bar - Above KPIs */}
+                    <div className="mb-4">
+                        <Card className="border-2">
+                            <CardContent className="p-4">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Target className="w-4 h-4 text-primary" />
+                                            <span className="text-sm font-semibold">Meta Financeira Mensal</span>
+                                        </div>
+                                        <div className="flex items-center gap-4 text-sm">
+                                            <div>
+                                                <span className="text-muted-foreground">Receita Atual: </span>
+                                                <span className="font-semibold text-primary">
+                                                    R$ {summary.income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-muted-foreground">Meta: </span>
+                                                <span className="font-semibold">
+                                                    R$ {monthlyGoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className={`font-semibold ${
+                                                    monthlyGoal - summary.income > 0 
+                                                        ? 'text-orange-600' 
+                                                        : 'text-green-600'
+                                                }`}>
+                                                    {monthlyGoal - summary.income > 0 
+                                                        ? `Faltam R$ ${Math.max(0, monthlyGoal - summary.income).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                                                        : `Superou em R$ ${Math.abs(monthlyGoal - summary.income).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                                                    }
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 w-full sm:w-auto sm:min-w-[200px]">
+                                        <div className="flex justify-between text-xs mb-1">
+                                            <span className="text-muted-foreground">Progresso</span>
+                                            <span className="font-semibold">{goalProgress.toFixed(1)}%</span>
+                                        </div>
+                                        <Progress value={goalProgress} className="h-2" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
 
                     {/* KPIs */}
@@ -373,91 +447,33 @@ export default function FinancialPage() {
                         <FinancialKPIs summary={summary} loading={loading} />
                     </div>
 
-                    {/* Charts, Goals & Top Patients */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                        <div className="lg:col-span-2">
-                            <FinancialCharts
-                                cashFlowData={cashFlowData}
-                                expenseDistribution={expenseDistribution}
-                                projectedCashFlow={projectedCashFlow}
+                    {/* Charts - 50/50 Split */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <FinancialCharts
+                            cashFlowData={cashFlowData}
+                            expenseDistribution={expenseDistribution}
+                            projectedCashFlow={projectedCashFlow}
+                            loading={loading}
+                        />
+                    </div>
+
+                    {/* Transaction List & Top Patients - 70/30 Split */}
+                    <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 mb-6">
+                        <div className="lg:col-span-7">
+                            <TransactionList
+                                transactions={transactions}
                                 loading={loading}
+                                onEdit={handleEditTransaction}
+                                onDelete={(id) => setDeleteConfirm(id)}
+                                onGenerateReceipt={handleGenerateReceipt}
+                                filters={filters}
+                                onFiltersChange={setFilters}
                             />
                         </div>
-                        <div className="space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Target className="w-5 h-5" />
-                                        Meta Financeira
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Meta mensal de receita
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div>
-                                        <Label htmlFor="monthlyGoal" className="text-xs text-muted-foreground mb-1">
-                                            Meta Mensal (R$)
-                                        </Label>
-                                        <Input
-                                            id="monthlyGoal"
-                                            type="number"
-                                            step="100"
-                                            min="0"
-                                            value={monthlyGoal}
-                                            onChange={(e) => setMonthlyGoal(parseFloat(e.target.value) || 0)}
-                                            className="mb-3"
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between text-sm mb-2">
-                                            <span className="text-muted-foreground">Progresso</span>
-                                            <span className="font-semibold">
-                                                {goalProgress.toFixed(1)}%
-                                            </span>
-                                        </div>
-                                        <Progress value={goalProgress} className="h-2" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-muted-foreground">Receita Atual</span>
-                                            <span className="font-semibold">
-                                                R$ {summary.income.toFixed(2)}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-muted-foreground">Meta</span>
-                                            <span className="font-semibold">
-                                                R$ {monthlyGoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-sm pt-2 border-t">
-                                            <span className="text-muted-foreground">Faltam</span>
-                                            <span className={`font-semibold ${
-                                                monthlyGoal - summary.income > 0 
-                                                    ? 'text-orange-600' 
-                                                    : 'text-green-600'
-                                            }`}>
-                                                R$ {Math.max(0, monthlyGoal - summary.income).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                        <div className="lg:col-span-3">
                             <TopPatientsWidget nutritionistId={user?.id} />
                         </div>
                     </div>
-
-                    {/* Transaction List */}
-                    <TransactionList
-                        transactions={transactions}
-                        loading={loading}
-                        onEdit={handleEditTransaction}
-                        onDelete={(id) => setDeleteConfirm(id)}
-                        onGenerateReceipt={handleGenerateReceipt}
-                        filters={filters}
-                        onFiltersChange={setFilters}
-                    />
                 </motion.div>
             </main>
 

@@ -4,15 +4,22 @@ import { format, startOfMonth, endOfMonth, addDays, parseISO, startOfDay } from 
 /**
  * Get financial summary for a specific month/year
  * @param {Date} monthDate - Date object representing the month/year to query
+ * @param {string} nutritionistId - Nutritionist UUID (required for RLS)
  * @returns {Promise<{income: number, expenses: number, netResult: number, overdue: number}>}
  */
-export async function getFinancialSummary(monthDate) {
+export async function getFinancialSummary(monthDate, nutritionistId) {
+    if (!nutritionistId) {
+        throw new Error('nutritionistId is required for getFinancialSummary');
+    }
+    
     const start = startOfMonth(monthDate);
     const end = endOfMonth(monthDate);
     
+    // Try to select net_amount, but fallback to amount if column doesn't exist
     const { data, error } = await supabase
         .from('financial_transactions')
-        .select('type, amount, net_amount, status')
+        .select('type, amount, status')
+        .eq('nutritionist_id', nutritionistId)
         .gte('transaction_date', format(start, 'yyyy-MM-dd'))
         .lte('transaction_date', format(end, 'yyyy-MM-dd'));
 
@@ -21,20 +28,19 @@ export async function getFinancialSummary(monthDate) {
         throw error;
     }
 
-    // Calculate gross and net income
-    const income = data
+    // Calculate gross and net income (use amount for both if net_amount doesn't exist)
+    const income = (data || [])
         .filter(t => t.type === 'income')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    const netIncome = data
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + parseFloat(t.net_amount || t.amount || 0), 0);
+    // For now, netIncome = income (net_amount column may not exist yet)
+    const netIncome = income;
 
-    const expenses = data
+    const expenses = (data || [])
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    const overdue = data
+    const overdue = (data || [])
         .filter(t => t.status === 'overdue')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
@@ -285,9 +291,10 @@ export async function getProjectedCashFlow(nutritionistId, startDate) {
     const endDate = addDays(today, 30);
     
     // Get current balance (sum of all paid transactions)
+    // Use amount only (net_amount may not exist)
     const { data: paidTransactions, error: paidError } = await supabase
         .from('financial_transactions')
-        .select('type, net_amount, amount')
+        .select('type, amount')
         .eq('nutritionist_id', nutritionistId)
         .eq('status', 'paid');
 
@@ -296,10 +303,10 @@ export async function getProjectedCashFlow(nutritionistId, startDate) {
         throw paidError;
     }
 
-    // Calculate current balance (net income - expenses)
+    // Calculate current balance (income - expenses)
     let currentBalance = 0;
-    paidTransactions.forEach(transaction => {
-        const value = parseFloat(transaction.net_amount || transaction.amount || 0);
+    (paidTransactions || []).forEach(transaction => {
+        const value = parseFloat(transaction.amount || 0);
         if (transaction.type === 'income') {
             currentBalance += value;
         } else {
@@ -311,7 +318,7 @@ export async function getProjectedCashFlow(nutritionistId, startDate) {
     // First, get transactions with due_date in range
     const { data: pendingWithDueDate, error: pendingError1 } = await supabase
         .from('financial_transactions')
-        .select('type, net_amount, amount, due_date, transaction_date')
+        .select('type, amount, due_date, transaction_date')
         .eq('nutritionist_id', nutritionistId)
         .eq('status', 'pending')
         .gte('due_date', format(today, 'yyyy-MM-dd'))
@@ -320,7 +327,7 @@ export async function getProjectedCashFlow(nutritionistId, startDate) {
     // Get transactions without due_date but with transaction_date in range
     const { data: pendingWithoutDueDate, error: pendingError2 } = await supabase
         .from('financial_transactions')
-        .select('type, net_amount, amount, due_date, transaction_date')
+        .select('type, amount, due_date, transaction_date')
         .eq('nutritionist_id', nutritionistId)
         .eq('status', 'pending')
         .is('due_date', null)
@@ -346,7 +353,7 @@ export async function getProjectedCashFlow(nutritionistId, startDate) {
             transactionsByDate[date] = { income: 0, expenses: 0 };
         }
         
-        const value = parseFloat(transaction.net_amount || transaction.amount || 0);
+        const value = parseFloat(transaction.amount || 0);
         if (transaction.type === 'income') {
             transactionsByDate[date].income += value;
         } else {

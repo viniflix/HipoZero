@@ -41,3 +41,32 @@ COMMENT ON TABLE "public"."services" IS 'Catálogo de serviços padronizados do 
 COMMENT ON COLUMN "public"."services"."price" IS 'Preço padrão do serviço em R$';
 COMMENT ON COLUMN "public"."services"."category" IS 'Categoria do serviço: consulta, plano_mensal, outros';
 
+-- Enable RLS
+ALTER TABLE "public"."services" ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for services
+-- Nutritionists can view their own services
+CREATE POLICY "Nutritionists can view their own services"
+ON "public"."services"
+FOR SELECT
+USING (nutritionist_id = auth.uid());
+
+-- Nutritionists can insert their own services
+CREATE POLICY "Nutritionists can insert their own services"
+ON "public"."services"
+FOR INSERT
+WITH CHECK (nutritionist_id = auth.uid());
+
+-- Nutritionists can update their own services
+CREATE POLICY "Nutritionists can update their own services"
+ON "public"."services"
+FOR UPDATE
+USING (nutritionist_id = auth.uid())
+WITH CHECK (nutritionist_id = auth.uid());
+
+-- Nutritionists can delete their own services (soft delete via update)
+CREATE POLICY "Nutritionists can delete their own services"
+ON "public"."services"
+FOR DELETE
+USING (nutritionist_id = auth.uid());
+

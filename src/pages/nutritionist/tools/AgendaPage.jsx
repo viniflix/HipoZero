@@ -27,6 +27,7 @@ export default function AgendaPage() {
     const navigate = useNavigate();
     const [appointments, setAppointments] = useState([]);
     const [patients, setPatients] = useState([]);
+    const [services, setServices] = useState([]);
     const [selectedDate, setSelectedDate] = useState(null); // null = todos os dias
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingAppointment, setEditingAppointment] = useState(null);
@@ -63,17 +64,16 @@ export default function AgendaPage() {
         else setPatients(patientsData || []);
 
         // Load services
-        if (services.length === 0) {
-            try {
-                const servicesData = await getServices(user.id);
-                setServices(servicesData);
-            } catch (error) {
-                console.error('Error loading services:', error);
-            }
+        try {
+            const servicesData = await getServices(user.id);
+            setServices(servicesData || []);
+        } catch (error) {
+            console.error('Error loading services:', error);
+            setServices([]);
         }
 
         setLoading(false);
-    }, [user, toast, services.length]);
+    }, [user, toast]);
 
     useEffect(() => {
         loadData();

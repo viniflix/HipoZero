@@ -48,8 +48,8 @@ export default function TransactionDialog({
     const [formData, setFormData] = useState({
         type: 'income',
         category: '',
-        patient_id: '',
-        service_id: '',
+        patient_id: 'none',
+        service_id: 'none',
         description: '',
         amount: '',
         transaction_date: format(new Date(), 'yyyy-MM-dd'),
@@ -69,8 +69,8 @@ export default function TransactionDialog({
             setFormData({
                 type: transaction.type || 'income',
                 category: transaction.category || '',
-                patient_id: transaction.patient_id || '',
-                service_id: '',
+                patient_id: transaction.patient_id || 'none',
+                service_id: 'none',
                 description: transaction.description || '',
                 amount: transaction.amount?.toString() || '',
                 transaction_date: transaction.transaction_date 
@@ -92,8 +92,8 @@ export default function TransactionDialog({
             setFormData({
                 type: 'income',
                 category: '',
-                patient_id: '',
-                service_id: '',
+                patient_id: 'none',
+                service_id: 'none',
                 description: '',
                 amount: '',
                 transaction_date: format(new Date(), 'yyyy-MM-dd'),
@@ -187,15 +187,15 @@ export default function TransactionDialog({
             ...prev,
             type,
             category: '',
-            patient_id: type === 'expense' ? '' : prev.patient_id,
-            service_id: type === 'expense' ? '' : prev.service_id,
+            patient_id: type === 'expense' ? 'none' : (prev.patient_id || 'none'),
+            service_id: type === 'expense' ? 'none' : (prev.service_id || 'none'),
             isInstallment: type === 'expense' ? prev.isInstallment : false
         }));
     };
 
     const handleServiceChange = (serviceId) => {
-        if (!serviceId) {
-            setFormData(prev => ({ ...prev, service_id: '', amount: '', description: '' }));
+        if (!serviceId || serviceId === 'none') {
+            setFormData(prev => ({ ...prev, service_id: 'none', amount: '', description: '' }));
             return;
         }
 
@@ -238,7 +238,7 @@ export default function TransactionDialog({
                 id: transaction.id,
                 type: formData.type,
                 category: formData.category,
-                patient_id: formData.type === 'income' && formData.patient_id ? formData.patient_id : null,
+                patient_id: formData.type === 'income' && formData.patient_id && formData.patient_id !== 'none' && formData.patient_id !== '' ? formData.patient_id : null,
                 description: formData.description,
                 amount: parseFloat(formData.amount),
                 transaction_date: formData.transaction_date,
@@ -280,7 +280,7 @@ export default function TransactionDialog({
             const payload = {
                 type: formData.type,
                 category: formData.category,
-                patient_id: formData.type === 'income' && formData.patient_id ? formData.patient_id : null,
+                patient_id: formData.type === 'income' && formData.patient_id && formData.patient_id !== 'none' && formData.patient_id !== '' ? formData.patient_id : null,
                 description: formData.description,
                 amount: parseFloat(formData.amount),
                 transaction_date: formData.transaction_date,
@@ -328,14 +328,14 @@ export default function TransactionDialog({
                         <div>
                             <Label htmlFor="service_id">Serviço (opcional)</Label>
                             <Select
-                                value={formData.service_id}
+                                value={formData.service_id || 'none'}
                                 onValueChange={handleServiceChange}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecione um serviço para preencher automaticamente" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">Nenhum</SelectItem>
+                                    <SelectItem value="none">Nenhum</SelectItem>
                                     {services.map(service => (
                                         <SelectItem key={service.id} value={service.id.toString()}>
                                             {service.name} - {formatCurrency(service.price)}
@@ -374,14 +374,14 @@ export default function TransactionDialog({
                         <div>
                             <Label htmlFor="patient_id">Paciente (opcional)</Label>
                             <Select
-                                value={formData.patient_id}
-                                onValueChange={(value) => setFormData(prev => ({ ...prev, patient_id: value }))}
+                                value={formData.patient_id || 'none'}
+                                onValueChange={(value) => setFormData(prev => ({ ...prev, patient_id: value === 'none' ? '' : value }))}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecione um paciente" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">Nenhum</SelectItem>
+                                    <SelectItem value="none">Nenhum</SelectItem>
                                     {patients.map(patient => (
                                         <SelectItem key={patient.id} value={patient.id}>
                                             {patient.name}

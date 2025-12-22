@@ -36,7 +36,7 @@ export default function FinancialCharts({ cashFlowData, expenseDistribution, pro
     }, [projectedCashFlow]);
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <>
             {/* Cash Flow Chart */}
             <Card>
                 <CardHeader>
@@ -193,7 +193,7 @@ export default function FinancialCharts({ cashFlowData, expenseDistribution, pro
                     </Tabs>
                 </CardContent>
             </Card>
-        </div>
+        </>
     );
 }
 

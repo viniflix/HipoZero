@@ -26,7 +26,8 @@ export default function ProfileFinancialTab({ userId, onUpdate }) {
     
     const [financialSettings, setFinancialSettings] = useState({
         defaultPixKey: '',
-        defaultFeePercentage: ''
+        defaultFeePercentage: '',
+        monthlyFinancialGoal: 10000
     });
 
     const [services, setServices] = useState([]);
@@ -69,7 +70,8 @@ export default function ProfileFinancialTab({ userId, onUpdate }) {
 
             setFinancialSettings({
                 defaultPixKey: settings.defaultPixKey || '',
-                defaultFeePercentage: settings.defaultFeePercentage || ''
+                defaultFeePercentage: settings.defaultFeePercentage || '',
+                monthlyFinancialGoal: settings.monthlyFinancialGoal || 10000
             });
 
             setServices(servicesData);
@@ -92,7 +94,8 @@ export default function ProfileFinancialTab({ userId, onUpdate }) {
         try {
             await updateClinicSettings(userId, {
                 defaultPixKey: financialSettings.defaultPixKey,
-                defaultFeePercentage: financialSettings.defaultFeePercentage ? parseFloat(financialSettings.defaultFeePercentage) : null
+                defaultFeePercentage: financialSettings.defaultFeePercentage ? parseFloat(financialSettings.defaultFeePercentage) : null,
+                monthlyFinancialGoal: financialSettings.monthlyFinancialGoal ? parseFloat(financialSettings.monthlyFinancialGoal) : 10000
             });
 
             toast({
@@ -292,6 +295,21 @@ export default function ProfileFinancialTab({ userId, onUpdate }) {
                             onChange={(e) => setFinancialSettings(prev => ({ ...prev, defaultFeePercentage: e.target.value }))}
                             placeholder="Ex: 2.5"
                         />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="monthlyFinancialGoal">Meta Financeira Mensal (R$)</Label>
+                        <Input
+                            id="monthlyFinancialGoal"
+                            type="number"
+                            step="100"
+                            min="0"
+                            value={financialSettings.monthlyFinancialGoal}
+                            onChange={(e) => setFinancialSettings(prev => ({ ...prev, monthlyFinancialGoal: parseFloat(e.target.value) || 0 }))}
+                            placeholder="Ex: 10000"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Meta de receita mensal para acompanhamento no dashboard financeiro
+                        </p>
                     </div>
                     <Button onClick={handleSaveFinancialSettings} disabled={saving}>
                         {saving ? (

@@ -223,11 +223,11 @@ export default function ProfilePersonalTab({ profile, onUpdate }) {
                     <div className="space-y-2">
                         <Label>Especialidades</Label>
                         <Select
-                            value={formData.specialties[0] || ''}
+                            value={formData.specialties[0] || 'none'}
                             onValueChange={(value) => {
                                 setFormData(prev => ({
                                     ...prev,
-                                    specialties: value ? [value] : []
+                                    specialties: value && value !== 'none' ? [value] : []
                                 }));
                             }}
                         >
@@ -235,7 +235,7 @@ export default function ProfilePersonalTab({ profile, onUpdate }) {
                                 <SelectValue placeholder="Selecione uma especialidade" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">Nenhuma</SelectItem>
+                                <SelectItem value="none">Nenhuma</SelectItem>
                                 {specialtiesList.map(s => (
                                     <SelectItem key={s} value={s}>{s}</SelectItem>
                                 ))}
