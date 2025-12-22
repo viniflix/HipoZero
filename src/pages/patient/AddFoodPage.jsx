@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { calculateNutrition } from '@/lib/utils/nutrition-calculations';
 
 const getMealType = (time) => {
     if (!time) return '';
@@ -92,13 +93,9 @@ const AddFoodPage = () => {
 
     const calculateNutrients = (food, grams) => {
         if(!food || !grams) return { calories: 0, protein: 0, fat: 0, carbs: 0 };
-        const factor = grams / 100;
-        return {
-            calories: food.calories * factor,
-            protein: food.protein * factor,
-            fat: food.fat * factor,
-            carbs: food.carbs * factor
-        };
+        
+        // Calcular nutrição (recalcula calorias baseado nos macros)
+        return calculateNutrition(food, grams);
     };
 
     const handleSelectFood = async (food) => {

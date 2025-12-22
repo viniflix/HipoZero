@@ -9,6 +9,7 @@ import AnthropometryTable from '@/components/anthropometry/AnthropometryTable';
 import WeightChart from '@/components/anthropometry/WeightChart';
 import IMCChart from '@/components/anthropometry/IMCChart';
 import CompositionCharts from '@/components/anthropometry/CompositionCharts';
+import SomatotypeChart from '@/components/anthropometry/SomatotypeChart';
 import { supabase } from '@/lib/customSupabaseClient';
 import {
     getAnthropometryRecords,
@@ -280,6 +281,12 @@ const AnthropometryPage = () => {
                 {records.some(r => r.results || r.bioimpedance) && (
                     <CompositionCharts data={records} />
                 )}
+                
+                {/* Somatotipo Chart (se houver dados do último registro) */}
+                {latestRecord?.results?.somatotype && (
+                    <SomatotypeChart somatotype={latestRecord.results.somatotype} />
+                )}
+                
                 {/* Gráficos tradicionais */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <WeightChart data={chartData} />
