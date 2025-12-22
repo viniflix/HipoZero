@@ -1,27 +1,26 @@
 import React, { useState, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
-import { Plus, X, Calculator, Barcode, Loader2, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, X, Calculator, Barcode, Loader2, Info, ChevronRight, ChevronLeft, Search, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/use-toast';
 import { createFood } from '@/lib/supabase/foodService';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 
 /**
- * SmartFoodForm - Formulário inteligente e intuitivo para criar/editar alimentos
+ * SmartFoodForm - Formulário inteligente passo a passo para criar/editar alimentos
  * 
  * Features:
- * - Busca por código de barras (OpenFoodFacts)
+ * - Wizard passo a passo (5 etapas)
+ * - Busca por código de barras ou nome (OpenFoodFacts)
  * - Auto-cálculo de calorias baseado em macros
  * - Conversão automática de porção do rótulo para 100g
  * - Suporte completo a micronutrientes
- * - Layout organizado em tabs para melhor UX
- * - Adição rápida de medidas caseiras comuns
+ * - Opção de pular etapas opcionais
  * 
  * @param {Object} props
  * @param {Object} props.initialData - Dados iniciais (para edição)
@@ -38,12 +37,16 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
     const { toast } = useToast();
     const { user } = useAuth();
     
+    // Wizard state
+    const [currentStep, setCurrentStep] = useState(1);
+    const totalSteps = 5;
+    
     // Basic Info
     const [name, setName] = useState('');
     const [brand, setBrand] = useState('');
     
     // Input Mode
-    const [inputMode, setInputMode] = useState('100g'); // '100g' | 'portion'
+    const [inputMode, setInputMode] = useState('100g');
     const [labelPortionSize, setLabelPortionSize] = useState(100);
     
     // Macronutrients
@@ -83,10 +86,11 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
     const [householdMeasures, setHouseholdMeasures] = useState([]);
     const [loading, setLoading] = useState(false);
     const [barcode, setBarcode] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
     const [barcodeLoading, setBarcodeLoading] = useState(false);
-    const [showMicronutrients, setShowMicronutrients] = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
 
-    // Pre-fill from initialData (for editing) or initialName (for quick-add)
+    // Pre-fill from initialData
     useEffect(() => {
         if (initialData) {
             setName(initialData.name || '');
@@ -117,17 +121,12 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             setFolate(initialData.folate?.toString() || '');
             setAutoCalcCalories(false);
             setInputMode('100g');
-            
-            // Show micronutrients if any exist
-            if (initialData.fiber || initialData.sodium || initialData.calcium || initialData.iron) {
-                setShowMicronutrients(true);
-            }
         } else if (initialName) {
             setName(initialName);
         }
     }, [initialData, initialName]);
 
-    // Calculate normalized values (for 100g) when in portion mode
+    // Calculate normalized values
     const normalizedValues = useMemo(() => {
         if (inputMode === 'portion' && labelPortionSize > 0) {
             const factor = 100 / labelPortionSize;
@@ -141,19 +140,18 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
         return null;
     }, [inputMode, labelPortionSize, protein, carbs, fat, calories]);
 
-    // Auto-calculate calories when macros change
+    // Auto-calculate calories
     useEffect(() => {
         if (autoCalcCalories && protein && carbs && fat) {
             let proteinVal = parseFloat(protein) || 0;
             let carbsVal = parseFloat(carbs) || 0;
             let fatVal = parseFloat(fat) || 0;
-            
             const calculated = (proteinVal * 4) + (carbsVal * 4) + (fatVal * 9);
             setCalories(Math.round(calculated * 100) / 100);
         }
     }, [protein, carbs, fat, autoCalcCalories, inputMode, labelPortionSize]);
 
-    // Helper function to normalize a value based on input mode
+    // Helper function to normalize a value
     const normalizeValue = (value) => {
         if (!value) return null;
         if (inputMode === 'portion' && labelPortionSize > 0) {
@@ -161,6 +159,58 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             return parseFloat(value) * factor;
         }
         return parseFloat(value);
+    };
+
+    // Validation for each step
+    const validateStep = (step) => {
+        switch (step) {
+            case 1: // Básico
+                return name.trim().length > 0;
+            case 2: // Macronutrientes
+                return name.trim().length > 0 && protein && carbs && fat && calories;
+            case 3: // Gorduras Detalhadas (opcional)
+            case 4: // Micronutrientes (opcional)
+            case 5: // Medidas (opcional)
+                return true; // All optional
+            default:
+                return false;
+        }
+    };
+
+    // Navigation
+    const nextStep = () => {
+        if (currentStep < totalSteps) {
+            if (validateStep(currentStep)) {
+                setCurrentStep(currentStep + 1);
+            } else {
+                toast({
+                    title: 'Campos obrigatórios',
+                    description: 'Preencha todos os campos obrigatórios antes de continuar.',
+                    variant: 'destructive'
+                });
+            }
+        }
+    };
+
+    const prevStep = () => {
+        if (currentStep > 1) {
+            setCurrentStep(currentStep - 1);
+        }
+    };
+
+    const goToStep = (step) => {
+        if (step >= 1 && step <= totalSteps) {
+            // Allow going back to any step, but validate when going forward
+            if (step > currentStep && !validateStep(currentStep)) {
+                toast({
+                    title: 'Campos obrigatórios',
+                    description: 'Preencha todos os campos obrigatórios antes de continuar.',
+                    variant: 'destructive'
+                });
+                return;
+            }
+            setCurrentStep(step);
+        }
     };
 
     // Pre-defined common household measures
@@ -190,7 +240,46 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
         setHouseholdMeasures(householdMeasures.filter((_, i) => i !== index));
     };
 
-    // Fetch product from OpenFoodFacts API
+    // Fill form with OpenFoodFacts data
+    const fillFormWithProduct = (product) => {
+        const nutriments = product.nutriments || {};
+
+        if (product.product_name) setName(product.product_name);
+        if (product.brands) setBrand(product.brands.split(',')[0].trim());
+        if (nutriments.proteins_100g !== undefined) setProtein(nutriments.proteins_100g.toString());
+        if (nutriments.carbohydrates_100g !== undefined) setCarbs(nutriments.carbohydrates_100g.toString());
+        if (nutriments.fat_100g !== undefined) setFat(nutriments.fat_100g.toString());
+        if (nutriments.fiber_100g !== undefined) setFiber(nutriments.fiber_100g.toString());
+        if (nutriments.sodium_100g !== undefined) setSodium((nutriments.sodium_100g * 1000).toString());
+        if (nutriments.sugars_100g !== undefined) setSugar(nutriments.sugars_100g.toString());
+        if (nutriments.saturated_fat_100g !== undefined) setSaturatedFat(nutriments.saturated_fat_100g.toString());
+        if (nutriments.calcium_100g !== undefined) setCalcium((nutriments.calcium_100g * 1000).toString());
+        if (nutriments.iron_100g !== undefined) setIron((nutriments.iron_100g * 1000).toString());
+        if (nutriments.vitamin_c_100g !== undefined) setVitaminC((nutriments.vitamin_c_100g * 1000).toString());
+        if (nutriments.vitamin_a_100g !== undefined) setVitaminA((nutriments.vitamin_a_100g * 1000).toString());
+        if (nutriments.vitamin_d_100g !== undefined) setVitaminD((nutriments.vitamin_d_100g * 1000).toString());
+        if (nutriments.vitamin_e_100g !== undefined) setVitaminE((nutriments.vitamin_e_100g * 1000).toString());
+        if (nutriments.vitamin_b12_100g !== undefined) setVitaminB12((nutriments.vitamin_b12_100g * 1000).toString());
+        if (nutriments.folate_100g !== undefined) setFolate((nutriments.folate_100g * 1000).toString());
+        if (nutriments.magnesium_100g !== undefined) setMagnesium((nutriments.magnesium_100g * 1000).toString());
+        if (nutriments.phosphorus_100g !== undefined) setPhosphorus((nutriments.phosphorus_100g * 1000).toString());
+        if (nutriments.potassium_100g !== undefined) setPotassium((nutriments.potassium_100g * 1000).toString());
+        if (nutriments.zinc_100g !== undefined) setZinc((nutriments.zinc_100g * 1000).toString());
+
+        if (nutriments.energy_kcal_100g !== undefined) {
+            setCalories(nutriments.energy_kcal_100g.toString());
+            setAutoCalcCalories(false);
+        } else if (nutriments.energy_100g !== undefined) {
+            const kcal = nutriments.energy_100g / 4.184;
+            setCalories(kcal.toFixed(2));
+            setAutoCalcCalories(false);
+        }
+
+        setInputMode('100g');
+        setLabelPortionSize(100);
+    };
+
+    // Fetch product by barcode
     const handleFetchBarcode = async () => {
         if (!barcode.trim()) {
             toast({
@@ -215,33 +304,7 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                 return;
             }
 
-            const product = data.product;
-            const nutriments = product.nutriments || {};
-
-            if (product.product_name) setName(product.product_name);
-            if (product.brands) setBrand(product.brands.split(',')[0].trim());
-            if (nutriments.proteins_100g !== undefined) setProtein(nutriments.proteins_100g.toString());
-            if (nutriments.carbohydrates_100g !== undefined) setCarbs(nutriments.carbohydrates_100g.toString());
-            if (nutriments.fat_100g !== undefined) setFat(nutriments.fat_100g.toString());
-            if (nutriments.fiber_100g !== undefined) setFiber(nutriments.fiber_100g.toString());
-            if (nutriments.sodium_100g !== undefined) setSodium((nutriments.sodium_100g * 1000).toString()); // Convert to mg
-            if (nutriments.sugars_100g !== undefined) setSugar(nutriments.sugars_100g.toString());
-            if (nutriments.saturated_fat_100g !== undefined) setSaturatedFat(nutriments.saturated_fat_100g.toString());
-            if (nutriments.calcium_100g !== undefined) setCalcium((nutriments.calcium_100g * 1000).toString()); // Convert to mg
-            if (nutriments.iron_100g !== undefined) setIron((nutriments.iron_100g * 1000).toString()); // Convert to mg
-            if (nutriments.vitamin_c_100g !== undefined) setVitaminC((nutriments.vitamin_c_100g * 1000).toString()); // Convert to mg
-
-            if (nutriments.energy_kcal_100g !== undefined) {
-                setCalories(nutriments.energy_kcal_100g.toString());
-                setAutoCalcCalories(false);
-            } else if (nutriments.energy_100g !== undefined) {
-                const kcal = nutriments.energy_100g / 4.184;
-                setCalories(kcal.toFixed(2));
-                setAutoCalcCalories(false);
-            }
-
-            setInputMode('100g');
-            setLabelPortionSize(100);
+            fillFormWithProduct(data.product);
 
             toast({
                 title: 'Produto encontrado!',
@@ -259,20 +322,58 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
         }
     };
 
-    const handleSubmit = async () => {
-        if (!name.trim()) {
+    // Search product by name
+    const handleSearchProduct = async () => {
+        if (!searchTerm.trim() || searchTerm.length < 3) {
             toast({
                 title: 'Erro',
-                description: 'Nome do alimento é obrigatório.',
+                description: 'Digite pelo menos 3 caracteres para buscar.',
                 variant: 'destructive'
             });
             return;
         }
 
-        if (!protein || !carbs || !fat || !calories) {
+        setSearchLoading(true);
+        try {
+            const response = await fetch(
+                `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(searchTerm.trim())}&json=1&page_size=1`
+            );
+            const data = await response.json();
+
+            if (!data.products || data.products.length === 0) {
+                toast({
+                    title: 'Produto não encontrado',
+                    description: 'Não foi possível encontrar este produto no OpenFoodFacts.',
+                    variant: 'default'
+                });
+                return;
+            }
+
+            // Use first result
+            const product = data.products[0];
+            fillFormWithProduct(product);
+
+            toast({
+                title: 'Produto encontrado!',
+                description: `${product.product_name || 'Produto'} encontrado e preenchido automaticamente.`,
+            });
+        } catch (error) {
+            console.error('Erro ao buscar produto:', error);
             toast({
                 title: 'Erro',
-                description: 'Preencha todos os valores nutricionais básicos (Proteína, Carboidratos, Gorduras, Calorias).',
+                description: 'Não foi possível buscar o produto. Verifique sua conexão.',
+                variant: 'destructive'
+            });
+        } finally {
+            setSearchLoading(false);
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!validateStep(2)) {
+            toast({
+                title: 'Erro',
+                description: 'Preencha todos os campos obrigatórios (Nome, Proteína, Carboidratos, Gorduras, Calorias).',
                 variant: 'destructive'
             });
             return;
@@ -289,7 +390,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
 
         setLoading(true);
         try {
-            // Normalize all values to 100g base if in portion mode
             const normalize = (val) => val ? normalizeValue(val) : null;
             
             const foodData = {
@@ -345,7 +445,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                 createdFood = data;
             }
 
-            // Create household measures
             if (householdMeasures.length > 0) {
                 if (initialData) {
                     await supabase
@@ -394,70 +493,143 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
     }));
 
     const isCompact = mode === 'compact';
+    const progress = (currentStep / totalSteps) * 100;
+
+    // Step titles
+    const stepTitles = [
+        'Básico',
+        'Macronutrientes',
+        'Gorduras Detalhadas',
+        'Micronutrientes',
+        'Medidas Caseiras'
+    ];
 
     return (
         <div className={isCompact ? "space-y-3" : "space-y-6"}>
-            {/* Barcode Search - Only in full mode */}
+            {/* Progress Bar */}
             {!isCompact && (
                 <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <Barcode className="h-4 w-4" />
-                            Buscar por Código de Barras
-                        </CardTitle>
-                        <CardDescription>
-                            Busca automática de dados nutricionais via OpenFoodFacts
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex gap-2">
-                            <Input
-                                placeholder="Digite o código EAN (ex: 7891000100103)"
-                                value={barcode}
-                                onChange={(e) => setBarcode(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        handleFetchBarcode();
-                                    }
-                                }}
-                            />
-                            <Button
-                                onClick={handleFetchBarcode}
-                                disabled={barcodeLoading || !barcode.trim()}
-                                variant="outline"
-                            >
-                                {barcodeLoading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <>
-                                        <Barcode className="h-4 w-4 mr-2" />
-                                        Buscar
-                                    </>
-                                )}
-                            </Button>
+                    <CardContent className="pt-6">
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="font-medium">
+                                    Passo {currentStep} de {totalSteps}: {stepTitles[currentStep - 1]}
+                                </span>
+                                <span className="text-muted-foreground">{Math.round(progress)}%</span>
+                            </div>
+                            <Progress value={progress} className="h-2" />
                         </div>
                     </CardContent>
                 </Card>
             )}
 
-            {/* Main Form Tabs */}
-            <Tabs defaultValue="basic" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="basic">Básico</TabsTrigger>
-                    <TabsTrigger value="macros">Macronutrientes</TabsTrigger>
-                    <TabsTrigger value="micros">Micronutrientes</TabsTrigger>
-                </TabsList>
+            {/* Search Section - Only in full mode and step 1 */}
+            {!isCompact && currentStep === 1 && (
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <Search className="h-4 w-4" />
+                            Buscar Produto no OpenFoodFacts
+                        </CardTitle>
+                        <CardDescription>
+                            Busque por código de barras ou nome do produto para preencher automaticamente
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="barcode">Código de Barras (EAN)</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    id="barcode"
+                                    placeholder="Ex: 7891000100103"
+                                    value={barcode}
+                                    onChange={(e) => setBarcode(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleFetchBarcode();
+                                        }
+                                    }}
+                                />
+                                <Button
+                                    onClick={handleFetchBarcode}
+                                    disabled={barcodeLoading || !barcode.trim()}
+                                    variant="outline"
+                                >
+                                    {barcodeLoading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <>
+                                            <Barcode className="h-4 w-4 mr-2" />
+                                            Buscar
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-background px-2 text-muted-foreground">ou</span>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="searchTerm">Nome do Produto</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    id="searchTerm"
+                                    placeholder="Ex: Nutella"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleSearchProduct();
+                                        }
+                                    }}
+                                />
+                                <Button
+                                    onClick={handleSearchProduct}
+                                    disabled={searchLoading || !searchTerm.trim() || searchTerm.length < 3}
+                                    variant="outline"
+                                >
+                                    {searchLoading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <>
+                                            <Search className="h-4 w-4 mr-2" />
+                                            Buscar
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
-                {/* TAB 1: Basic Info */}
-                <TabsContent value="basic" className="space-y-4 mt-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Informações Básicas</CardTitle>
-                            <CardDescription>
-                                Dados essenciais do alimento
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
+            {/* Step Content */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base">
+                        {currentStep === 1 && '1/5 - Informações Básicas'}
+                        {currentStep === 2 && '2/5 - Macronutrientes'}
+                        {currentStep === 3 && '3/5 - Gorduras Detalhadas e Outros (Opcional)'}
+                        {currentStep === 4 && '4/5 - Micronutrientes (Opcional)'}
+                        {currentStep === 5 && '5/5 - Medidas Caseiras (Opcional)'}
+                    </CardTitle>
+                    <CardDescription>
+                        {currentStep === 1 && 'Dados essenciais do alimento'}
+                        {currentStep === 2 && 'Valores nutricionais principais (obrigatórios)'}
+                        {currentStep === 3 && 'Informações adicionais sobre gorduras e outros componentes'}
+                        {currentStep === 4 && 'Vitaminas e minerais do alimento'}
+                        {currentStep === 5 && 'Medidas caseiras para facilitar o uso'}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {/* STEP 1: Basic Info */}
+                    {currentStep === 1 && (
+                        <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="name">
                                     Nome do Alimento <span className="text-destructive">*</span>
@@ -470,7 +642,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                     autoFocus={!initialData}
                                 />
                             </div>
-
                             <div className="space-y-2">
                                 <Label htmlFor="brand">Marca (opcional)</Label>
                                 <Input
@@ -480,75 +651,12 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                     placeholder="Ex: Marca X"
                                 />
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    )}
 
-                    {/* Household Measures */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Medidas Caseiras</CardTitle>
-                            <CardDescription>
-                                Adicione medidas caseiras comuns para facilitar o uso
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex flex-wrap gap-2">
-                                {commonMeasures.map((measure, idx) => (
-                                    <Badge
-                                        key={idx}
-                                        variant="outline"
-                                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors px-3 py-1"
-                                        onClick={() => handleAddMeasure(measure)}
-                                    >
-                                        <Plus className="h-3 w-3 mr-1" />
-                                        {measure.label} ({measure.grams}g)
-                                    </Badge>
-                                ))}
-                            </div>
-
-                            {householdMeasures.length > 0 && (
-                                <div className="space-y-2">
-                                    <Label className="text-sm">Medidas Adicionadas:</Label>
-                                    <div className="space-y-2">
-                                        {householdMeasures.map((measure, idx) => (
-                                            <div
-                                                key={idx}
-                                                className="flex items-center justify-between p-2 border rounded-lg bg-muted/30"
-                                            >
-                                                <span className="text-sm">
-                                                    {measure.label} - {measure.grams}g
-                                                </span>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleRemoveMeasure(idx)}
-                                                    className="h-6 w-6 p-0"
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                {/* TAB 2: Macronutrients */}
-                <TabsContent value="macros" className="space-y-4 mt-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Calculator className="h-4 w-4" />
-                                Macronutrientes
-                            </CardTitle>
-                            <CardDescription>
-                                Valores nutricionais principais do alimento
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {/* Input Mode Tabs */}
+                    {/* STEP 2: Macronutrients */}
+                    {currentStep === 2 && (
+                        <div className="space-y-4">
                             <Tabs value={inputMode} onValueChange={setInputMode} className="w-full">
                                 <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="100g">Dados por 100g</TabsTrigger>
@@ -576,9 +684,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                             onChange={(e) => setLabelPortionSize(e.target.value)}
                                             placeholder="Ex: 30"
                                         />
-                                        <p className="text-xs text-muted-foreground">
-                                            Informe o tamanho da porção indicada no rótulo
-                                        </p>
                                     </div>
                                     {normalizedValues && (
                                         <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
@@ -598,16 +703,10 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                 </TabsContent>
                             </Tabs>
 
-                            {/* Main Macros */}
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="protein">
                                         Proteína (g) <span className="text-destructive">*</span>
-                                        {inputMode === 'portion' && labelPortionSize > 0 && (
-                                            <span className="text-xs text-muted-foreground block">
-                                                por {labelPortionSize}g
-                                            </span>
-                                        )}
                                     </Label>
                                     <Input
                                         id="protein"
@@ -618,15 +717,9 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                         placeholder="0"
                                     />
                                 </div>
-
                                 <div className="space-y-2">
                                     <Label htmlFor="carbs">
                                         Carboidratos (g) <span className="text-destructive">*</span>
-                                        {inputMode === 'portion' && labelPortionSize > 0 && (
-                                            <span className="text-xs text-muted-foreground block">
-                                                por {labelPortionSize}g
-                                            </span>
-                                        )}
                                     </Label>
                                     <Input
                                         id="carbs"
@@ -637,15 +730,9 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                         placeholder="0"
                                     />
                                 </div>
-
                                 <div className="space-y-2">
                                     <Label htmlFor="fat">
                                         Gorduras (g) <span className="text-destructive">*</span>
-                                        {inputMode === 'portion' && labelPortionSize > 0 && (
-                                            <span className="text-xs text-muted-foreground block">
-                                                por {labelPortionSize}g
-                                            </span>
-                                        )}
                                     </Label>
                                     <Input
                                         id="fat"
@@ -658,7 +745,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                 </div>
                             </div>
 
-                            {/* Calories */}
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="calories">
@@ -696,123 +782,122 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                     </p>
                                 )}
                             </div>
+                        </div>
+                    )}
 
-                            {/* Additional Macronutrients */}
-                            <Collapsible open={showMicronutrients} onOpenChange={setShowMicronutrients}>
-                                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted transition-colors">
-                                    <span className="text-sm font-medium">Gorduras Detalhadas e Outros (opcional)</span>
-                                    {showMicronutrients ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                </CollapsibleTrigger>
-                                <CollapsibleContent className="space-y-4 pt-4">
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="fiber">Fibra (g)</Label>
-                                            <Input
-                                                id="fiber"
-                                                type="number"
-                                                step="0.1"
-                                                value={fiber}
-                                                onChange={(e) => setFiber(e.target.value)}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="sugar">Açúcares (g)</Label>
-                                            <Input
-                                                id="sugar"
-                                                type="number"
-                                                step="0.1"
-                                                value={sugar}
-                                                onChange={(e) => setSugar(e.target.value)}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="saturatedFat">Gordura Saturada (g)</Label>
-                                            <Input
-                                                id="saturatedFat"
-                                                type="number"
-                                                step="0.1"
-                                                value={saturatedFat}
-                                                onChange={(e) => setSaturatedFat(e.target.value)}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="transFat">Gordura Trans (g)</Label>
-                                            <Input
-                                                id="transFat"
-                                                type="number"
-                                                step="0.1"
-                                                value={transFat}
-                                                onChange={(e) => setTransFat(e.target.value)}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="monounsaturatedFat">Gordura Monoinsaturada (g)</Label>
-                                            <Input
-                                                id="monounsaturatedFat"
-                                                type="number"
-                                                step="0.1"
-                                                value={monounsaturatedFat}
-                                                onChange={(e) => setMonounsaturatedFat(e.target.value)}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="polyunsaturatedFat">Gordura Poliinsaturada (g)</Label>
-                                            <Input
-                                                id="polyunsaturatedFat"
-                                                type="number"
-                                                step="0.1"
-                                                value={polyunsaturatedFat}
-                                                onChange={(e) => setPolyunsaturatedFat(e.target.value)}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="cholesterol">Colesterol (mg)</Label>
-                                            <Input
-                                                id="cholesterol"
-                                                type="number"
-                                                step="0.1"
-                                                value={cholesterol}
-                                                onChange={(e) => setCholesterol(e.target.value)}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="sodium">Sódio (mg)</Label>
-                                            <Input
-                                                id="sodium"
-                                                type="number"
-                                                step="0.1"
-                                                value={sodium}
-                                                onChange={(e) => setSodium(e.target.value)}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                    </div>
-                                </CollapsibleContent>
-                            </Collapsible>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                    {/* STEP 3: Additional Macronutrients */}
+                    {currentStep === 3 && (
+                        <div className="space-y-4">
+                            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                <p className="text-sm text-amber-900 dark:text-amber-100 flex items-center gap-2">
+                                    <Info className="h-4 w-4" />
+                                    Esta etapa é opcional. Você pode pular se não tiver essas informações.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="fiber">Fibra (g)</Label>
+                                    <Input
+                                        id="fiber"
+                                        type="number"
+                                        step="0.1"
+                                        value={fiber}
+                                        onChange={(e) => setFiber(e.target.value)}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="sugar">Açúcares (g)</Label>
+                                    <Input
+                                        id="sugar"
+                                        type="number"
+                                        step="0.1"
+                                        value={sugar}
+                                        onChange={(e) => setSugar(e.target.value)}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="saturatedFat">Gordura Saturada (g)</Label>
+                                    <Input
+                                        id="saturatedFat"
+                                        type="number"
+                                        step="0.1"
+                                        value={saturatedFat}
+                                        onChange={(e) => setSaturatedFat(e.target.value)}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="transFat">Gordura Trans (g)</Label>
+                                    <Input
+                                        id="transFat"
+                                        type="number"
+                                        step="0.1"
+                                        value={transFat}
+                                        onChange={(e) => setTransFat(e.target.value)}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="monounsaturatedFat">Gordura Monoinsaturada (g)</Label>
+                                    <Input
+                                        id="monounsaturatedFat"
+                                        type="number"
+                                        step="0.1"
+                                        value={monounsaturatedFat}
+                                        onChange={(e) => setMonounsaturatedFat(e.target.value)}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="polyunsaturatedFat">Gordura Poliinsaturada (g)</Label>
+                                    <Input
+                                        id="polyunsaturatedFat"
+                                        type="number"
+                                        step="0.1"
+                                        value={polyunsaturatedFat}
+                                        onChange={(e) => setPolyunsaturatedFat(e.target.value)}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cholesterol">Colesterol (mg)</Label>
+                                    <Input
+                                        id="cholesterol"
+                                        type="number"
+                                        step="0.1"
+                                        value={cholesterol}
+                                        onChange={(e) => setCholesterol(e.target.value)}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="sodium">Sódio (mg)</Label>
+                                    <Input
+                                        id="sodium"
+                                        type="number"
+                                        step="0.1"
+                                        value={sodium}
+                                        onChange={(e) => setSodium(e.target.value)}
+                                        placeholder="0"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
-                {/* TAB 3: Micronutrients */}
-                <TabsContent value="micros" className="space-y-4 mt-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Micronutrientes</CardTitle>
-                            <CardDescription>
-                                Vitaminas e minerais (opcional) - Todos os valores serão normalizados para 100g
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            {/* Minerals */}
+                    {/* STEP 4: Micronutrients */}
+                    {currentStep === 4 && (
+                        <div className="space-y-6">
+                            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                <p className="text-sm text-amber-900 dark:text-amber-100 flex items-center gap-2">
+                                    <Info className="h-4 w-4" />
+                                    Esta etapa é opcional. Você pode pular se não tiver essas informações.
+                                </p>
+                            </div>
                             <div className="space-y-4">
-                                <h3 className="text-sm font-semibold text-muted-foreground">Minerais (mg por {inputMode === 'portion' ? `${labelPortionSize}g` : '100g'})</h3>
+                                <h3 className="text-sm font-semibold text-muted-foreground">Minerais (mg)</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="calcium">Cálcio (mg)</Label>
@@ -882,10 +967,8 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Vitamins */}
                             <div className="space-y-4">
-                                <h3 className="text-sm font-semibold text-muted-foreground">Vitaminas (mg por {inputMode === 'portion' ? `${labelPortionSize}g` : '100g'})</h3>
+                                <h3 className="text-sm font-semibold text-muted-foreground">Vitaminas (mg)</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="vitaminA">Vitamina A (mg)</Label>
@@ -955,27 +1038,114 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                     </div>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
+                        </div>
+                    )}
 
-            {/* Submit Button (only in full mode) */}
+                    {/* STEP 5: Household Measures */}
+                    {currentStep === 5 && (
+                        <div className="space-y-4">
+                            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                <p className="text-sm text-amber-900 dark:text-amber-100 flex items-center gap-2">
+                                    <Info className="h-4 w-4" />
+                                    Esta etapa é opcional. Você pode pular se não quiser adicionar medidas caseiras.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {commonMeasures.map((measure, idx) => (
+                                    <Badge
+                                        key={idx}
+                                        variant="outline"
+                                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors px-3 py-1"
+                                        onClick={() => handleAddMeasure(measure)}
+                                    >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        {measure.label} ({measure.grams}g)
+                                    </Badge>
+                                ))}
+                            </div>
+                            {householdMeasures.length > 0 && (
+                                <div className="space-y-2">
+                                    <Label className="text-sm">Medidas Adicionadas:</Label>
+                                    <div className="space-y-2">
+                                        {householdMeasures.map((measure, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="flex items-center justify-between p-2 border rounded-lg bg-muted/30"
+                                            >
+                                                <span className="text-sm">
+                                                    {measure.label} - {measure.grams}g
+                                                </span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleRemoveMeasure(idx)}
+                                                    className="h-6 w-6 p-0"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Navigation Buttons */}
             {!isCompact && (
-                <div className="flex justify-end gap-2 pt-4 border-t">
-                    <Button onClick={handleSubmit} disabled={loading} size="lg">
-                        {loading ? (
-                            <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                {initialData ? 'Atualizando...' : 'Criando...'}
-                            </>
-                        ) : (
-                            <>
-                                <Plus className="h-4 w-4 mr-2" />
-                                {initialData ? 'Atualizar Alimento' : 'Criar Alimento'}
-                            </>
+                <div className="flex items-center justify-between gap-2 pt-4 border-t">
+                    <div className="flex gap-2">
+                        {currentStep > 1 && (
+                            <Button
+                                variant="outline"
+                                onClick={prevStep}
+                                disabled={loading}
+                            >
+                                <ChevronLeft className="h-4 w-4 mr-2" />
+                                Anterior
+                            </Button>
                         )}
-                    </Button>
+                    </div>
+                    <div className="flex gap-2">
+                        {(currentStep === 3 || currentStep === 4 || currentStep === 5) && (
+                            <Button
+                                variant="ghost"
+                                onClick={nextStep}
+                                disabled={loading}
+                            >
+                                Pular
+                            </Button>
+                        )}
+                        {currentStep < totalSteps ? (
+                            <Button
+                                onClick={nextStep}
+                                disabled={loading}
+                            >
+                                Próximo
+                                <ChevronRight className="h-4 w-4 ml-2" />
+                            </Button>
+                        ) : (
+                            <Button
+                                onClick={handleSubmit}
+                                disabled={loading}
+                                size="lg"
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        {initialData ? 'Atualizando...' : 'Criando...'}
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        {initialData ? 'Atualizar Alimento' : 'Criar Alimento'}
+                                    </>
+                                )}
+                            </Button>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
