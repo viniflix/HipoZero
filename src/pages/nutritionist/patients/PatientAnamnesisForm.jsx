@@ -39,7 +39,7 @@ import { anamnesisFormSchema } from '@/lib/validations/anamnesis-schema';
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * PatientAnamnesisFormV2 - Formulário de Anamnese Melhorado
+ * PatientAnamnesisForm - Formulário de Anamnese Melhorado
  * ETAPA 1: Validação + Campos Condicionais + Listas Dinâmicas
  *
  * Melhorias implementadas:
@@ -51,7 +51,7 @@ import { useToast } from '@/hooks/use-toast';
  * - Scroll automático para erros
  * - Salvamento estruturado no JSONB
  */
-const PatientAnamnesisFormV2 = () => {
+const PatientAnamnesisForm = () => {
     const navigate = useNavigate();
     const { patientId, anamnesisId } = useParams();
     const [searchParams] = useSearchParams();
@@ -1861,4 +1861,4 @@ const PatientAnamnesisFormV2 = () => {
     );
 };
 
-export default PatientAnamnesisFormV2;
+export default PatientAnamnesisForm;
