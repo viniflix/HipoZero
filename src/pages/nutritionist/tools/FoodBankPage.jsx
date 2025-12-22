@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Plus, Filter, Database, Package, Loader2, X } from 'lucide-react';
+import { Search, Plus, Filter, Database, Package, Loader2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -17,17 +17,20 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import FoodCard from '@/components/nutrition/FoodCard';
+import FoodCardHorizontal from '@/components/nutrition/FoodCardHorizontal';
 import FoodDetailsDialog from '@/components/nutrition/FoodDetailsDialog';
 import SmartFoodForm from '@/components/nutrition/SmartFoodForm';
 import { useDebounce } from '@/hooks/useDebounce';
+
+const ITEMS_PER_PAGE = 20;
 
 const FoodBankPage = () => {
     const { user } = useAuth();
     const { toast } = useToast();
     
     // State
-    const [foods, setFoods] = useState([]);
+    const [customFoods, setCustomFoods] = useState([]);
+    const [publicFoods, setPublicFoods] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [sourceFilter, setSourceFilter] = useState('all');
@@ -38,6 +41,14 @@ const FoodBankPage = () => {
     const [foodToEdit, setFoodToEdit] = useState(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [foodToDelete, setFoodToDelete] = useState(null);
+    
+    // Pagination state
+    const [customPage, setCustomPage] = useState(0);
+    const [publicPage, setPublicPage] = useState(0);
+    const [customTotal, setCustomTotal] = useState(0);
+    const [publicTotal, setPublicTotal] = useState(0);
+    const [loadingCustom, setLoadingCustom] = useState(false);
+    const [loadingPublic, setLoadingPublic] = useState(false);
     
     // Debounce search
     const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -53,76 +64,168 @@ const FoodBankPage = () => {
         { value: 'TBCA', label: 'TBCA' }
     ];
 
-    // Fetch foods
-    const fetchFoods = useCallback(async () => {
-        setLoading(true);
+    // Fetch custom foods with pagination
+    const fetchCustomFoods = useCallback(async (page = 0, append = false) => {
+        if (sourceFilter !== 'all' && sourceFilter !== 'custom') {
+            if (!append) {
+                setCustomFoods([]);
+                setCustomTotal(0);
+            }
+            return;
+        }
+
+        setLoadingCustom(true);
         try {
+            const offset = page * ITEMS_PER_PAGE;
             let query = supabase
                 .from('foods')
-                .select('*, food_measures(*)')
+                .select('*, food_measures(*)', { count: 'exact' })
                 .eq('is_active', true)
-                .order('source', { ascending: true })
-                .order('name', { ascending: true });
+                .or(`source.eq.custom,nutritionist_id.eq.${user.id}`)
+                .order('name', { ascending: true })
+                .range(offset, offset + ITEMS_PER_PAGE - 1);
 
-            // Filter by source
-            if (sourceFilter !== 'all') {
-                if (sourceFilter === 'custom') {
-                    query = query.eq('nutritionist_id', user.id);
-                } else {
-                    query = query.eq('source', sourceFilter);
-                }
+            // Apply search filter
+            if (debouncedSearchTerm.trim()) {
+                const searchLower = debouncedSearchTerm.toLowerCase();
+                query = query.or(`name.ilike.%${searchLower}%,group.ilike.%${searchLower}%,description.ilike.%${searchLower}%`);
+            }
+
+            const { data, error, count } = await query;
+
+            if (error) throw error;
+
+            if (append) {
+                setCustomFoods(prev => [...prev, ...(data || [])]);
             } else {
-                // Include custom foods from this nutritionist
-                query = query.or(`source.eq.custom,nutritionist_id.eq.${user.id},source.neq.custom`);
+                setCustomFoods(data || []);
             }
-
-            const { data, error } = await query;
-
-            if (error) {
-                throw error;
-            }
-
-            setFoods(data || []);
+            setCustomTotal(count || 0);
         } catch (error) {
-            console.error('Erro ao buscar alimentos:', error);
+            console.error('Erro ao buscar alimentos personalizados:', error);
             toast({
                 title: 'Erro',
-                description: 'Não foi possível carregar os alimentos.',
+                description: 'Não foi possível carregar os alimentos personalizados.',
                 variant: 'destructive'
             });
         } finally {
-            setLoading(false);
+            setLoadingCustom(false);
         }
-    }, [user.id, sourceFilter, toast]);
+    }, [user.id, debouncedSearchTerm, sourceFilter, toast]);
 
+    // Fetch public foods with pagination
+    const fetchPublicFoods = useCallback(async (page = 0, append = false) => {
+        if (sourceFilter === 'custom') {
+            if (!append) {
+                setPublicFoods([]);
+                setPublicTotal(0);
+            }
+            return;
+        }
+
+        setLoadingPublic(true);
+        try {
+            const offset = page * ITEMS_PER_PAGE;
+            let query = supabase
+                .from('foods')
+                .select('*, food_measures(*)', { count: 'exact' })
+                .eq('is_active', true)
+                .neq('source', 'custom')
+                .is('nutritionist_id', null)
+                .order('name', { ascending: true })
+                .range(offset, offset + ITEMS_PER_PAGE - 1);
+
+            // Apply source filter
+            if (sourceFilter !== 'all') {
+                query = query.eq('source', sourceFilter);
+            }
+
+            // Apply search filter
+            if (debouncedSearchTerm.trim()) {
+                const searchLower = debouncedSearchTerm.toLowerCase();
+                query = query.or(`name.ilike.%${searchLower}%,group.ilike.%${searchLower}%,description.ilike.%${searchLower}%`);
+            }
+
+            const { data, error, count } = await query;
+
+            if (error) throw error;
+
+            if (append) {
+                setPublicFoods(prev => [...prev, ...(data || [])]);
+            } else {
+                setPublicFoods(data || []);
+            }
+            setPublicTotal(count || 0);
+        } catch (error) {
+            console.error('Erro ao buscar alimentos públicos:', error);
+            toast({
+                title: 'Erro',
+                description: 'Não foi possível carregar os alimentos públicos.',
+                variant: 'destructive'
+            });
+        } finally {
+            setLoadingPublic(false);
+        }
+    }, [debouncedSearchTerm, sourceFilter, toast]);
+
+    // Fetch stats
+    const fetchStats = useCallback(async () => {
+        try {
+            const [customResult, publicResult] = await Promise.all([
+                supabase
+                    .from('foods')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('is_active', true)
+                    .or(`source.eq.custom,nutritionist_id.eq.${user.id}`),
+                supabase
+                    .from('foods')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('is_active', true)
+                    .neq('source', 'custom')
+                    .is('nutritionist_id', null)
+            ]);
+            
+            return {
+                custom: customResult.count || 0,
+                public: publicResult.count || 0
+            };
+        } catch (error) {
+            console.error('Erro ao buscar estatísticas:', error);
+            return { custom: 0, public: 0 };
+        }
+    }, [user.id]);
+
+    const [stats, setStats] = useState({ custom: 0, public: 0 });
+
+    // Load initial data
     useEffect(() => {
-        fetchFoods();
-    }, [fetchFoods]);
+        const loadData = async () => {
+            setLoading(true);
+            const statsData = await fetchStats();
+            setStats(statsData);
+            await Promise.all([
+                fetchCustomFoods(0, false),
+                fetchPublicFoods(0, false)
+            ]);
+            setLoading(false);
+        };
+        loadData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    // Filter and search foods
-    const filteredFoods = useMemo(() => {
-        let filtered = foods;
-
-        // Apply search filter
-        if (debouncedSearchTerm.trim()) {
-            const searchLower = debouncedSearchTerm.toLowerCase();
-            filtered = filtered.filter(food =>
-                food.name.toLowerCase().includes(searchLower) ||
-                (food.group && food.group.toLowerCase().includes(searchLower)) ||
-                (food.description && food.description.toLowerCase().includes(searchLower))
-            );
-        }
-
-        // Separate custom foods from others
-        const customFoods = filtered.filter(food => 
-            food.source === 'custom' || food.nutritionist_id === user.id
-        );
-        const otherFoods = filtered.filter(food => 
-            food.source !== 'custom' && food.nutritionist_id !== user.id
-        );
-
-        return { customFoods, otherFoods, all: filtered };
-    }, [foods, debouncedSearchTerm, user.id]);
+    // Reload when filters change
+    useEffect(() => {
+        setCustomPage(0);
+        setPublicPage(0);
+        const reload = async () => {
+            await Promise.all([
+                fetchCustomFoods(0, false),
+                fetchPublicFoods(0, false)
+            ]);
+        };
+        reload();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [debouncedSearchTerm, sourceFilter]);
 
     // Handle view details
     const handleViewDetails = (food) => {
@@ -158,7 +261,11 @@ const FoodBankPage = () => {
                 description: 'Alimento excluído com sucesso.',
             });
 
-            fetchFoods();
+            // Reload data
+            setCustomPage(0);
+            fetchCustomFoods(0, false);
+            const statsData = await fetchStats();
+            setStats(statsData);
             setDeleteConfirmOpen(false);
             setFoodToDelete(null);
         } catch (error) {
@@ -172,9 +279,12 @@ const FoodBankPage = () => {
     };
 
     // Handle create success
-    const handleCreateSuccess = () => {
+    const handleCreateSuccess = async () => {
         setCreateDialogOpen(false);
-        fetchFoods();
+        setCustomPage(0);
+        await fetchCustomFoods(0, false);
+        const statsData = await fetchStats();
+        setStats(statsData);
         toast({
             title: 'Sucesso!',
             description: 'Alimento criado com sucesso.',
@@ -182,24 +292,35 @@ const FoodBankPage = () => {
     };
 
     // Handle edit success
-    const handleEditSuccess = () => {
+    const handleEditSuccess = async () => {
         setEditDialogOpen(false);
         setFoodToEdit(null);
-        fetchFoods();
+        setCustomPage(0);
+        await fetchCustomFoods(0, false);
+        const statsData = await fetchStats();
+        setStats(statsData);
         toast({
             title: 'Sucesso!',
             description: 'Alimento atualizado com sucesso.',
         });
     };
 
-    // Stats
-    const stats = useMemo(() => {
-        const customCount = foods.filter(f => 
-            f.source === 'custom' || f.nutritionist_id === user.id
-        ).length;
-        const totalCount = foods.length;
-        return { custom: customCount, total: totalCount };
-    }, [foods, user.id]);
+    // Pagination helpers
+    const customTotalPages = Math.ceil(customTotal / ITEMS_PER_PAGE);
+    const publicTotalPages = Math.ceil(publicTotal / ITEMS_PER_PAGE);
+    const customHasNext = customPage < customTotalPages - 1;
+    const customHasPrev = customPage > 0;
+    const publicHasNext = publicPage < publicTotalPages - 1;
+    const publicHasPrev = publicPage > 0;
+
+    // Split foods into 2 columns
+    const splitIntoColumns = (items) => {
+        const mid = Math.ceil(items.length / 2);
+        return [items.slice(0, mid), items.slice(mid)];
+    };
+
+    const customColumns = useMemo(() => splitIntoColumns(customFoods), [customFoods]);
+    const publicColumns = useMemo(() => splitIntoColumns(publicFoods), [publicFoods]);
 
     return (
         <div className="flex flex-col min-h-screen bg-background">
@@ -248,9 +369,9 @@ const FoodBankPage = () => {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">
-                                        Total de Alimentos
+                                        Banco de Dados Público
                                     </p>
-                                    <p className="text-3xl font-bold mt-1">{stats.total}</p>
+                                    <p className="text-3xl font-bold mt-1">{stats.public}</p>
                                 </div>
                                 <Database className="w-10 h-10 text-primary opacity-50" />
                             </div>
@@ -289,7 +410,7 @@ const FoodBankPage = () => {
                             {searchTerm && (
                                 <div className="flex items-center gap-2">
                                     <Badge variant="outline">
-                                        {filteredFoods.all.length} resultado(s) encontrado(s)
+                                        {customTotal + publicTotal} resultado(s) encontrado(s)
                                     </Badge>
                                     <Button
                                         variant="ghost"
@@ -319,98 +440,193 @@ const FoodBankPage = () => {
                     <Tabs defaultValue="all" className="w-full">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="all">
-                                Todos ({filteredFoods.all.length})
+                                Todos ({customTotal + publicTotal})
                             </TabsTrigger>
                             <TabsTrigger value="custom">
-                                Meus Alimentos ({filteredFoods.customFoods.length})
+                                Meus Alimentos ({customTotal})
                             </TabsTrigger>
                         </TabsList>
 
                         {/* Tab: All Foods */}
                         <TabsContent value="all" className="space-y-6 mt-6">
                             {/* Custom Foods Section - Always First */}
-                            {filteredFoods.customFoods.length > 0 && (
+                            {(sourceFilter === 'all' || sourceFilter === 'custom') && (
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-2">
-                                        <Package className="w-5 h-5 text-emerald-600" />
-                                        <h2 className="text-xl font-semibold">
-                                            Meus Alimentos Personalizados
-                                        </h2>
-                                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-                                            {filteredFoods.customFoods.length}
-                                        </Badge>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Package className="w-5 h-5 text-emerald-600" />
+                                            <h2 className="text-xl font-semibold">
+                                                Meus Alimentos Personalizados
+                                            </h2>
+                                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                                                {customTotal}
+                                            </Badge>
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {filteredFoods.customFoods.map((food) => (
-                                            <FoodCard
-                                                key={food.id}
-                                                food={food}
-                                                isCustom={true}
-                                                onView={handleViewDetails}
-                                                onEdit={handleEdit}
-                                                onDelete={handleDeleteClick}
-                                            />
-                                        ))}
-                                    </div>
+                                    
+                                    {loadingCustom ? (
+                                        <div className="flex justify-center py-8">
+                                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                                        </div>
+                                    ) : customFoods.length === 0 ? (
+                                        <Card>
+                                            <CardContent className="py-8 text-center">
+                                                <p className="text-sm text-muted-foreground">
+                                                    Nenhum alimento personalizado encontrado
+                                                </p>
+                                            </CardContent>
+                                        </Card>
+                                    ) : (
+                                        <>
+                                            {/* 2 Column Layout */}
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                {customColumns.map((column, colIndex) => (
+                                                    <div key={colIndex} className="space-y-2">
+                                                        {column.map((food) => (
+                                                            <FoodCardHorizontal
+                                                                key={food.id}
+                                                                food={food}
+                                                                isCustom={true}
+                                                                onView={handleViewDetails}
+                                                                onEdit={handleEdit}
+                                                                onDelete={handleDeleteClick}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            
+                                            {/* Pagination */}
+                                            {customTotalPages > 1 && (
+                                                <div className="flex items-center justify-between pt-4">
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Página {customPage + 1} de {customTotalPages}
+                                                    </p>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setCustomPage(prev => Math.max(0, prev - 1));
+                                                                fetchCustomFoods(Math.max(0, customPage - 1), false);
+                                                            }}
+                                                            disabled={!customHasPrev || loadingCustom}
+                                                        >
+                                                            <ChevronLeft className="w-4 h-4 mr-1" />
+                                                            Anterior
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setCustomPage(prev => prev + 1);
+                                                                fetchCustomFoods(customPage + 1, false);
+                                                            }}
+                                                            disabled={!customHasNext || loadingCustom}
+                                                        >
+                                                            Próxima
+                                                            <ChevronRight className="w-4 h-4 ml-1" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
                             )}
 
-                            {/* Other Foods Section */}
-                            {filteredFoods.otherFoods.length > 0 && (
+                            {/* Public Foods Section */}
+                            {(sourceFilter === 'all' || sourceFilter !== 'custom') && (
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-2">
-                                        <Database className="w-5 h-5 text-primary" />
-                                        <h2 className="text-xl font-semibold">
-                                            Banco de Dados Público
-                                        </h2>
-                                        <Badge variant="outline">
-                                            {filteredFoods.otherFoods.length}
-                                        </Badge>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Database className="w-5 h-5 text-primary" />
+                                            <h2 className="text-xl font-semibold">
+                                                Banco de Dados Público
+                                            </h2>
+                                            <Badge variant="outline">
+                                                {publicTotal}
+                                            </Badge>
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {filteredFoods.otherFoods.map((food) => (
-                                            <FoodCard
-                                                key={food.id}
-                                                food={food}
-                                                isCustom={false}
-                                                onView={handleViewDetails}
-                                            />
-                                        ))}
-                                    </div>
+                                    
+                                    {loadingPublic ? (
+                                        <div className="flex justify-center py-8">
+                                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                                        </div>
+                                    ) : publicFoods.length === 0 ? (
+                                        <Card>
+                                            <CardContent className="py-8 text-center">
+                                                <p className="text-sm text-muted-foreground">
+                                                    Nenhum alimento público encontrado
+                                                </p>
+                                            </CardContent>
+                                        </Card>
+                                    ) : (
+                                        <>
+                                            {/* 2 Column Layout */}
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                {publicColumns.map((column, colIndex) => (
+                                                    <div key={colIndex} className="space-y-2">
+                                                        {column.map((food) => (
+                                                            <FoodCardHorizontal
+                                                                key={food.id}
+                                                                food={food}
+                                                                isCustom={false}
+                                                                onView={handleViewDetails}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            
+                                            {/* Pagination */}
+                                            {publicTotalPages > 1 && (
+                                                <div className="flex items-center justify-between pt-4">
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Página {publicPage + 1} de {publicTotalPages}
+                                                    </p>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setPublicPage(prev => Math.max(0, prev - 1));
+                                                                fetchPublicFoods(Math.max(0, publicPage - 1), false);
+                                                            }}
+                                                            disabled={!publicHasPrev || loadingPublic}
+                                                        >
+                                                            <ChevronLeft className="w-4 h-4 mr-1" />
+                                                            Anterior
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setPublicPage(prev => prev + 1);
+                                                                fetchPublicFoods(publicPage + 1, false);
+                                                            }}
+                                                            disabled={!publicHasNext || loadingPublic}
+                                                        >
+                                                            Próxima
+                                                            <ChevronRight className="w-4 h-4 ml-1" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
-                            )}
-
-                            {/* Empty State */}
-                            {filteredFoods.all.length === 0 && (
-                                <Card>
-                                    <CardContent className="py-12 text-center">
-                                        <Database className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                                        <p className="text-sm text-muted-foreground">
-                                            {searchTerm
-                                                ? `Nenhum alimento encontrado para "${searchTerm}"`
-                                                : 'Nenhum alimento encontrado'}
-                                        </p>
-                                    </CardContent>
-                                </Card>
                             )}
                         </TabsContent>
 
                         {/* Tab: Custom Foods Only */}
                         <TabsContent value="custom" className="space-y-6 mt-6">
-                            {filteredFoods.customFoods.length > 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {filteredFoods.customFoods.map((food) => (
-                                        <FoodCard
-                                            key={food.id}
-                                            food={food}
-                                            isCustom={true}
-                                            onView={handleViewDetails}
-                                            onEdit={handleEdit}
-                                            onDelete={handleDeleteClick}
-                                        />
-                                    ))}
+                            {loadingCustom ? (
+                                <div className="flex justify-center py-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
                                 </div>
-                            ) : (
+                            ) : customFoods.length === 0 ? (
                                 <Card>
                                     <CardContent className="py-12 text-center">
                                         <Package className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
@@ -423,6 +639,59 @@ const FoodBankPage = () => {
                                         </Button>
                                     </CardContent>
                                 </Card>
+                            ) : (
+                                <>
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                        {customColumns.map((column, colIndex) => (
+                                            <div key={colIndex} className="space-y-2">
+                                                {column.map((food) => (
+                                                    <FoodCardHorizontal
+                                                        key={food.id}
+                                                        food={food}
+                                                        isCustom={true}
+                                                        onView={handleViewDetails}
+                                                        onEdit={handleEdit}
+                                                        onDelete={handleDeleteClick}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    
+                                    {customTotalPages > 1 && (
+                                        <div className="flex items-center justify-between pt-4">
+                                            <p className="text-sm text-muted-foreground">
+                                                Página {customPage + 1} de {customTotalPages}
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setCustomPage(prev => Math.max(0, prev - 1));
+                                                        fetchCustomFoods(Math.max(0, customPage - 1), false);
+                                                    }}
+                                                    disabled={!customHasPrev || loadingCustom}
+                                                >
+                                                    <ChevronLeft className="w-4 h-4 mr-1" />
+                                                    Anterior
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setCustomPage(prev => prev + 1);
+                                                        fetchCustomFoods(customPage + 1, false);
+                                                    }}
+                                                    disabled={!customHasNext || loadingCustom}
+                                                >
+                                                    Próxima
+                                                    <ChevronRight className="w-4 h-4 ml-1" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </TabsContent>
                     </Tabs>
