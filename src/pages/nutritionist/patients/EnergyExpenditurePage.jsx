@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calculator, Save, Loader2, Target, TrendingUp, Database, User } from 'lucide-react';
+import { ArrowLeft, Calculator, Save, Loader2, Target, TrendingUp, Database, User, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { ProtocolComparisonTable } from '@/components/energy';
 import ActivityLevelSelector from '@/components/energy/ActivityLevelSelector';
 import WeightProjectionCard from '@/components/energy/WeightProjectionCard';
 import CalculationInfoTooltip from '@/components/energy/CalculationInfoTooltip';
+import ExerciseSelector, { calculateExerciseCalories, EXERCISE_DATABASE } from '@/components/energy/ExerciseSelector';
 import { getLatestAnamnesisForEnergy, getActiveGoalForEnergy } from '@/lib/supabase/patient-queries';
 import { 
     calculateAllProtocols, 
@@ -54,6 +55,9 @@ const EnergyExpenditurePage = () => {
     // Goal (Deficit/Superavit)
     const [goalAdjustment, setGoalAdjustment] = useState(0); // -1000 to +1000
 
+    // Exercícios físicos
+    const [selectedExercises, setSelectedExercises] = useState([]);
+
     // Smart Defaults (sugestões baseadas em anamnese/objetivos)
     const [suggestedActivity, setSuggestedActivity] = useState(null);
     const [suggestedGoal, setSuggestedGoal] = useState(null);
@@ -64,6 +68,7 @@ const EnergyExpenditurePage = () => {
     const [selectedProtocolData, setSelectedProtocolData] = useState(null);
     const [finalGET, setFinalGET] = useState(0);
     const [goalCalories, setGoalCalories] = useState(0);
+    const [exerciseCalories, setExerciseCalories] = useState(0);
 
     // Carregar dados do paciente (SMART FETCHING)
     useEffect(() => {
@@ -77,14 +82,37 @@ const EnergyExpenditurePage = () => {
         }
     }, [weight, height, age, gender, leanMass]);
 
+    // Calcular calorias dos exercícios
+    useEffect(() => {
+        if (selectedExercises.length > 0 && weight) {
+            const totalWeekly = selectedExercises.reduce((total, exercise) => {
+                // Buscar MET do exercício na base de dados
+                const exerciseData = EXERCISE_DATABASE.find(e => e.id === exercise.id);
+                if (!exerciseData) return total;
+                
+                const caloriesPerSession = calculateExerciseCalories(
+                    exerciseData.met,
+                    parseFloat(weight),
+                    exercise.minutes
+                );
+                return total + (caloriesPerSession * exercise.daysPerWeek);
+            }, 0);
+            setExerciseCalories(totalWeekly / 7); // Média diária
+        } else {
+            setExerciseCalories(0);
+        }
+    }, [selectedExercises, weight]);
+
     // Atualizar GET final quando protocolo ou atividade mudar
     useEffect(() => {
         if (selectedProtocolData) {
             const get = calculateGET(selectedProtocolData.bmr, activityFactor);
             setFinalGET(get);
-            setGoalCalories(get + goalAdjustment);
+            // GET com exercícios = GET base + calorias médias diárias dos exercícios
+            const getWithExercises = get + exerciseCalories;
+            setGoalCalories(getWithExercises + goalAdjustment);
         }
-    }, [selectedProtocolData, activityFactor, goalAdjustment]);
+    }, [selectedProtocolData, activityFactor, goalAdjustment, exerciseCalories]);
 
     const loadPatientData = async () => {
         setLoading(true);
@@ -288,8 +316,13 @@ const EnergyExpenditurePage = () => {
                 'harris': 'harris-benedict',
                 'mifflin': 'mifflin-st-jeor',
                 'fao': 'fao-who',
+                'fao2001': 'fao-oms-2001',
+                'schofield': 'schofield',
+                'owen': 'owen',
                 'cunningham': 'cunningham',
-                'tinsley': 'tinsley'
+                'tinsley': 'tinsley',
+                'katch': 'katch-mcardle',
+                'delorenzo': 'de-lorenzo'
             };
 
             const dataToSave = {
@@ -303,6 +336,7 @@ const EnergyExpenditurePage = () => {
                 tmb: selectedProtocolData.bmr,
                 get: finalGET,
                 get_with_activities: goalCalories,
+                activities: selectedExercises.length > 0 ? selectedExercises : null,
                 updated_at: new Date().toISOString()
             };
 
@@ -387,7 +421,7 @@ const EnergyExpenditurePage = () => {
                 </div>
 
                 {/* Split View Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {/* LEFT COLUMN: Parameters */}
                     <div className="lg:col-span-1 space-y-6">
                         {/* Dados Biológicos */}
@@ -496,6 +530,29 @@ const EnergyExpenditurePage = () => {
                         </Card>
                     </div>
 
+                    {/* MIDDLE COLUMN: Exercises */}
+                    <div className="lg:col-span-1 space-y-6">
+                        {/* Exercícios Físicos */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Activity className="w-5 h-5" />
+                                    Exercícios Físicos
+                                </CardTitle>
+                                <CardDescription>
+                                    Adicione exercícios específicos para cálculo preciso
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ExerciseSelector
+                                    selectedExercises={selectedExercises}
+                                    onExercisesChange={setSelectedExercises}
+                                    patientWeight={parseFloat(weight) || 70}
+                                />
+                            </CardContent>
+                        </Card>
+                    </div>
+
                     {/* RIGHT COLUMN: The Lab & Strategy */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Comparativo Científico */}
@@ -585,10 +642,20 @@ const EnergyExpenditurePage = () => {
                                                 <p className="text-2xl font-bold text-primary mt-1">
                                                     {Math.round(finalGET)} <span className="text-base font-normal">kcal/dia</span>
                                                 </p>
+                                                {exerciseCalories > 0 && (
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        + {Math.round(exerciseCalories)} kcal/dia de exercícios
+                                                    </p>
+                                                )}
                                             </div>
                                             <div className="text-right text-sm text-muted-foreground">
                                                 <p>TMB: {Math.round(selectedProtocolData.bmr)} kcal</p>
                                                 <p>NAF: x{activityFactor}</p>
+                                                {exerciseCalories > 0 && (
+                                                    <p className="text-green-600 font-medium">
+                                                        + {Math.round(exerciseCalories)} kcal
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

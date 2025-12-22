@@ -53,24 +53,24 @@ export default function ActivityLevelSelector({ value, onChange }) {
                         onClick={() => onChange && onChange(factor.value)}
                     >
                         <CardContent className="p-4">
-                            <div className="flex flex-col items-center text-center space-y-2">
+                            <div className="flex flex-col items-center text-center space-y-2 min-h-[120px]">
                                 <Icon className={cn(
-                                    "w-8 h-8",
+                                    "w-8 h-8 flex-shrink-0",
                                     isSelected ? "text-primary" : "text-muted-foreground"
                                 )} />
-                                <div>
+                                <div className="flex-1 flex flex-col justify-center w-full">
                                     <p className={cn(
-                                        "font-semibold text-sm",
+                                        "font-semibold text-sm break-words",
                                         isSelected ? "text-foreground" : "text-muted-foreground"
                                     )}>
                                         {factor.label}
                                     </p>
-                                    <p className="text-xs text-muted-foreground mt-1">
+                                    <p className="text-xs text-muted-foreground mt-1 break-words line-clamp-2">
                                         {factor.desc}
                                     </p>
                                 </div>
                                 <div className={cn(
-                                    "text-xs font-mono px-2 py-1 rounded",
+                                    "text-xs font-mono px-2 py-1 rounded flex-shrink-0",
                                     isSelected 
                                         ? "bg-primary text-primary-foreground" 
                                         : "bg-muted text-muted-foreground"
