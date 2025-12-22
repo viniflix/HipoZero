@@ -1343,14 +1343,14 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
 
             {/* Dialog for Product Selection */}
             <Dialog open={showResultsDialog} onOpenChange={setShowResultsDialog}>
-                <DialogContent className="max-w-2xl max-h-[90vh] w-[95vw] sm:w-full p-4 sm:p-6">
-                    <DialogHeader className="pb-3">
+                <DialogContent className="max-w-2xl max-h-[90vh] w-[95vw] sm:w-full p-4 sm:p-6 overflow-hidden flex flex-col">
+                    <DialogHeader className="pb-3 flex-shrink-0">
                         <DialogTitle className="text-base sm:text-lg">Selecione o Produto</DialogTitle>
                         <DialogDescription className="text-xs sm:text-sm">
                             Encontramos {searchResults.length} produto(s). Selecione o produto correto para preencher os dados automaticamente.
                         </DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[calc(90vh-140px)] sm:max-h-[60vh] pr-2 sm:pr-4">
+                    <ScrollArea className="flex-1 min-h-0 pr-2 sm:pr-4">
                         <div className="space-y-2">
                             {searchResults.map((product) => (
                                 <Card
@@ -1359,7 +1359,7 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                     onClick={() => handleSelectProduct(product.code)}
                                 >
                                     <CardContent className="p-3 sm:p-4">
-                                        <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+                                        <div className="flex items-start gap-3 sm:gap-4">
                                             {product.image_url && (
                                                 <img
                                                     src={product.image_url}
@@ -1370,17 +1370,17 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                                     }}
                                                 />
                                             )}
-                                            <div className="flex-1 min-w-0 w-full sm:w-auto">
-                                                <h4 className="font-semibold text-xs sm:text-sm truncate">
+                                            <div className="flex-1 min-w-0 flex flex-col gap-1 pr-2">
+                                                <h4 className="font-semibold text-xs sm:text-sm break-words line-clamp-2 leading-tight">
                                                     {product.product_name || 'Produto sem nome'}
                                                 </h4>
                                                 {product.brands && (
-                                                    <p className="text-xs text-muted-foreground mt-1 truncate">
+                                                    <p className="text-xs text-muted-foreground break-words line-clamp-1">
                                                         Marca: {product.brands.split(',')[0].trim()}
                                                     </p>
                                                 )}
                                                 {product.code && (
-                                                    <p className="text-xs text-muted-foreground truncate">
+                                                    <p className="text-xs text-muted-foreground break-all">
                                                         Código: {product.code}
                                                     </p>
                                                 )}
@@ -1392,9 +1392,10 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                                     e.stopPropagation();
                                                     handleSelectProduct(product.code);
                                                 }}
-                                                className="w-full sm:w-auto flex-shrink-0 mt-2 sm:mt-0"
+                                                className="flex-shrink-0 self-start whitespace-nowrap"
                                             >
-                                                Selecionar
+                                                <span className="hidden sm:inline">Selecionar</span>
+                                                <span className="sm:hidden">OK</span>
                                             </Button>
                                         </div>
                                     </CardContent>
