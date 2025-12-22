@@ -70,7 +70,10 @@ export async function createAppointmentWithFinance(appointmentData, financialDat
     if (amount > 0 && description) {
         try {
             const appointmentDate = new Date(appointment_time);
-            transaction = await saveTransaction({
+            // Note: financial_records.appointment_id is UUID, but appointments.id is bigint
+            // Since there's no foreign key constraint, we'll store it as a reference
+            // Convert to string if needed, or omit if it causes issues
+            const transactionData = {
                 nutritionist_id,
                 patient_id,
                 type: 'income',
@@ -79,8 +82,15 @@ export async function createAppointmentWithFinance(appointmentData, financialDat
                 amount,
                 transaction_date: format(appointmentDate, 'yyyy-MM-dd'),
                 status: 'pending',
-                due_date: format(appointmentDate, 'yyyy-MM-dd')
-            });
+                due_date: format(appointmentDate, 'yyyy-MM-dd'),
+                service_id: service_id || null
+            };
+            
+            // Only add appointment_id if it's a valid UUID format
+            // Since appointments.id is bigint, we'll omit it to avoid type mismatch
+            // The relationship can be tracked via patient_id and date if needed
+            
+            transaction = await saveTransaction(transactionData);
         } catch (error) {
             console.error('Error creating financial transaction:', error);
             // Don't throw - appointment was created successfully
@@ -139,7 +149,13 @@ export async function deleteAppointment(appointmentId) {
 export async function getAppointments(nutritionistId, filters = {}) {
     let query = supabase
         .from('appointments')
-        .select('*, patient:user_profiles!appointments_patient_id_fkey(name, id)')
+        .select(`
+            *,
+            patient:user_profiles!appointments_patient_id_fkey(
+                id,
+                name
+            )
+        `)
         .eq('nutritionist_id', nutritionistId)
         .order('appointment_time', { ascending: true });
 

@@ -22,11 +22,12 @@ export default function TopPatientsWidget({ nutritionistId }) {
         try {
             // Fetch all paid income transactions
             const { data: transactions, error } = await supabase
-                .from('financial_transactions')
+                .from('financial_records')
                 .select(`
                     patient_id,
                     amount,
-                    patient:user_profiles!financial_transactions_patient_id_fkey(
+                    net_amount,
+                    patient:user_profiles!financial_records_patient_id_fkey(
                         id,
                         name,
                         avatar_url,
@@ -43,7 +44,7 @@ export default function TopPatientsWidget({ nutritionistId }) {
                 return;
             }
 
-            // Group by patient_id and sum amounts
+            // Group by patient_id and sum amounts (use net_amount if available, otherwise amount)
             const patientTotals = {};
             transactions.forEach(transaction => {
                 if (!transaction.patient_id) return;
@@ -55,7 +56,9 @@ export default function TopPatientsWidget({ nutritionistId }) {
                         total: 0
                     };
                 }
-                patientTotals[patientId].total += parseFloat(transaction.amount || 0);
+                // Use net_amount for income if available, otherwise use amount
+                const value = parseFloat(transaction.net_amount || transaction.amount || 0);
+                patientTotals[patientId].total += value;
             });
 
             // Convert to array, sort by total, and take top 3

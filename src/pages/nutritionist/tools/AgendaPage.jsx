@@ -47,7 +47,13 @@ export default function AgendaPage() {
         setLoading(true);
         const { data: apptsData, error: apptsError } = await supabase
             .from('appointments')
-            .select('*, patient:user_profiles!appointments_patient_id_fkey(name, id)')
+            .select(`
+                *,
+                patient:user_profiles!appointments_patient_id_fkey(
+                    id,
+                    name
+                )
+            `)
             .eq('nutritionist_id', user.id)
             .limit(1000);
 
