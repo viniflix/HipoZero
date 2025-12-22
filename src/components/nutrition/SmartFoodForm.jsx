@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/components/ui/use-toast';
 import { createFood } from '@/lib/supabase/foodService';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -86,10 +88,10 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
     // Other
     const [householdMeasures, setHouseholdMeasures] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [barcode, setBarcode] = useState('');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [barcodeLoading, setBarcodeLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const [searchLoading, setSearchLoading] = useState(false);
+    const [searchResults, setSearchResults] = useState([]);
+    const [showResultsDialog, setShowResultsDialog] = useState(false);
 
     // Pre-fill from initialData
     useEffect(() => {
@@ -122,6 +124,16 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             setFolate(initialData.folate?.toString() || '');
             setAutoCalcCalories(false);
             setInputMode('100g');
+            
+            // Load household measures if available
+            if (initialData.food_measures && Array.isArray(initialData.food_measures)) {
+                setHouseholdMeasures(
+                    initialData.food_measures.map(measure => ({
+                        label: measure.measure_label,
+                        grams: measure.quantity_grams
+                    }))
+                );
+            }
         } else if (initialName) {
             setName(initialName);
         }
@@ -151,12 +163,12 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             setCalories(Math.round(calculated * 100) / 100);
         }
     }, [protein, carbs, fat, autoCalcCalories, inputMode, labelPortionSize]);
-
+            
     // Helper function to normalize a value
     const normalizeValue = (value) => {
         if (!value) return null;
-        if (inputMode === 'portion' && labelPortionSize > 0) {
-            const factor = 100 / labelPortionSize;
+            if (inputMode === 'portion' && labelPortionSize > 0) {
+                const factor = 100 / labelPortionSize;
             return parseFloat(value) * factor;
         }
         return parseFloat(value);
@@ -280,20 +292,30 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
         setLabelPortionSize(100);
     };
 
-    // Fetch product by barcode
-    const handleFetchBarcode = async () => {
-        if (!barcode.trim()) {
+    // Check if query is a barcode (only numbers, 8-13 digits)
+    const isBarcode = (query) => {
+        const cleaned = query.trim().replace(/\s/g, '');
+        return /^\d{8,13}$/.test(cleaned);
+    };
+
+    // Unified search handler
+    const handleSearch = async () => {
+        if (!searchQuery.trim()) {
             toast({
                 title: 'Erro',
-                description: 'Digite um código de barras válido.',
+                description: 'Digite um código de barras ou nome do produto.',
                 variant: 'destructive'
             });
             return;
         }
 
-        setBarcodeLoading(true);
-        try {
-            const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode.trim()}.json`);
+        const query = searchQuery.trim();
+        
+        // If it's a barcode, search directly
+        if (isBarcode(query)) {
+            setSearchLoading(true);
+            try {
+                const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${query}.json`);
             const data = await response.json();
 
             if (data.status === 0 || !data.product) {
@@ -305,64 +327,107 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                 return;
             }
 
-            fillFormWithProduct(data.product);
+                fillFormWithProduct(data.product);
+                setSearchQuery('');
 
+                toast({
+                    title: 'Produto encontrado!',
+                    description: 'Campos preenchidos automaticamente.',
+                });
+            } catch (error) {
+                console.error('Erro ao buscar produto:', error);
+                toast({
+                    title: 'Erro',
+                    description: 'Não foi possível buscar o produto. Verifique sua conexão.',
+                    variant: 'destructive'
+                });
+            } finally {
+                setSearchLoading(false);
+            }
+        } else {
+            // If it's a name, search and show results
+            if (query.length < 3) {
+                toast({
+                    title: 'Erro',
+                    description: 'Digite pelo menos 3 caracteres para buscar por nome.',
+                    variant: 'destructive'
+                });
+                return;
+            }
+
+            setSearchLoading(true);
+            try {
+                const response = await fetch(
+                    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&json=1&page_size=20&fields=product_name,brands,code,image_url,nutriments`
+                );
+                const data = await response.json();
+
+                if (!data.products || data.products.length === 0) {
+                    toast({
+                        title: 'Nenhum produto encontrado',
+                        description: 'Não foi possível encontrar produtos com este nome no OpenFoodFacts.',
+                        variant: 'default'
+                    });
+                    return;
+                }
+
+                // Filter products with valid names
+                const validProducts = data.products.filter(p => p.product_name && p.product_name.trim().length > 0);
+                
+                if (validProducts.length === 0) {
             toast({
-                title: 'Produto encontrado!',
-                description: 'Campos preenchidos automaticamente.',
+                        title: 'Nenhum produto válido encontrado',
+                        description: 'Os produtos encontrados não possuem informações suficientes.',
+                        variant: 'default'
             });
+                    return;
+                }
+
+                setSearchResults(validProducts);
+                setShowResultsDialog(true);
         } catch (error) {
-            console.error('Erro ao buscar produto:', error);
+                console.error('Erro ao buscar produtos:', error);
             toast({
                 title: 'Erro',
-                description: 'Não foi possível buscar o produto. Verifique sua conexão.',
+                    description: 'Não foi possível buscar produtos. Verifique sua conexão.',
                 variant: 'destructive'
             });
         } finally {
-            setBarcodeLoading(false);
+                setSearchLoading(false);
+            }
         }
     };
 
-    // Search product by name
-    const handleSearchProduct = async () => {
-        if (!searchTerm.trim() || searchTerm.length < 3) {
+    // Handle product selection from results
+    const handleSelectProduct = async (productCode) => {
+        setSearchLoading(true);
+        try {
+            const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${productCode}.json`);
+            const data = await response.json();
+
+            if (data.status === 0 || !data.product) {
             toast({
                 title: 'Erro',
-                description: 'Digite pelo menos 3 caracteres para buscar.',
+                    description: 'Não foi possível carregar os dados do produto selecionado.',
                 variant: 'destructive'
             });
             return;
         }
 
-        setSearchLoading(true);
-        try {
-            const response = await fetch(
-                `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(searchTerm.trim())}&json=1&page_size=1`
-            );
-            const data = await response.json();
-
-            if (!data.products || data.products.length === 0) {
-                toast({
-                    title: 'Produto não encontrado',
-                    description: 'Não foi possível encontrar este produto no OpenFoodFacts.',
-                    variant: 'default'
-                });
-                return;
-            }
-
-            // Use first result
-            const product = data.products[0];
-            fillFormWithProduct(product);
+            fillFormWithProduct(data.product);
+            setSearchQuery('');
+            setShowResultsDialog(false);
+            setSearchResults([]);
 
             toast({
-                title: 'Produto encontrado!',
-                description: `${product.product_name || 'Produto'} encontrado e preenchido automaticamente.`,
+                title: 'Produto selecionado!',
+                description: 'Campos preenchidos automaticamente.',
             });
         } catch (error) {
-            console.error('Erro ao buscar produto:', error);
+            console.error('Erro ao carregar produto:', error);
             toast({
                 title: 'Erro',
-                description: 'Não foi possível buscar o produto. Verifique sua conexão.',
+                description: 'Não foi possível carregar o produto. Verifique sua conexão.',
                 variant: 'destructive'
             });
         } finally {
@@ -517,99 +582,14 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                     Passo {currentStep} de {totalSteps}: {stepTitles[currentStep - 1]}
                                 </span>
                                 <span className="text-muted-foreground">{Math.round(progress)}%</span>
-                            </div>
+                    </div>
                             <Progress value={progress} className="h-2" />
-                        </div>
+                </div>
                     </CardContent>
                 </Card>
             )}
 
-            {/* Search Section - Only in full mode and step 1 */}
-            {mode !== 'compact' && currentStep === 1 && (
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <Search className="h-4 w-4" />
-                            Buscar Produto no OpenFoodFacts
-                        </CardTitle>
-                        <CardDescription>
-                            Busque por código de barras ou nome do produto para preencher automaticamente
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="barcode">Código de Barras (EAN)</Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    id="barcode"
-                                    placeholder="Ex: 7891000100103"
-                                    value={barcode}
-                                    onChange={(e) => setBarcode(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            handleFetchBarcode();
-                                        }
-                                    }}
-                                />
-                                <Button
-                                    onClick={handleFetchBarcode}
-                                    disabled={barcodeLoading || !barcode.trim()}
-                                    variant="outline"
-                                >
-                                    {barcodeLoading ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <>
-                                            <Barcode className="h-4 w-4 mr-2" />
-                                            Buscar
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </div>
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t" />
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-background px-2 text-muted-foreground">ou</span>
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="searchTerm">Nome do Produto</Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    id="searchTerm"
-                                    placeholder="Ex: Nutella"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            handleSearchProduct();
-                                        }
-                                    }}
-                                />
-                                <Button
-                                    onClick={handleSearchProduct}
-                                    disabled={searchLoading || !searchTerm.trim() || searchTerm.length < 3}
-                                    variant="outline"
-                                >
-                                    {searchLoading ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <>
-                                            <Search className="h-4 w-4 mr-2" />
-                                            Buscar
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Step Content */}
+            {/* Step Content - Show first */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-base">
@@ -631,159 +611,159 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                     {/* STEP 1: Basic Info */}
                     {currentStep === 1 && (
                         <div className="space-y-4">
-                            <div className="space-y-2">
+                <div className="space-y-2">
                                 <Label htmlFor="name">
                                     Nome do Alimento <span className="text-destructive">*</span>
                                 </Label>
-                                <Input
-                                    id="name"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    placeholder="Ex: Bolo de Chocolate"
-                                    autoFocus={!initialData}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="brand">Marca (opcional)</Label>
-                                <Input
-                                    id="brand"
-                                    value={brand}
-                                    onChange={(e) => setBrand(e.target.value)}
-                                    placeholder="Ex: Marca X"
-                                />
-                            </div>
-                        </div>
+                    <Input
+                        id="name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Ex: Bolo de Chocolate"
+                        autoFocus={!initialData}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="brand">Marca (opcional)</Label>
+                    <Input
+                        id="brand"
+                        value={brand}
+                        onChange={(e) => setBrand(e.target.value)}
+                        placeholder="Ex: Marca X"
+                    />
+                </div>
+            </div>
                     )}
 
                     {/* STEP 2: Macronutrients */}
                     {currentStep === 2 && (
                         <div className="space-y-4">
-                            <Tabs value={inputMode} onValueChange={setInputMode} className="w-full">
-                                <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="100g">Dados por 100g</TabsTrigger>
-                                    <TabsTrigger value="portion">Dados do Rótulo (Porção)</TabsTrigger>
-                                </TabsList>
-                                
-                                <TabsContent value="100g" className="space-y-4 mt-4">
+                <Tabs value={inputMode} onValueChange={setInputMode} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="100g">Dados por 100g</TabsTrigger>
+                        <TabsTrigger value="portion">Dados do Rótulo (Porção)</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="100g" className="space-y-4 mt-4">
                                     <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                                         <p className="text-sm text-blue-900 dark:text-blue-100 flex items-center gap-2">
                                             <Info className="h-4 w-4" />
-                                            Informe os valores nutricionais por 100g do alimento
-                                        </p>
+                            Informe os valores nutricionais por 100g do alimento
+                        </p>
                                     </div>
-                                </TabsContent>
-                                
-                                <TabsContent value="portion" className="space-y-4 mt-4">
-                                    <div className="space-y-2">
+                    </TabsContent>
+                    
+                    <TabsContent value="portion" className="space-y-4 mt-4">
+                        <div className="space-y-2">
                                         <Label htmlFor="labelPortionSize">
                                             Tamanho da Porção do Rótulo (g) <span className="text-destructive">*</span>
                                         </Label>
-                                        <Input
-                                            id="labelPortionSize"
-                                            type="number"
-                                            value={labelPortionSize}
-                                            onChange={(e) => setLabelPortionSize(e.target.value)}
-                                            placeholder="Ex: 30"
-                                        />
-                                    </div>
-                                    {normalizedValues && (
+                            <Input
+                                id="labelPortionSize"
+                                type="number"
+                                value={labelPortionSize}
+                                onChange={(e) => setLabelPortionSize(e.target.value)}
+                                placeholder="Ex: 30"
+                            />
+                        </div>
+                        {normalizedValues && (
                                         <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
                                             <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-100 mb-2">
-                                                Equivalente por 100g:
-                                            </p>
+                                    Equivalente por 100g:
+                                </p>
                                             <div className="text-xs text-emerald-800 dark:text-emerald-200 space-y-1">
-                                                <p>Proteína: {normalizedValues.protein}g</p>
-                                                <p>Carboidratos: {normalizedValues.carbs}g</p>
-                                                <p>Gorduras: {normalizedValues.fat}g</p>
-                                                {normalizedValues.calories && (
-                                                    <p>Calorias: {normalizedValues.calories} kcal</p>
-                                                )}
-                                            </div>
-                                        </div>
+                                    <p>Proteína: {normalizedValues.protein}g</p>
+                                    <p>Carboidratos: {normalizedValues.carbs}g</p>
+                                    <p>Gorduras: {normalizedValues.fat}g</p>
+                                    {normalizedValues.calories && (
+                                        <p>Calorias: {normalizedValues.calories} kcal</p>
                                     )}
-                                </TabsContent>
-                            </Tabs>
-
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="protein">
-                                        Proteína (g) <span className="text-destructive">*</span>
-                                    </Label>
-                                    <Input
-                                        id="protein"
-                                        type="number"
-                                        step="0.1"
-                                        value={protein}
-                                        onChange={(e) => setProtein(e.target.value)}
-                                        placeholder="0"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="carbs">
-                                        Carboidratos (g) <span className="text-destructive">*</span>
-                                    </Label>
-                                    <Input
-                                        id="carbs"
-                                        type="number"
-                                        step="0.1"
-                                        value={carbs}
-                                        onChange={(e) => setCarbs(e.target.value)}
-                                        placeholder="0"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="fat">
-                                        Gorduras (g) <span className="text-destructive">*</span>
-                                    </Label>
-                                    <Input
-                                        id="fat"
-                                        type="number"
-                                        step="0.1"
-                                        value={fat}
-                                        onChange={(e) => setFat(e.target.value)}
-                                        placeholder="0"
-                                    />
                                 </div>
                             </div>
+                        )}
+                    </TabsContent>
+                </Tabs>
 
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="protein">
+                                        Proteína (g) <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                            id="protein"
+                            type="number"
+                            step="0.1"
+                            value={protein}
+                            onChange={(e) => setProtein(e.target.value)}
+                            placeholder="0"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="carbs">
+                                        Carboidratos (g) <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                            id="carbs"
+                            type="number"
+                            step="0.1"
+                            value={carbs}
+                            onChange={(e) => setCarbs(e.target.value)}
+                            placeholder="0"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="fat">
+                                        Gorduras (g) <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                            id="fat"
+                            type="number"
+                            step="0.1"
+                            value={fat}
+                            onChange={(e) => setFat(e.target.value)}
+                            placeholder="0"
+                        />
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
                                     <Label htmlFor="calories">
                                         Calorias (kcal) <span className="text-destructive">*</span>
                                     </Label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            id="autoCalc"
-                                            checked={autoCalcCalories}
-                                            onChange={(e) => setAutoCalcCalories(e.target.checked)}
-                                            className="w-4 h-4"
-                                        />
-                                        <Label htmlFor="autoCalc" className="text-sm font-normal cursor-pointer">
-                                            Calcular automaticamente
-                                        </Label>
-                                    </div>
-                                </div>
-                                <Input
-                                    id="calories"
-                                    type="number"
-                                    step="0.1"
-                                    value={calories}
-                                    onChange={(e) => {
-                                        setCalories(e.target.value);
-                                        setAutoCalcCalories(false);
-                                    }}
-                                    placeholder="0"
-                                    disabled={autoCalcCalories}
-                                    className={autoCalcCalories ? 'bg-muted' : ''}
-                                />
-                                {autoCalcCalories && (
-                                    <p className="text-xs text-muted-foreground">
-                                        Cálculo: (Proteína × 4) + (Carboidratos × 4) + (Gorduras × 9)
-                                    </p>
-                                )}
-                            </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="autoCalc"
+                                checked={autoCalcCalories}
+                                onChange={(e) => setAutoCalcCalories(e.target.checked)}
+                                className="w-4 h-4"
+                            />
+                            <Label htmlFor="autoCalc" className="text-sm font-normal cursor-pointer">
+                                Calcular automaticamente
+                            </Label>
                         </div>
+                    </div>
+                    <Input
+                        id="calories"
+                        type="number"
+                        step="0.1"
+                        value={calories}
+                        onChange={(e) => {
+                            setCalories(e.target.value);
+                            setAutoCalcCalories(false);
+                        }}
+                        placeholder="0"
+                        disabled={autoCalcCalories}
+                        className={autoCalcCalories ? 'bg-muted' : ''}
+                    />
+                    {autoCalcCalories && (
+                        <p className="text-xs text-muted-foreground">
+                            Cálculo: (Proteína × 4) + (Carboidratos × 4) + (Gorduras × 9)
+                        </p>
+                    )}
+                </div>
+            </div>
                     )}
 
                     {/* STEP 3: Additional Macronutrients */}
@@ -1051,48 +1031,162 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                     Esta etapa é opcional. Você pode pular se não quiser adicionar medidas caseiras.
                                 </p>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                                {commonMeasures.map((measure, idx) => (
-                                    <Badge
-                                        key={idx}
-                                        variant="outline"
-                                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors px-3 py-1"
-                                        onClick={() => handleAddMeasure(measure)}
+                <div className="flex flex-wrap gap-2">
+                    {commonMeasures.map((measure, idx) => (
+                        <Badge
+                            key={idx}
+                            variant="outline"
+                            className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors px-3 py-1"
+                            onClick={() => handleAddMeasure(measure)}
+                        >
+                            <Plus className="h-3 w-3 mr-1" />
+                            {measure.label} ({measure.grams}g)
+                        </Badge>
+                    ))}
+                </div>
+                {householdMeasures.length > 0 && (
+                    <div className="space-y-2">
+                        <Label className="text-sm">Medidas Adicionadas:</Label>
+                        <div className="space-y-2">
+                            {householdMeasures.map((measure, idx) => (
+                                <div
+                                    key={idx}
+                                    className="flex items-center justify-between p-2 border rounded-lg bg-muted/30"
+                                >
+                                    <span className="text-sm">
+                                        {measure.label} - {measure.grams}g
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRemoveMeasure(idx)}
+                                        className="h-6 w-6 p-0"
                                     >
-                                        <Plus className="h-3 w-3 mr-1" />
-                                        {measure.label} ({measure.grams}g)
-                                    </Badge>
-                                ))}
-                            </div>
-                            {householdMeasures.length > 0 && (
-                                <div className="space-y-2">
-                                    <Label className="text-sm">Medidas Adicionadas:</Label>
-                                    <div className="space-y-2">
-                                        {householdMeasures.map((measure, idx) => (
-                                            <div
-                                                key={idx}
-                                                className="flex items-center justify-between p-2 border rounded-lg bg-muted/30"
-                                            >
-                                                <span className="text-sm">
-                                                    {measure.label} - {measure.grams}g
-                                                </span>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleRemoveMeasure(idx)}
-                                                    className="h-6 w-6 p-0"
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
+                                        <X className="h-3 w-3" />
+                                    </Button>
                                 </div>
-                            )}
+                            ))}
                         </div>
+                    </div>
+                )}
+            </div>
                     )}
                 </CardContent>
             </Card>
+
+            {/* Search Section - Only in full mode and step 1, below wizard */}
+            {mode !== 'compact' && currentStep === 1 && (
+                <Card className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2 text-green-900 dark:text-green-100">
+                            <Search className="h-4 w-4" />
+                            Buscar no Banco de Alimentos Públicos
+                        </CardTitle>
+                        <CardDescription className="text-green-800 dark:text-green-200">
+                            <p className="mb-1">Busque por código de barras (EAN) ou nome do produto</p>
+                            <p className="text-xs mt-1 opacity-75">
+                                Utilizamos a plataforma OpenFoodFacts. Os dados podem ter imprecisões e devem ser verificados.
+                            </p>
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="flex gap-2">
+                            <Input
+                                id="searchQuery"
+                                placeholder="Digite o código de barras (ex: 7891000100103) ou nome do produto (ex: Whey Protein)"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !searchLoading) {
+                                        handleSearch();
+                                    }
+                                }}
+                                className="flex-1"
+                            />
+                            <Button
+                                onClick={handleSearch}
+                                disabled={searchLoading || !searchQuery.trim()}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                {searchLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <>
+                                        <Search className="h-4 w-4 mr-2" />
+                                        Buscar
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                        <p className="text-xs text-green-700 dark:text-green-300">
+                            💡 Dica: Digite apenas números para buscar por código de barras, ou texto para buscar por nome do produto
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Dialog for Product Selection */}
+            <Dialog open={showResultsDialog} onOpenChange={setShowResultsDialog}>
+                <DialogContent className="max-w-2xl max-h-[80vh]">
+                    <DialogHeader>
+                        <DialogTitle>Selecione o Produto</DialogTitle>
+                        <DialogDescription>
+                            Encontramos {searchResults.length} produto(s). Selecione o produto correto para preencher os dados automaticamente.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <ScrollArea className="max-h-[60vh] pr-4">
+                        <div className="space-y-2">
+                            {searchResults.map((product) => (
+                                <Card
+                                    key={product.code}
+                                    className="cursor-pointer hover:bg-muted transition-colors"
+                                    onClick={() => handleSelectProduct(product.code)}
+                                >
+                                    <CardContent className="p-4">
+                                        <div className="flex items-start gap-4">
+                                            {product.image_url && (
+                                                <img
+                                                    src={product.image_url}
+                                                    alt={product.product_name}
+                                                    className="w-16 h-16 object-cover rounded-lg"
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                    }}
+                                                />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-semibold text-sm truncate">
+                                                    {product.product_name || 'Produto sem nome'}
+                                                </h4>
+                                                {product.brands && (
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        Marca: {product.brands.split(',')[0].trim()}
+                                                    </p>
+                                                )}
+                                                {product.code && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Código: {product.code}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSelectProduct(product.code);
+                                                }}
+                                            >
+                                                Selecionar
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </DialogContent>
+            </Dialog>
 
             {/* Navigation Buttons - Always show in full mode */}
             {mode !== 'compact' && (
@@ -1138,20 +1232,20 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                         disabled={loading}
                                         size="lg"
                                     >
-                                        {loading ? (
-                                            <>
-                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                                {initialData ? 'Atualizando...' : 'Criando...'}
-                                            </>
-                                        ) : (
-                                            <>
+                        {loading ? (
+                            <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                {initialData ? 'Atualizando...' : 'Criando...'}
+                            </>
+                        ) : (
+                            <>
                                                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                {initialData ? 'Atualizar Alimento' : 'Criar Alimento'}
-                                            </>
-                                        )}
-                                    </Button>
+                                {initialData ? 'Atualizar Alimento' : 'Criar Alimento'}
+                            </>
+                        )}
+                    </Button>
                                 )}
-                            </div>
+                </div>
                         </div>
                     </CardContent>
                 </Card>
