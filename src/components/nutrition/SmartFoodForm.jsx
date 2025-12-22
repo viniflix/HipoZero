@@ -1,22 +1,26 @@
 import React, { useState, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
-import { Plus, X, Calculator, Barcode, Loader2 } from 'lucide-react';
+import { Plus, X, Calculator, Barcode, Loader2, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/components/ui/use-toast';
 import { createFood } from '@/lib/supabase/foodService';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 
 /**
- * SmartFoodForm - Formulário inteligente para criar/editar alimentos
+ * SmartFoodForm - Formulário inteligente e intuitivo para criar/editar alimentos
  * 
  * Features:
  * - Busca por código de barras (OpenFoodFacts)
  * - Auto-cálculo de calorias baseado em macros
  * - Conversão automática de porção do rótulo para 100g
+ * - Suporte completo a micronutrientes
+ * - Layout organizado em tabs para melhor UX
  * - Adição rápida de medidas caseiras comuns
  * 
  * @param {Object} props
@@ -34,34 +38,91 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
     const { toast } = useToast();
     const { user } = useAuth();
     
+    // Basic Info
     const [name, setName] = useState('');
     const [brand, setBrand] = useState('');
+    
+    // Input Mode
     const [inputMode, setInputMode] = useState('100g'); // '100g' | 'portion'
-    const [labelPortionSize, setLabelPortionSize] = useState(100); // Tamanho da porção do rótulo
+    const [labelPortionSize, setLabelPortionSize] = useState(100);
+    
+    // Macronutrients
     const [protein, setProtein] = useState('');
     const [carbs, setCarbs] = useState('');
     const [fat, setFat] = useState('');
     const [calories, setCalories] = useState('');
     const [autoCalcCalories, setAutoCalcCalories] = useState(true);
+    
+    // Additional Macronutrients
+    const [fiber, setFiber] = useState('');
+    const [sugar, setSugar] = useState('');
+    const [saturatedFat, setSaturatedFat] = useState('');
+    const [transFat, setTransFat] = useState('');
+    const [monounsaturatedFat, setMonounsaturatedFat] = useState('');
+    const [polyunsaturatedFat, setPolyunsaturatedFat] = useState('');
+    const [cholesterol, setCholesterol] = useState('');
+    const [sodium, setSodium] = useState('');
+    
+    // Minerals
+    const [calcium, setCalcium] = useState('');
+    const [iron, setIron] = useState('');
+    const [magnesium, setMagnesium] = useState('');
+    const [phosphorus, setPhosphorus] = useState('');
+    const [potassium, setPotassium] = useState('');
+    const [zinc, setZinc] = useState('');
+    
+    // Vitamins
+    const [vitaminA, setVitaminA] = useState('');
+    const [vitaminC, setVitaminC] = useState('');
+    const [vitaminD, setVitaminD] = useState('');
+    const [vitaminE, setVitaminE] = useState('');
+    const [vitaminB12, setVitaminB12] = useState('');
+    const [folate, setFolate] = useState('');
+    
+    // Other
     const [householdMeasures, setHouseholdMeasures] = useState([]);
     const [loading, setLoading] = useState(false);
     const [barcode, setBarcode] = useState('');
     const [barcodeLoading, setBarcodeLoading] = useState(false);
+    const [showMicronutrients, setShowMicronutrients] = useState(false);
 
     // Pre-fill from initialData (for editing) or initialName (for quick-add)
     useEffect(() => {
         if (initialData) {
-            // Edit mode: load existing food data
             setName(initialData.name || '');
             setBrand(initialData.description?.replace('Marca: ', '') || '');
             setProtein(initialData.protein?.toString() || '');
             setCarbs(initialData.carbs?.toString() || '');
             setFat(initialData.fat?.toString() || '');
             setCalories(initialData.calories?.toString() || '');
-            setAutoCalcCalories(false); // Don't auto-calc when editing
-            setInputMode('100g'); // Always 100g when editing (already normalized)
+            setFiber(initialData.fiber?.toString() || '');
+            setSodium(initialData.sodium?.toString() || '');
+            setSugar(initialData.sugar?.toString() || '');
+            setSaturatedFat(initialData.saturated_fat?.toString() || '');
+            setTransFat(initialData.trans_fat?.toString() || '');
+            setMonounsaturatedFat(initialData.monounsaturated_fat?.toString() || '');
+            setPolyunsaturatedFat(initialData.polyunsaturated_fat?.toString() || '');
+            setCholesterol(initialData.cholesterol?.toString() || '');
+            setCalcium(initialData.calcium?.toString() || '');
+            setIron(initialData.iron?.toString() || '');
+            setMagnesium(initialData.magnesium?.toString() || '');
+            setPhosphorus(initialData.phosphorus?.toString() || '');
+            setPotassium(initialData.potassium?.toString() || '');
+            setZinc(initialData.zinc?.toString() || '');
+            setVitaminA(initialData.vitamin_a?.toString() || '');
+            setVitaminC(initialData.vitamin_c?.toString() || '');
+            setVitaminD(initialData.vitamin_d?.toString() || '');
+            setVitaminE(initialData.vitamin_e?.toString() || '');
+            setVitaminB12(initialData.vitamin_b12?.toString() || '');
+            setFolate(initialData.folate?.toString() || '');
+            setAutoCalcCalories(false);
+            setInputMode('100g');
+            
+            // Show micronutrients if any exist
+            if (initialData.fiber || initialData.sodium || initialData.calcium || initialData.iron) {
+                setShowMicronutrients(true);
+            }
         } else if (initialName) {
-            // Quick-add mode: pre-fill name
             setName(initialName);
         }
     }, [initialData, initialName]);
@@ -87,14 +148,20 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             let carbsVal = parseFloat(carbs) || 0;
             let fatVal = parseFloat(fat) || 0;
             
-            // Always calculate calories directly from the entered macros
-            // Calories = (Protein × 4) + (Carbs × 4) + (Fat × 9)
-            // In portion mode, this gives calories for the portion size
-            // In 100g mode, this gives calories for 100g
             const calculated = (proteinVal * 4) + (carbsVal * 4) + (fatVal * 9);
-            setCalories(Math.round(calculated * 100) / 100); // Round to 2 decimals
+            setCalories(Math.round(calculated * 100) / 100);
         }
     }, [protein, carbs, fat, autoCalcCalories, inputMode, labelPortionSize]);
+
+    // Helper function to normalize a value based on input mode
+    const normalizeValue = (value) => {
+        if (!value) return null;
+        if (inputMode === 'portion' && labelPortionSize > 0) {
+            const factor = 100 / labelPortionSize;
+            return parseFloat(value) * factor;
+        }
+        return parseFloat(value);
+    };
 
     // Pre-defined common household measures
     const commonMeasures = [
@@ -107,7 +174,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
     ];
 
     const handleAddMeasure = (measure) => {
-        // Check if measure already exists
         const exists = householdMeasures.some(m => m.label === measure.label);
         if (exists) {
             toast({
@@ -117,7 +183,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             });
             return;
         }
-
         setHouseholdMeasures([...householdMeasures, measure]);
     };
 
@@ -153,33 +218,28 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             const product = data.product;
             const nutriments = product.nutriments || {};
 
-            // Map OpenFoodFacts data to our fields
-            if (product.product_name) {
-                setName(product.product_name);
-            }
-            if (product.brands) {
-                setBrand(product.brands.split(',')[0].trim()); // Take first brand
-            }
-            if (nutriments.proteins_100g !== undefined) {
-                setProtein(nutriments.proteins_100g.toString());
-            }
-            if (nutriments.carbohydrates_100g !== undefined) {
-                setCarbs(nutriments.carbohydrates_100g.toString());
-            }
-            if (nutriments.fat_100g !== undefined) {
-                setFat(nutriments.fat_100g.toString());
-            }
+            if (product.product_name) setName(product.product_name);
+            if (product.brands) setBrand(product.brands.split(',')[0].trim());
+            if (nutriments.proteins_100g !== undefined) setProtein(nutriments.proteins_100g.toString());
+            if (nutriments.carbohydrates_100g !== undefined) setCarbs(nutriments.carbohydrates_100g.toString());
+            if (nutriments.fat_100g !== undefined) setFat(nutriments.fat_100g.toString());
+            if (nutriments.fiber_100g !== undefined) setFiber(nutriments.fiber_100g.toString());
+            if (nutriments.sodium_100g !== undefined) setSodium((nutriments.sodium_100g * 1000).toString()); // Convert to mg
+            if (nutriments.sugars_100g !== undefined) setSugar(nutriments.sugars_100g.toString());
+            if (nutriments.saturated_fat_100g !== undefined) setSaturatedFat(nutriments.saturated_fat_100g.toString());
+            if (nutriments.calcium_100g !== undefined) setCalcium((nutriments.calcium_100g * 1000).toString()); // Convert to mg
+            if (nutriments.iron_100g !== undefined) setIron((nutriments.iron_100g * 1000).toString()); // Convert to mg
+            if (nutriments.vitamin_c_100g !== undefined) setVitaminC((nutriments.vitamin_c_100g * 1000).toString()); // Convert to mg
+
             if (nutriments.energy_kcal_100g !== undefined) {
                 setCalories(nutriments.energy_kcal_100g.toString());
-                setAutoCalcCalories(false); // Use API value
+                setAutoCalcCalories(false);
             } else if (nutriments.energy_100g !== undefined) {
-                // Convert kJ to kcal (1 kcal = 4.184 kJ)
                 const kcal = nutriments.energy_100g / 4.184;
                 setCalories(kcal.toFixed(2));
                 setAutoCalcCalories(false);
             }
 
-            // Set input mode to 100g (OpenFoodFacts provides per 100g)
             setInputMode('100g');
             setLabelPortionSize(100);
 
@@ -200,7 +260,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
     };
 
     const handleSubmit = async () => {
-        // Validation
         if (!name.trim()) {
             toast({
                 title: 'Erro',
@@ -213,13 +272,12 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
         if (!protein || !carbs || !fat || !calories) {
             toast({
                 title: 'Erro',
-                description: 'Preencha todos os valores nutricionais.',
+                description: 'Preencha todos os valores nutricionais básicos (Proteína, Carboidratos, Gorduras, Calorias).',
                 variant: 'destructive'
             });
             return;
         }
 
-        // Validate label portion size if in portion mode
         if (inputMode === 'portion' && (!labelPortionSize || parseFloat(labelPortionSize) <= 0)) {
             toast({
                 title: 'Erro',
@@ -231,29 +289,37 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
 
         setLoading(true);
         try {
-            // Normalize values to 100g base if in portion mode
-            let finalProtein = parseFloat(protein) || 0;
-            let finalCarbs = parseFloat(carbs) || 0;
-            let finalFat = parseFloat(fat) || 0;
-            let finalCalories = parseFloat(calories) || 0;
-
-            if (inputMode === 'portion' && labelPortionSize > 0) {
-                const factor = 100 / labelPortionSize;
-                finalProtein = (finalProtein * factor);
-                finalCarbs = (finalCarbs * factor);
-                finalFat = (finalFat * factor);
-                finalCalories = (finalCalories * factor);
-            }
-
-            // Prepare food data (always stored per 100g)
+            // Normalize all values to 100g base if in portion mode
+            const normalize = (val) => val ? normalizeValue(val) : null;
+            
             const foodData = {
                 name: name.trim(),
                 description: brand.trim() ? `Marca: ${brand.trim()}` : null,
-                calories: Math.round(finalCalories * 100) / 100,
-                protein: Math.round(finalProtein * 100) / 100,
-                carbs: Math.round(finalCarbs * 100) / 100,
-                fat: Math.round(finalFat * 100) / 100,
-                portion_size: 100, // Always 100g in DB
+                calories: Math.round(normalize(calories) * 100) / 100,
+                protein: Math.round(normalize(protein) * 100) / 100,
+                carbs: Math.round(normalize(carbs) * 100) / 100,
+                fat: Math.round(normalize(fat) * 100) / 100,
+                fiber: normalize(fiber),
+                sodium: normalize(sodium),
+                sugar: normalize(sugar),
+                saturated_fat: normalize(saturatedFat),
+                trans_fat: normalize(transFat),
+                monounsaturated_fat: normalize(monounsaturatedFat),
+                polyunsaturated_fat: normalize(polyunsaturatedFat),
+                cholesterol: normalize(cholesterol),
+                calcium: normalize(calcium),
+                iron: normalize(iron),
+                magnesium: normalize(magnesium),
+                phosphorus: normalize(phosphorus),
+                potassium: normalize(potassium),
+                zinc: normalize(zinc),
+                vitamin_a: normalize(vitaminA),
+                vitamin_c: normalize(vitaminC),
+                vitamin_d: normalize(vitaminD),
+                vitamin_e: normalize(vitaminE),
+                vitamin_b12: normalize(vitaminB12),
+                folate: normalize(folate),
+                portion_size: 100,
                 source: 'custom',
                 nutritionist_id: user?.id || null,
                 group: 'Personalizado',
@@ -263,7 +329,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             let createdFood;
 
             if (initialData) {
-                // Update existing food
                 const { data, error } = await supabase
                     .from('foods')
                     .update(foodData)
@@ -274,18 +339,14 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                 if (error) throw error;
                 createdFood = data;
             } else {
-                // Create new food
                 const { data, error } = await createFood(foodData);
                 if (error) throw error;
-                if (!data) {
-                    throw new Error('Alimento criado mas não retornado');
-                }
+                if (!data) throw new Error('Alimento criado mas não retornado');
                 createdFood = data;
             }
 
-            // Create household measures (using food_measures table)
+            // Create household measures
             if (householdMeasures.length > 0) {
-                // Delete existing measures if editing
                 if (initialData) {
                     await supabase
                         .from('food_measures')
@@ -305,7 +366,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
 
                 if (measuresError) {
                     console.warn('Erro ao criar medidas caseiras:', measuresError);
-                    // Não falhar a criação do alimento se as medidas falharem
                 }
             }
 
@@ -314,7 +374,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                 description: `${name} foi ${initialData ? 'atualizado' : 'adicionado'} ao banco de dados.`,
             });
 
-            // Callback with created/updated food
             if (onSuccess) {
                 onSuccess(createdFood);
             }
@@ -330,7 +389,6 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
         }
     };
 
-    // Expose submit function via ref (for compact mode)
     useImperativeHandle(ref, () => ({
         submit: handleSubmit
     }));
@@ -338,274 +396,574 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
     const isCompact = mode === 'compact';
 
     return (
-        <div className={isCompact ? "space-y-3" : "space-y-4"}>
-            {/* Barcode Detective Section */}
+        <div className={isCompact ? "space-y-3" : "space-y-6"}>
+            {/* Barcode Search - Only in full mode */}
             {!isCompact && (
-                <div className="space-y-2 border-b pb-4">
-                    <Label className="text-base font-semibold flex items-center gap-2">
-                        <Barcode className="h-4 w-4" />
-                        Buscar por Código de Barras
-                    </Label>
-                    <div className="flex gap-2">
-                        <Input
-                            placeholder="Digite o código EAN (ex: 7891000100103)"
-                            value={barcode}
-                            onChange={(e) => setBarcode(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    handleFetchBarcode();
-                                }
-                            }}
-                        />
-                        <Button
-                            onClick={handleFetchBarcode}
-                            disabled={barcodeLoading || !barcode.trim()}
-                            variant="outline"
-                        >
-                            {barcodeLoading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <>
-                                    <Barcode className="h-4 w-4 mr-2" />
-                                    Buscar
-                                </>
-                            )}
-                        </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        Busca automática de dados nutricionais via OpenFoodFacts
-                    </p>
-                </div>
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <Barcode className="h-4 w-4" />
+                            Buscar por Código de Barras
+                        </CardTitle>
+                        <CardDescription>
+                            Busca automática de dados nutricionais via OpenFoodFacts
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="Digite o código EAN (ex: 7891000100103)"
+                                value={barcode}
+                                onChange={(e) => setBarcode(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleFetchBarcode();
+                                    }
+                                }}
+                            />
+                            <Button
+                                onClick={handleFetchBarcode}
+                                disabled={barcodeLoading || !barcode.trim()}
+                                variant="outline"
+                            >
+                                {barcodeLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <>
+                                        <Barcode className="h-4 w-4 mr-2" />
+                                        Buscar
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
             )}
 
-            {/* Basic Info */}
-            <div className={`space-y-${isCompact ? '3' : '4'}`}>
-                <div className="space-y-2">
-                    <Label htmlFor="name">Nome do Alimento *</Label>
-                    <Input
-                        id="name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Ex: Bolo de Chocolate"
-                        autoFocus={!initialData}
-                    />
-                </div>
+            {/* Main Form Tabs */}
+            <Tabs defaultValue="basic" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="basic">Básico</TabsTrigger>
+                    <TabsTrigger value="macros">Macronutrientes</TabsTrigger>
+                    <TabsTrigger value="micros">Micronutrientes</TabsTrigger>
+                </TabsList>
 
-                <div className="space-y-2">
-                    <Label htmlFor="brand">Marca (opcional)</Label>
-                    <Input
-                        id="brand"
-                        value={brand}
-                        onChange={(e) => setBrand(e.target.value)}
-                        placeholder="Ex: Marca X"
-                    />
-                </div>
-            </div>
+                {/* TAB 1: Basic Info */}
+                <TabsContent value="basic" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Informações Básicas</CardTitle>
+                            <CardDescription>
+                                Dados essenciais do alimento
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="name">
+                                    Nome do Alimento <span className="text-destructive">*</span>
+                                </Label>
+                                <Input
+                                    id="name"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="Ex: Bolo de Chocolate"
+                                    autoFocus={!initialData}
+                                />
+                            </div>
 
-            {/* Macros Section */}
-            <div className={`${isCompact ? "space-y-3 border-t pt-3" : "space-y-4 border-t pt-4"}`}>
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Calculator className="h-4 w-4 text-muted-foreground" />
-                        <Label className="text-base font-semibold">Macronutrientes</Label>
-                    </div>
-                </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="brand">Marca (opcional)</Label>
+                                <Input
+                                    id="brand"
+                                    value={brand}
+                                    onChange={(e) => setBrand(e.target.value)}
+                                    placeholder="Ex: Marca X"
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                {/* Input Mode Tabs */}
-                <Tabs value={inputMode} onValueChange={setInputMode} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="100g">Dados por 100g</TabsTrigger>
-                        <TabsTrigger value="portion">Dados do Rótulo (Porção)</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="100g" className="space-y-4 mt-4">
-                        <p className="text-sm text-muted-foreground">
-                            Informe os valores nutricionais por 100g do alimento
-                        </p>
-                    </TabsContent>
-                    
-                    <TabsContent value="portion" className="space-y-4 mt-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="labelPortionSize">Tamanho da Porção do Rótulo (g) *</Label>
-                            <Input
-                                id="labelPortionSize"
-                                type="number"
-                                value={labelPortionSize}
-                                onChange={(e) => setLabelPortionSize(e.target.value)}
-                                placeholder="Ex: 30"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Informe o tamanho da porção indicada no rótulo
-                            </p>
-                        </div>
-                        {normalizedValues && (
-                            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                                <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-1">
-                                    Equivalente por 100g:
-                                </p>
-                                <div className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
-                                    <p>Proteína: {normalizedValues.protein}g</p>
-                                    <p>Carboidratos: {normalizedValues.carbs}g</p>
-                                    <p>Gorduras: {normalizedValues.fat}g</p>
-                                    {normalizedValues.calories && (
-                                        <p>Calorias: {normalizedValues.calories} kcal</p>
+                    {/* Household Measures */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Medidas Caseiras</CardTitle>
+                            <CardDescription>
+                                Adicione medidas caseiras comuns para facilitar o uso
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex flex-wrap gap-2">
+                                {commonMeasures.map((measure, idx) => (
+                                    <Badge
+                                        key={idx}
+                                        variant="outline"
+                                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors px-3 py-1"
+                                        onClick={() => handleAddMeasure(measure)}
+                                    >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        {measure.label} ({measure.grams}g)
+                                    </Badge>
+                                ))}
+                            </div>
+
+                            {householdMeasures.length > 0 && (
+                                <div className="space-y-2">
+                                    <Label className="text-sm">Medidas Adicionadas:</Label>
+                                    <div className="space-y-2">
+                                        {householdMeasures.map((measure, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="flex items-center justify-between p-2 border rounded-lg bg-muted/30"
+                                            >
+                                                <span className="text-sm">
+                                                    {measure.label} - {measure.grams}g
+                                                </span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleRemoveMeasure(idx)}
+                                                    className="h-6 w-6 p-0"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* TAB 2: Macronutrients */}
+                <TabsContent value="macros" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Calculator className="h-4 w-4" />
+                                Macronutrientes
+                            </CardTitle>
+                            <CardDescription>
+                                Valores nutricionais principais do alimento
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Input Mode Tabs */}
+                            <Tabs value={inputMode} onValueChange={setInputMode} className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="100g">Dados por 100g</TabsTrigger>
+                                    <TabsTrigger value="portion">Dados do Rótulo (Porção)</TabsTrigger>
+                                </TabsList>
+                                
+                                <TabsContent value="100g" className="space-y-4 mt-4">
+                                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                        <p className="text-sm text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                                            <Info className="h-4 w-4" />
+                                            Informe os valores nutricionais por 100g do alimento
+                                        </p>
+                                    </div>
+                                </TabsContent>
+                                
+                                <TabsContent value="portion" className="space-y-4 mt-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="labelPortionSize">
+                                            Tamanho da Porção do Rótulo (g) <span className="text-destructive">*</span>
+                                        </Label>
+                                        <Input
+                                            id="labelPortionSize"
+                                            type="number"
+                                            value={labelPortionSize}
+                                            onChange={(e) => setLabelPortionSize(e.target.value)}
+                                            placeholder="Ex: 30"
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Informe o tamanho da porção indicada no rótulo
+                                        </p>
+                                    </div>
+                                    {normalizedValues && (
+                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                                            <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-100 mb-2">
+                                                Equivalente por 100g:
+                                            </p>
+                                            <div className="text-xs text-emerald-800 dark:text-emerald-200 space-y-1">
+                                                <p>Proteína: {normalizedValues.protein}g</p>
+                                                <p>Carboidratos: {normalizedValues.carbs}g</p>
+                                                <p>Gorduras: {normalizedValues.fat}g</p>
+                                                {normalizedValues.calories && (
+                                                    <p>Calorias: {normalizedValues.calories} kcal</p>
+                                                )}
+                                            </div>
+                                        </div>
                                     )}
+                                </TabsContent>
+                            </Tabs>
+
+                            {/* Main Macros */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="protein">
+                                        Proteína (g) <span className="text-destructive">*</span>
+                                        {inputMode === 'portion' && labelPortionSize > 0 && (
+                                            <span className="text-xs text-muted-foreground block">
+                                                por {labelPortionSize}g
+                                            </span>
+                                        )}
+                                    </Label>
+                                    <Input
+                                        id="protein"
+                                        type="number"
+                                        step="0.1"
+                                        value={protein}
+                                        onChange={(e) => setProtein(e.target.value)}
+                                        placeholder="0"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="carbs">
+                                        Carboidratos (g) <span className="text-destructive">*</span>
+                                        {inputMode === 'portion' && labelPortionSize > 0 && (
+                                            <span className="text-xs text-muted-foreground block">
+                                                por {labelPortionSize}g
+                                            </span>
+                                        )}
+                                    </Label>
+                                    <Input
+                                        id="carbs"
+                                        type="number"
+                                        step="0.1"
+                                        value={carbs}
+                                        onChange={(e) => setCarbs(e.target.value)}
+                                        placeholder="0"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="fat">
+                                        Gorduras (g) <span className="text-destructive">*</span>
+                                        {inputMode === 'portion' && labelPortionSize > 0 && (
+                                            <span className="text-xs text-muted-foreground block">
+                                                por {labelPortionSize}g
+                                            </span>
+                                        )}
+                                    </Label>
+                                    <Input
+                                        id="fat"
+                                        type="number"
+                                        step="0.1"
+                                        value={fat}
+                                        onChange={(e) => setFat(e.target.value)}
+                                        placeholder="0"
+                                    />
                                 </div>
                             </div>
-                        )}
-                    </TabsContent>
-                </Tabs>
 
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="protein">
-                            Proteína (g) *
-                            {inputMode === 'portion' && labelPortionSize > 0 && (
-                                <span className="text-xs text-muted-foreground block">
-                                    por {labelPortionSize}g
-                                </span>
-                            )}
-                        </Label>
-                        <Input
-                            id="protein"
-                            type="number"
-                            step="0.1"
-                            value={protein}
-                            onChange={(e) => setProtein(e.target.value)}
-                            placeholder="0"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="carbs">
-                            Carboidratos (g) *
-                            {inputMode === 'portion' && labelPortionSize > 0 && (
-                                <span className="text-xs text-muted-foreground block">
-                                    por {labelPortionSize}g
-                                </span>
-                            )}
-                        </Label>
-                        <Input
-                            id="carbs"
-                            type="number"
-                            step="0.1"
-                            value={carbs}
-                            onChange={(e) => setCarbs(e.target.value)}
-                            placeholder="0"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="fat">
-                            Gorduras (g) *
-                            {inputMode === 'portion' && labelPortionSize > 0 && (
-                                <span className="text-xs text-muted-foreground block">
-                                    por {labelPortionSize}g
-                                </span>
-                            )}
-                        </Label>
-                        <Input
-                            id="fat"
-                            type="number"
-                            step="0.1"
-                            value={fat}
-                            onChange={(e) => setFat(e.target.value)}
-                            placeholder="0"
-                        />
-                    </div>
-                </div>
-
-                {/* Calories */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <Label htmlFor="calories">Calorias (kcal) *</Label>
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                id="autoCalc"
-                                checked={autoCalcCalories}
-                                onChange={(e) => setAutoCalcCalories(e.target.checked)}
-                                className="w-4 h-4"
-                            />
-                            <Label htmlFor="autoCalc" className="text-sm font-normal cursor-pointer">
-                                Calcular automaticamente
-                            </Label>
-                        </div>
-                    </div>
-                    <Input
-                        id="calories"
-                        type="number"
-                        step="0.1"
-                        value={calories}
-                        onChange={(e) => {
-                            setCalories(e.target.value);
-                            setAutoCalcCalories(false);
-                        }}
-                        placeholder="0"
-                        disabled={autoCalcCalories}
-                        className={autoCalcCalories ? 'bg-muted' : ''}
-                    />
-                    {autoCalcCalories && (
-                        <p className="text-xs text-muted-foreground">
-                            Cálculo: (Proteína × 4) + (Carboidratos × 4) + (Gorduras × 9)
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            {/* Household Measures Section */}
-            <div className={`space-y-${isCompact ? '3' : '4'} border-t pt-${isCompact ? '3' : '4'}`}>
-                <Label className="text-base font-semibold">Medidas Caseiras Comuns</Label>
-                <p className="text-sm text-muted-foreground">
-                    Clique nos botões abaixo para adicionar medidas rapidamente
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                    {commonMeasures.map((measure, idx) => (
-                        <Badge
-                            key={idx}
-                            variant="outline"
-                            className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors px-3 py-1"
-                            onClick={() => handleAddMeasure(measure)}
-                        >
-                            <Plus className="h-3 w-3 mr-1" />
-                            {measure.label} ({measure.grams}g)
-                        </Badge>
-                    ))}
-                </div>
-
-                {/* Added Measures List */}
-                {householdMeasures.length > 0 && (
-                    <div className="space-y-2">
-                        <Label className="text-sm">Medidas Adicionadas:</Label>
-                        <div className="space-y-2">
-                            {householdMeasures.map((measure, idx) => (
-                                <div
-                                    key={idx}
-                                    className="flex items-center justify-between p-2 border rounded-lg bg-muted/30"
-                                >
-                                    <span className="text-sm">
-                                        {measure.label} - {measure.grams}g
-                                    </span>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleRemoveMeasure(idx)}
-                                        className="h-6 w-6 p-0"
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </Button>
+                            {/* Calories */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="calories">
+                                        Calorias (kcal) <span className="text-destructive">*</span>
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="autoCalc"
+                                            checked={autoCalcCalories}
+                                            onChange={(e) => setAutoCalcCalories(e.target.checked)}
+                                            className="w-4 h-4"
+                                        />
+                                        <Label htmlFor="autoCalc" className="text-sm font-normal cursor-pointer">
+                                            Calcular automaticamente
+                                        </Label>
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
+                                <Input
+                                    id="calories"
+                                    type="number"
+                                    step="0.1"
+                                    value={calories}
+                                    onChange={(e) => {
+                                        setCalories(e.target.value);
+                                        setAutoCalcCalories(false);
+                                    }}
+                                    placeholder="0"
+                                    disabled={autoCalcCalories}
+                                    className={autoCalcCalories ? 'bg-muted' : ''}
+                                />
+                                {autoCalcCalories && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Cálculo: (Proteína × 4) + (Carboidratos × 4) + (Gorduras × 9)
+                                    </p>
+                                )}
+                            </div>
 
-            {/* Submit Button (only in full mode, compact mode handles it externally) */}
+                            {/* Additional Macronutrients */}
+                            <Collapsible open={showMicronutrients} onOpenChange={setShowMicronutrients}>
+                                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted transition-colors">
+                                    <span className="text-sm font-medium">Gorduras Detalhadas e Outros (opcional)</span>
+                                    {showMicronutrients ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="space-y-4 pt-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="fiber">Fibra (g)</Label>
+                                            <Input
+                                                id="fiber"
+                                                type="number"
+                                                step="0.1"
+                                                value={fiber}
+                                                onChange={(e) => setFiber(e.target.value)}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="sugar">Açúcares (g)</Label>
+                                            <Input
+                                                id="sugar"
+                                                type="number"
+                                                step="0.1"
+                                                value={sugar}
+                                                onChange={(e) => setSugar(e.target.value)}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="saturatedFat">Gordura Saturada (g)</Label>
+                                            <Input
+                                                id="saturatedFat"
+                                                type="number"
+                                                step="0.1"
+                                                value={saturatedFat}
+                                                onChange={(e) => setSaturatedFat(e.target.value)}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="transFat">Gordura Trans (g)</Label>
+                                            <Input
+                                                id="transFat"
+                                                type="number"
+                                                step="0.1"
+                                                value={transFat}
+                                                onChange={(e) => setTransFat(e.target.value)}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="monounsaturatedFat">Gordura Monoinsaturada (g)</Label>
+                                            <Input
+                                                id="monounsaturatedFat"
+                                                type="number"
+                                                step="0.1"
+                                                value={monounsaturatedFat}
+                                                onChange={(e) => setMonounsaturatedFat(e.target.value)}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="polyunsaturatedFat">Gordura Poliinsaturada (g)</Label>
+                                            <Input
+                                                id="polyunsaturatedFat"
+                                                type="number"
+                                                step="0.1"
+                                                value={polyunsaturatedFat}
+                                                onChange={(e) => setPolyunsaturatedFat(e.target.value)}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="cholesterol">Colesterol (mg)</Label>
+                                            <Input
+                                                id="cholesterol"
+                                                type="number"
+                                                step="0.1"
+                                                value={cholesterol}
+                                                onChange={(e) => setCholesterol(e.target.value)}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="sodium">Sódio (mg)</Label>
+                                            <Input
+                                                id="sodium"
+                                                type="number"
+                                                step="0.1"
+                                                value={sodium}
+                                                onChange={(e) => setSodium(e.target.value)}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    </div>
+                                </CollapsibleContent>
+                            </Collapsible>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* TAB 3: Micronutrients */}
+                <TabsContent value="micros" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Micronutrientes</CardTitle>
+                            <CardDescription>
+                                Vitaminas e minerais (opcional) - Todos os valores serão normalizados para 100g
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Minerals */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-semibold text-muted-foreground">Minerais (mg por {inputMode === 'portion' ? `${labelPortionSize}g` : '100g'})</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="calcium">Cálcio (mg)</Label>
+                                        <Input
+                                            id="calcium"
+                                            type="number"
+                                            step="0.1"
+                                            value={calcium}
+                                            onChange={(e) => setCalcium(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="iron">Ferro (mg)</Label>
+                                        <Input
+                                            id="iron"
+                                            type="number"
+                                            step="0.1"
+                                            value={iron}
+                                            onChange={(e) => setIron(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="magnesium">Magnésio (mg)</Label>
+                                        <Input
+                                            id="magnesium"
+                                            type="number"
+                                            step="0.1"
+                                            value={magnesium}
+                                            onChange={(e) => setMagnesium(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phosphorus">Fósforo (mg)</Label>
+                                        <Input
+                                            id="phosphorus"
+                                            type="number"
+                                            step="0.1"
+                                            value={phosphorus}
+                                            onChange={(e) => setPhosphorus(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="potassium">Potássio (mg)</Label>
+                                        <Input
+                                            id="potassium"
+                                            type="number"
+                                            step="0.1"
+                                            value={potassium}
+                                            onChange={(e) => setPotassium(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="zinc">Zinco (mg)</Label>
+                                        <Input
+                                            id="zinc"
+                                            type="number"
+                                            step="0.1"
+                                            value={zinc}
+                                            onChange={(e) => setZinc(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Vitamins */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-semibold text-muted-foreground">Vitaminas (mg por {inputMode === 'portion' ? `${labelPortionSize}g` : '100g'})</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="vitaminA">Vitamina A (mg)</Label>
+                                        <Input
+                                            id="vitaminA"
+                                            type="number"
+                                            step="0.1"
+                                            value={vitaminA}
+                                            onChange={(e) => setVitaminA(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="vitaminC">Vitamina C (mg)</Label>
+                                        <Input
+                                            id="vitaminC"
+                                            type="number"
+                                            step="0.1"
+                                            value={vitaminC}
+                                            onChange={(e) => setVitaminC(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="vitaminD">Vitamina D (mg)</Label>
+                                        <Input
+                                            id="vitaminD"
+                                            type="number"
+                                            step="0.1"
+                                            value={vitaminD}
+                                            onChange={(e) => setVitaminD(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="vitaminE">Vitamina E (mg)</Label>
+                                        <Input
+                                            id="vitaminE"
+                                            type="number"
+                                            step="0.1"
+                                            value={vitaminE}
+                                            onChange={(e) => setVitaminE(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="vitaminB12">Vitamina B12 (mg)</Label>
+                                        <Input
+                                            id="vitaminB12"
+                                            type="number"
+                                            step="0.1"
+                                            value={vitaminB12}
+                                            onChange={(e) => setVitaminB12(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="folate">Folato (mg)</Label>
+                                        <Input
+                                            id="folate"
+                                            type="number"
+                                            step="0.1"
+                                            value={folate}
+                                            onChange={(e) => setFolate(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+
+            {/* Submit Button (only in full mode) */}
             {!isCompact && (
                 <div className="flex justify-end gap-2 pt-4 border-t">
-                    <Button onClick={handleSubmit} disabled={loading}>
+                    <Button onClick={handleSubmit} disabled={loading} size="lg">
                         {loading ? (
                             <>
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -625,4 +983,3 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
 });
 
 export default SmartFoodForm;
-
