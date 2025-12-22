@@ -350,7 +350,7 @@ const FoodBankPage = () => {
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
@@ -381,9 +381,9 @@ const FoodBankPage = () => {
 
                 {/* Search and Filters */}
                 <Card>
-                    <CardContent className="pt-6">
-                        <div className="space-y-4">
-                            <div className="flex flex-col sm:flex-row gap-4">
+                    <CardContent className="pt-4 sm:pt-6">
+                        <div className="space-y-3 sm:space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                                 <div className="flex-1 relative">
                                     <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
                                     <Input
@@ -438,12 +438,16 @@ const FoodBankPage = () => {
                     </Card>
                 ) : (
                     <Tabs defaultValue="all" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="all">
-                                Todos ({customTotal + publicTotal})
+                        <TabsList className="grid w-full grid-cols-2 h-auto p-1 gap-1">
+                            <TabsTrigger value="all" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                                <span className="hidden sm:inline">Todos</span>
+                                <span className="sm:hidden">Todos</span>
+                                <span className="ml-1">({customTotal + publicTotal})</span>
                             </TabsTrigger>
-                            <TabsTrigger value="custom">
-                                Meus Alimentos ({customTotal})
+                            <TabsTrigger value="custom" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                                <span className="hidden sm:inline">Meus Alimentos</span>
+                                <span className="sm:hidden">Meus</span>
+                                <span className="ml-1">({customTotal})</span>
                             </TabsTrigger>
                         </TabsList>
 
@@ -498,11 +502,11 @@ const FoodBankPage = () => {
                                             
                                             {/* Pagination */}
                                             {customTotalPages > 1 && (
-                                                <div className="flex items-center justify-between pt-4">
-                                                    <p className="text-sm text-muted-foreground">
+                                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
+                                                    <p className="text-xs sm:text-sm text-muted-foreground">
                                                         Página {customPage + 1} de {customTotalPages}
                                                     </p>
-                                                    <div className="flex gap-2">
+                                                    <div className="flex gap-2 w-full sm:w-auto">
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
@@ -511,9 +515,11 @@ const FoodBankPage = () => {
                                                                 fetchCustomFoods(Math.max(0, customPage - 1), false);
                                                             }}
                                                             disabled={!customHasPrev || loadingCustom}
+                                                            className="flex-1 sm:flex-initial"
                                                         >
                                                             <ChevronLeft className="w-4 h-4 mr-1" />
-                                                            Anterior
+                                                            <span className="hidden sm:inline">Anterior</span>
+                                                            <span className="sm:hidden">Ant</span>
                                                         </Button>
                                                         <Button
                                                             variant="outline"
@@ -523,8 +529,10 @@ const FoodBankPage = () => {
                                                                 fetchCustomFoods(customPage + 1, false);
                                                             }}
                                                             disabled={!customHasNext || loadingCustom}
+                                                            className="flex-1 sm:flex-initial"
                                                         >
-                                                            Próxima
+                                                            <span className="hidden sm:inline">Próxima</span>
+                                                            <span className="sm:hidden">Próx</span>
                                                             <ChevronRight className="w-4 h-4 ml-1" />
                                                         </Button>
                                                     </div>
@@ -582,11 +590,11 @@ const FoodBankPage = () => {
                                             
                                             {/* Pagination */}
                                             {publicTotalPages > 1 && (
-                                                <div className="flex items-center justify-between pt-4">
-                                                    <p className="text-sm text-muted-foreground">
+                                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
+                                                    <p className="text-xs sm:text-sm text-muted-foreground">
                                                         Página {publicPage + 1} de {publicTotalPages}
                                                     </p>
-                                                    <div className="flex gap-2">
+                                                    <div className="flex gap-2 w-full sm:w-auto">
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
@@ -595,9 +603,11 @@ const FoodBankPage = () => {
                                                                 fetchPublicFoods(Math.max(0, publicPage - 1), false);
                                                             }}
                                                             disabled={!publicHasPrev || loadingPublic}
+                                                            className="flex-1 sm:flex-initial"
                                                         >
                                                             <ChevronLeft className="w-4 h-4 mr-1" />
-                                                            Anterior
+                                                            <span className="hidden sm:inline">Anterior</span>
+                                                            <span className="sm:hidden">Ant</span>
                                                         </Button>
                                                         <Button
                                                             variant="outline"
@@ -607,8 +617,10 @@ const FoodBankPage = () => {
                                                                 fetchPublicFoods(publicPage + 1, false);
                                                             }}
                                                             disabled={!publicHasNext || loadingPublic}
+                                                            className="flex-1 sm:flex-initial"
                                                         >
-                                                            Próxima
+                                                            <span className="hidden sm:inline">Próxima</span>
+                                                            <span className="sm:hidden">Próx</span>
                                                             <ChevronRight className="w-4 h-4 ml-1" />
                                                         </Button>
                                                     </div>
@@ -659,11 +671,11 @@ const FoodBankPage = () => {
                                     </div>
                                     
                                     {customTotalPages > 1 && (
-                                        <div className="flex items-center justify-between pt-4">
-                                            <p className="text-sm text-muted-foreground">
+                                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
+                                            <p className="text-xs sm:text-sm text-muted-foreground">
                                                 Página {customPage + 1} de {customTotalPages}
                                             </p>
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-2 w-full sm:w-auto">
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
@@ -672,9 +684,11 @@ const FoodBankPage = () => {
                                                         fetchCustomFoods(Math.max(0, customPage - 1), false);
                                                     }}
                                                     disabled={!customHasPrev || loadingCustom}
+                                                    className="flex-1 sm:flex-initial"
                                                 >
                                                     <ChevronLeft className="w-4 h-4 mr-1" />
-                                                    Anterior
+                                                    <span className="hidden sm:inline">Anterior</span>
+                                                    <span className="sm:hidden">Ant</span>
                                                 </Button>
                                                 <Button
                                                     variant="outline"
@@ -684,8 +698,10 @@ const FoodBankPage = () => {
                                                         fetchCustomFoods(customPage + 1, false);
                                                     }}
                                                     disabled={!customHasNext || loadingCustom}
+                                                    className="flex-1 sm:flex-initial"
                                                 >
-                                                    Próxima
+                                                    <span className="hidden sm:inline">Próxima</span>
+                                                    <span className="sm:hidden">Próx</span>
                                                     <ChevronRight className="w-4 h-4 ml-1" />
                                                 </Button>
                                             </div>

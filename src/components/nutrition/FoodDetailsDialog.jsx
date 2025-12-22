@@ -42,18 +42,18 @@ const FoodDetailsDialog = ({ food, open, onOpenChange }) => {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh]">
-                <DialogHeader>
-                    <DialogTitle className="text-xl flex items-center gap-2">
-                        <Package className="w-5 h-5" />
-                        {food.name}
+            <DialogContent className="max-w-4xl max-h-[90vh] w-[95vw] sm:w-full p-4 sm:p-6">
+                <DialogHeader className="pb-3 sm:pb-4">
+                    <DialogTitle className="text-lg sm:text-xl flex items-center gap-2 flex-wrap">
+                        <Package className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        <span className="break-words">{food.name}</span>
                     </DialogTitle>
-                    <DialogDescription>
-                        {food.group && <span className="block">{food.group}</span>}
+                    <DialogDescription className="mt-2">
+                        {food.group && <span className="block text-xs sm:text-sm">{food.group}</span>}
                         {food.source && (
                             <Badge 
                                 variant="outline" 
-                                className={`${sourceColors[food.source] || ''} mt-2`}
+                                className={`${sourceColors[food.source] || ''} mt-2 text-xs`}
                             >
                                 {sourceLabels[food.source] || food.source}
                             </Badge>
@@ -61,49 +61,57 @@ const FoodDetailsDialog = ({ food, open, onOpenChange }) => {
                     </DialogDescription>
                 </DialogHeader>
 
-                <ScrollArea className="max-h-[70vh] pr-4">
+                <ScrollArea className="max-h-[calc(90vh-120px)] sm:max-h-[70vh] pr-2 sm:pr-4">
                     <Tabs defaultValue="macros" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="macros">Macronutrientes</TabsTrigger>
-                            <TabsTrigger value="micros">Micronutrientes</TabsTrigger>
-                            <TabsTrigger value="info">Informações</TabsTrigger>
+                        <TabsList className="grid w-full grid-cols-3 h-auto p-1 gap-1">
+                            <TabsTrigger value="macros" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                                <span className="hidden sm:inline">Macronutrientes</span>
+                                <span className="sm:hidden">Macros</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="micros" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                                <span className="hidden sm:inline">Micronutrientes</span>
+                                <span className="sm:hidden">Micros</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="info" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                                Informações
+                            </TabsTrigger>
                         </TabsList>
 
                         {/* TAB 1: Macronutrientes */}
-                        <TabsContent value="macros" className="space-y-4 mt-4">
+                        <TabsContent value="macros" className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
                             <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Valores por 100g</CardTitle>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-sm sm:text-base">Valores por 100g</CardTitle>
                                 </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        <div className="text-center p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
-                                            <p className="text-xs text-muted-foreground mb-1">Calorias</p>
-                                            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                <CardContent className="pt-0">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+                                        <div className="text-center p-2 sm:p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                                            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Calorias</p>
+                                            <p className="text-lg sm:text-2xl font-bold text-red-600 dark:text-red-400">
                                                 {food.calories ? Math.round(food.calories) : '—'}
                                             </p>
-                                            <p className="text-xs text-muted-foreground">kcal</p>
+                                            <p className="text-[10px] sm:text-xs text-muted-foreground">kcal</p>
                                         </div>
-                                        <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
-                                            <p className="text-xs text-muted-foreground mb-1">Proteína</p>
-                                            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                                        <div className="text-center p-2 sm:p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                                            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Proteína</p>
+                                            <p className="text-lg sm:text-2xl font-bold text-purple-600 dark:text-purple-400">
                                                 {food.protein ? food.protein.toFixed(1) : '—'}
                                             </p>
-                                            <p className="text-xs text-muted-foreground">g</p>
+                                            <p className="text-[10px] sm:text-xs text-muted-foreground">g</p>
                                         </div>
-                                        <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                                            <p className="text-xs text-muted-foreground mb-1">Carboidratos</p>
-                                            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                        <div className="text-center p-2 sm:p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                                            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Carboidratos</p>
+                                            <p className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400">
                                                 {food.carbs ? food.carbs.toFixed(1) : '—'}
                                             </p>
-                                            <p className="text-xs text-muted-foreground">g</p>
+                                            <p className="text-[10px] sm:text-xs text-muted-foreground">g</p>
                                         </div>
-                                        <div className="text-center p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
-                                            <p className="text-xs text-muted-foreground mb-1">Gorduras</p>
-                                            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                                        <div className="text-center p-2 sm:p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+                                            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Gorduras</p>
+                                            <p className="text-lg sm:text-2xl font-bold text-orange-600 dark:text-orange-400">
                                                 {food.fat ? food.fat.toFixed(1) : '—'}
                                             </p>
-                                            <p className="text-xs text-muted-foreground">g</p>
+                                            <p className="text-[10px] sm:text-xs text-muted-foreground">g</p>
                                         </div>
                                     </div>
                                 </CardContent>
@@ -112,11 +120,11 @@ const FoodDetailsDialog = ({ food, open, onOpenChange }) => {
                             {/* Gorduras Detalhadas */}
                             {(food.saturated_fat || food.trans_fat || food.monounsaturated_fat || food.polyunsaturated_fat || food.cholesterol || food.fiber || food.sugar || food.sodium) && (
                                 <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-base">Gorduras Detalhadas e Outros</CardTitle>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm sm:text-base">Gorduras Detalhadas e Outros</CardTitle>
                                     </CardHeader>
-                                    <CardContent>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <CardContent className="pt-0">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-4">
                                             {food.fiber && (
                                                 <div className="space-y-1">
                                                     <p className="text-xs text-muted-foreground">Fibra</p>
@@ -172,18 +180,18 @@ const FoodDetailsDialog = ({ food, open, onOpenChange }) => {
                         </TabsContent>
 
                         {/* TAB 2: Micronutrientes */}
-                        <TabsContent value="micros" className="space-y-4 mt-4">
+                        <TabsContent value="micros" className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
                             {(food.calcium || food.iron || food.magnesium || food.phosphorus || food.potassium || food.zinc || 
                               food.vitamin_a || food.vitamin_c || food.vitamin_d || food.vitamin_e || food.vitamin_b12 || food.folate) ? (
                                 <>
                                     {/* Minerais */}
                                     {(food.calcium || food.iron || food.magnesium || food.phosphorus || food.potassium || food.zinc) && (
                                         <Card>
-                                            <CardHeader>
-                                                <CardTitle className="text-base">Minerais (mg por 100g)</CardTitle>
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-sm sm:text-base">Minerais (mg por 100g)</CardTitle>
                                             </CardHeader>
-                                            <CardContent>
-                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            <CardContent className="pt-0">
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
                                                     {food.calcium && (
                                                         <div className="space-y-1">
                                                             <p className="text-xs text-muted-foreground">Cálcio</p>
@@ -228,11 +236,11 @@ const FoodDetailsDialog = ({ food, open, onOpenChange }) => {
                                     {/* Vitaminas */}
                                     {(food.vitamin_a || food.vitamin_c || food.vitamin_d || food.vitamin_e || food.vitamin_b12 || food.folate) && (
                                         <Card>
-                                            <CardHeader>
-                                                <CardTitle className="text-base">Vitaminas (mg por 100g)</CardTitle>
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-sm sm:text-base">Vitaminas (mg por 100g)</CardTitle>
                                             </CardHeader>
-                                            <CardContent>
-                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            <CardContent className="pt-0">
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
                                                     {food.vitamin_a && (
                                                         <div className="space-y-1">
                                                             <p className="text-xs text-muted-foreground">Vitamina A</p>
@@ -287,12 +295,12 @@ const FoodDetailsDialog = ({ food, open, onOpenChange }) => {
                         </TabsContent>
 
                         {/* TAB 3: Informações */}
-                        <TabsContent value="info" className="space-y-4 mt-4">
+                        <TabsContent value="info" className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
                             <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Informações Gerais</CardTitle>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-sm sm:text-base">Informações Gerais</CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
+                                <CardContent className="pt-0 space-y-3 sm:space-y-4">
                                     {food.description && (
                                         <div>
                                             <p className="text-xs text-muted-foreground mb-1">Descrição</p>

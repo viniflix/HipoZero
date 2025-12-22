@@ -50,6 +50,7 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
     
     // Input Mode
     const [inputMode, setInputMode] = useState('100g');
+    const [prevInputMode, setPrevInputMode] = useState('100g');
     const [labelPortionSize, setLabelPortionSize] = useState(100);
     
     // Macronutrients
@@ -152,6 +153,73 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
         }
         return null;
     }, [inputMode, labelPortionSize, protein, carbs, fat, calories]);
+
+    // Recalculate values when switching between modes
+    useEffect(() => {
+        if (inputMode !== prevInputMode && labelPortionSize > 0) {
+            const portionSize = parseFloat(labelPortionSize) || 100;
+            
+            if (prevInputMode === '100g' && inputMode === 'portion') {
+                // Switching from 100g to portion: calculate portion values
+                const factor = portionSize / 100;
+                if (protein) setProtein(((parseFloat(protein) || 0) * factor).toFixed(2));
+                if (carbs) setCarbs(((parseFloat(carbs) || 0) * factor).toFixed(2));
+                if (fat) setFat(((parseFloat(fat) || 0) * factor).toFixed(2));
+                if (calories) setCalories(((parseFloat(calories) || 0) * factor).toFixed(2));
+                if (fiber) setFiber(((parseFloat(fiber) || 0) * factor).toFixed(2));
+                if (sodium) setSodium(((parseFloat(sodium) || 0) * factor).toFixed(0));
+                if (sugar) setSugar(((parseFloat(sugar) || 0) * factor).toFixed(2));
+                if (saturatedFat) setSaturatedFat(((parseFloat(saturatedFat) || 0) * factor).toFixed(2));
+                if (transFat) setTransFat(((parseFloat(transFat) || 0) * factor).toFixed(2));
+                if (monounsaturatedFat) setMonounsaturatedFat(((parseFloat(monounsaturatedFat) || 0) * factor).toFixed(2));
+                if (polyunsaturatedFat) setPolyunsaturatedFat(((parseFloat(polyunsaturatedFat) || 0) * factor).toFixed(2));
+                if (cholesterol) setCholesterol(((parseFloat(cholesterol) || 0) * factor).toFixed(0));
+                // Micronutrients (already in mg, so same factor)
+                if (calcium) setCalcium(((parseFloat(calcium) || 0) * factor).toFixed(0));
+                if (iron) setIron(((parseFloat(iron) || 0) * factor).toFixed(0));
+                if (magnesium) setMagnesium(((parseFloat(magnesium) || 0) * factor).toFixed(0));
+                if (phosphorus) setPhosphorus(((parseFloat(phosphorus) || 0) * factor).toFixed(0));
+                if (potassium) setPotassium(((parseFloat(potassium) || 0) * factor).toFixed(0));
+                if (zinc) setZinc(((parseFloat(zinc) || 0) * factor).toFixed(0));
+                if (vitaminA) setVitaminA(((parseFloat(vitaminA) || 0) * factor).toFixed(0));
+                if (vitaminC) setVitaminC(((parseFloat(vitaminC) || 0) * factor).toFixed(0));
+                if (vitaminD) setVitaminD(((parseFloat(vitaminD) || 0) * factor).toFixed(0));
+                if (vitaminE) setVitaminE(((parseFloat(vitaminE) || 0) * factor).toFixed(0));
+                if (vitaminB12) setVitaminB12(((parseFloat(vitaminB12) || 0) * factor).toFixed(0));
+                if (folate) setFolate(((parseFloat(folate) || 0) * factor).toFixed(0));
+            } else if (prevInputMode === 'portion' && inputMode === '100g') {
+                // Switching from portion to 100g: normalize to 100g
+                const factor = 100 / portionSize;
+                if (protein) setProtein(((parseFloat(protein) || 0) * factor).toFixed(2));
+                if (carbs) setCarbs(((parseFloat(carbs) || 0) * factor).toFixed(2));
+                if (fat) setFat(((parseFloat(fat) || 0) * factor).toFixed(2));
+                if (calories) setCalories(((parseFloat(calories) || 0) * factor).toFixed(2));
+                if (fiber) setFiber(((parseFloat(fiber) || 0) * factor).toFixed(2));
+                if (sodium) setSodium(((parseFloat(sodium) || 0) * factor).toFixed(0));
+                if (sugar) setSugar(((parseFloat(sugar) || 0) * factor).toFixed(2));
+                if (saturatedFat) setSaturatedFat(((parseFloat(saturatedFat) || 0) * factor).toFixed(2));
+                if (transFat) setTransFat(((parseFloat(transFat) || 0) * factor).toFixed(2));
+                if (monounsaturatedFat) setMonounsaturatedFat(((parseFloat(monounsaturatedFat) || 0) * factor).toFixed(2));
+                if (polyunsaturatedFat) setPolyunsaturatedFat(((parseFloat(polyunsaturatedFat) || 0) * factor).toFixed(2));
+                if (cholesterol) setCholesterol(((parseFloat(cholesterol) || 0) * factor).toFixed(0));
+                // Micronutrients
+                if (calcium) setCalcium(((parseFloat(calcium) || 0) * factor).toFixed(0));
+                if (iron) setIron(((parseFloat(iron) || 0) * factor).toFixed(0));
+                if (magnesium) setMagnesium(((parseFloat(magnesium) || 0) * factor).toFixed(0));
+                if (phosphorus) setPhosphorus(((parseFloat(phosphorus) || 0) * factor).toFixed(0));
+                if (potassium) setPotassium(((parseFloat(potassium) || 0) * factor).toFixed(0));
+                if (zinc) setZinc(((parseFloat(zinc) || 0) * factor).toFixed(0));
+                if (vitaminA) setVitaminA(((parseFloat(vitaminA) || 0) * factor).toFixed(0));
+                if (vitaminC) setVitaminC(((parseFloat(vitaminC) || 0) * factor).toFixed(0));
+                if (vitaminD) setVitaminD(((parseFloat(vitaminD) || 0) * factor).toFixed(0));
+                if (vitaminE) setVitaminE(((parseFloat(vitaminE) || 0) * factor).toFixed(0));
+                if (vitaminB12) setVitaminB12(((parseFloat(vitaminB12) || 0) * factor).toFixed(0));
+                if (folate) setFolate(((parseFloat(folate) || 0) * factor).toFixed(0));
+            }
+            
+            setPrevInputMode(inputMode);
+        }
+    }, [inputMode, prevInputMode, labelPortionSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Auto-calculate calories
     useEffect(() => {
@@ -259,37 +327,184 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
 
         if (product.product_name) setName(product.product_name);
         if (product.brands) setBrand(product.brands.split(',')[0].trim());
-        if (nutriments.proteins_100g !== undefined) setProtein(nutriments.proteins_100g.toString());
-        if (nutriments.carbohydrates_100g !== undefined) setCarbs(nutriments.carbohydrates_100g.toString());
-        if (nutriments.fat_100g !== undefined) setFat(nutriments.fat_100g.toString());
-        if (nutriments.fiber_100g !== undefined) setFiber(nutriments.fiber_100g.toString());
-        if (nutriments.sodium_100g !== undefined) setSodium((nutriments.sodium_100g * 1000).toString());
-        if (nutriments.sugars_100g !== undefined) setSugar(nutriments.sugars_100g.toString());
-        if (nutriments.saturated_fat_100g !== undefined) setSaturatedFat(nutriments.saturated_fat_100g.toString());
-        if (nutriments.calcium_100g !== undefined) setCalcium((nutriments.calcium_100g * 1000).toString());
-        if (nutriments.iron_100g !== undefined) setIron((nutriments.iron_100g * 1000).toString());
-        if (nutriments.vitamin_c_100g !== undefined) setVitaminC((nutriments.vitamin_c_100g * 1000).toString());
-        if (nutriments.vitamin_a_100g !== undefined) setVitaminA((nutriments.vitamin_a_100g * 1000).toString());
-        if (nutriments.vitamin_d_100g !== undefined) setVitaminD((nutriments.vitamin_d_100g * 1000).toString());
-        if (nutriments.vitamin_e_100g !== undefined) setVitaminE((nutriments.vitamin_e_100g * 1000).toString());
-        if (nutriments.vitamin_b12_100g !== undefined) setVitaminB12((nutriments.vitamin_b12_100g * 1000).toString());
-        if (nutriments.folate_100g !== undefined) setFolate((nutriments.folate_100g * 1000).toString());
-        if (nutriments.magnesium_100g !== undefined) setMagnesium((nutriments.magnesium_100g * 1000).toString());
-        if (nutriments.phosphorus_100g !== undefined) setPhosphorus((nutriments.phosphorus_100g * 1000).toString());
-        if (nutriments.potassium_100g !== undefined) setPotassium((nutriments.potassium_100g * 1000).toString());
-        if (nutriments.zinc_100g !== undefined) setZinc((nutriments.zinc_100g * 1000).toString());
 
-        if (nutriments.energy_kcal_100g !== undefined) {
-            setCalories(nutriments.energy_kcal_100g.toString());
-            setAutoCalcCalories(false);
-        } else if (nutriments.energy_100g !== undefined) {
-            const kcal = nutriments.energy_100g / 4.184;
-            setCalories(kcal.toFixed(2));
-            setAutoCalcCalories(false);
+        // Detectar se há dados de porção no OpenFoodFacts
+        const hasServingData = nutriments.serving_size !== undefined || 
+                               nutriments.proteins_serving !== undefined ||
+                               nutriments.energy_kcal_serving !== undefined;
+        
+        // Detectar tamanho da porção (em gramas)
+        let servingSize = 100; // Default
+        if (nutriments.serving_size !== undefined) {
+            servingSize = nutriments.serving_size;
+        } else if (product.serving_size !== undefined) {
+            servingSize = product.serving_size;
+        } else if (product.serving_quantity !== undefined && product.serving_quantity_unit === 'g') {
+            servingSize = product.serving_quantity;
         }
 
-        setInputMode('100g');
-        setLabelPortionSize(100);
+        // Se tem dados de porção, preencher com valores da porção
+        if (hasServingData && servingSize !== 100) {
+            // Preencher com valores da porção
+            if (nutriments.proteins_serving !== undefined) {
+                setProtein(nutriments.proteins_serving.toString());
+            } else if (nutriments.proteins_100g !== undefined) {
+                // Calcular da porção baseado em 100g
+                const factor = servingSize / 100;
+                setProtein((nutriments.proteins_100g * factor).toFixed(2));
+            }
+
+            if (nutriments.carbohydrates_serving !== undefined) {
+                setCarbs(nutriments.carbohydrates_serving.toString());
+            } else if (nutriments.carbohydrates_100g !== undefined) {
+                const factor = servingSize / 100;
+                setCarbs((nutriments.carbohydrates_100g * factor).toFixed(2));
+            }
+
+            if (nutriments.fat_serving !== undefined) {
+                setFat(nutriments.fat_serving.toString());
+            } else if (nutriments.fat_100g !== undefined) {
+                const factor = servingSize / 100;
+                setFat((nutriments.fat_100g * factor).toFixed(2));
+            }
+
+            if (nutriments.fiber_serving !== undefined) {
+                setFiber(nutriments.fiber_serving.toString());
+            } else if (nutriments.fiber_100g !== undefined) {
+                const factor = servingSize / 100;
+                setFiber((nutriments.fiber_100g * factor).toFixed(2));
+            }
+
+            if (nutriments.sodium_serving !== undefined) {
+                setSodium((nutriments.sodium_serving * 1000).toString());
+            } else if (nutriments.sodium_100g !== undefined) {
+                const factor = servingSize / 100;
+                setSodium((nutriments.sodium_100g * factor * 1000).toFixed(0));
+            }
+
+            if (nutriments.sugars_serving !== undefined) {
+                setSugar(nutriments.sugars_serving.toString());
+            } else if (nutriments.sugars_100g !== undefined) {
+                const factor = servingSize / 100;
+                setSugar((nutriments.sugars_100g * factor).toFixed(2));
+            }
+
+            if (nutriments.saturated_fat_serving !== undefined) {
+                setSaturatedFat(nutriments.saturated_fat_serving.toString());
+            } else if (nutriments.saturated_fat_100g !== undefined) {
+                const factor = servingSize / 100;
+                setSaturatedFat((nutriments.saturated_fat_100g * factor).toFixed(2));
+            }
+
+            // Micronutrientes (sempre calcular da porção se não tiver serving)
+            if (nutriments.calcium_100g !== undefined) {
+                const factor = servingSize / 100;
+                setCalcium((nutriments.calcium_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.iron_100g !== undefined) {
+                const factor = servingSize / 100;
+                setIron((nutriments.iron_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.vitamin_c_100g !== undefined) {
+                const factor = servingSize / 100;
+                setVitaminC((nutriments.vitamin_c_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.vitamin_a_100g !== undefined) {
+                const factor = servingSize / 100;
+                setVitaminA((nutriments.vitamin_a_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.vitamin_d_100g !== undefined) {
+                const factor = servingSize / 100;
+                setVitaminD((nutriments.vitamin_d_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.vitamin_e_100g !== undefined) {
+                const factor = servingSize / 100;
+                setVitaminE((nutriments.vitamin_e_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.vitamin_b12_100g !== undefined) {
+                const factor = servingSize / 100;
+                setVitaminB12((nutriments.vitamin_b12_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.folate_100g !== undefined) {
+                const factor = servingSize / 100;
+                setFolate((nutriments.folate_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.magnesium_100g !== undefined) {
+                const factor = servingSize / 100;
+                setMagnesium((nutriments.magnesium_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.phosphorus_100g !== undefined) {
+                const factor = servingSize / 100;
+                setPhosphorus((nutriments.phosphorus_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.potassium_100g !== undefined) {
+                const factor = servingSize / 100;
+                setPotassium((nutriments.potassium_100g * factor * 1000).toFixed(0));
+            }
+            if (nutriments.zinc_100g !== undefined) {
+                const factor = servingSize / 100;
+                setZinc((nutriments.zinc_100g * factor * 1000).toFixed(0));
+            }
+
+            // Calorias da porção
+            if (nutriments.energy_kcal_serving !== undefined) {
+                setCalories(nutriments.energy_kcal_serving.toString());
+                setAutoCalcCalories(false);
+            } else if (nutriments.energy_serving !== undefined) {
+                const kcal = nutriments.energy_serving / 4.184;
+                setCalories(kcal.toFixed(2));
+                setAutoCalcCalories(false);
+            } else if (nutriments.energy_kcal_100g !== undefined) {
+                const factor = servingSize / 100;
+                setCalories((nutriments.energy_kcal_100g * factor).toFixed(2));
+                setAutoCalcCalories(false);
+            } else if (nutriments.energy_100g !== undefined) {
+                const factor = servingSize / 100;
+                const kcal = (nutriments.energy_100g * factor) / 4.184;
+                setCalories(kcal.toFixed(2));
+                setAutoCalcCalories(false);
+            }
+
+            // Configurar para modo porção
+            setInputMode('portion');
+            setPrevInputMode('portion');
+            setLabelPortionSize(servingSize);
+        } else {
+            // Não tem dados de porção, usar valores por 100g
+            if (nutriments.proteins_100g !== undefined) setProtein(nutriments.proteins_100g.toString());
+            if (nutriments.carbohydrates_100g !== undefined) setCarbs(nutriments.carbohydrates_100g.toString());
+            if (nutriments.fat_100g !== undefined) setFat(nutriments.fat_100g.toString());
+            if (nutriments.fiber_100g !== undefined) setFiber(nutriments.fiber_100g.toString());
+            if (nutriments.sodium_100g !== undefined) setSodium((nutriments.sodium_100g * 1000).toString());
+            if (nutriments.sugars_100g !== undefined) setSugar(nutriments.sugars_100g.toString());
+            if (nutriments.saturated_fat_100g !== undefined) setSaturatedFat(nutriments.saturated_fat_100g.toString());
+            if (nutriments.calcium_100g !== undefined) setCalcium((nutriments.calcium_100g * 1000).toString());
+            if (nutriments.iron_100g !== undefined) setIron((nutriments.iron_100g * 1000).toString());
+            if (nutriments.vitamin_c_100g !== undefined) setVitaminC((nutriments.vitamin_c_100g * 1000).toString());
+            if (nutriments.vitamin_a_100g !== undefined) setVitaminA((nutriments.vitamin_a_100g * 1000).toString());
+            if (nutriments.vitamin_d_100g !== undefined) setVitaminD((nutriments.vitamin_d_100g * 1000).toString());
+            if (nutriments.vitamin_e_100g !== undefined) setVitaminE((nutriments.vitamin_e_100g * 1000).toString());
+            if (nutriments.vitamin_b12_100g !== undefined) setVitaminB12((nutriments.vitamin_b12_100g * 1000).toString());
+            if (nutriments.folate_100g !== undefined) setFolate((nutriments.folate_100g * 1000).toString());
+            if (nutriments.magnesium_100g !== undefined) setMagnesium((nutriments.magnesium_100g * 1000).toString());
+            if (nutriments.phosphorus_100g !== undefined) setPhosphorus((nutriments.phosphorus_100g * 1000).toString());
+            if (nutriments.potassium_100g !== undefined) setPotassium((nutriments.potassium_100g * 1000).toString());
+            if (nutriments.zinc_100g !== undefined) setZinc((nutriments.zinc_100g * 1000).toString());
+
+            if (nutriments.energy_kcal_100g !== undefined) {
+                setCalories(nutriments.energy_kcal_100g.toString());
+                setAutoCalcCalories(false);
+            } else if (nutriments.energy_100g !== undefined) {
+                const kcal = nutriments.energy_100g / 4.184;
+                setCalories(kcal.toFixed(2));
+                setAutoCalcCalories(false);
+            }
+
+            // Configurar para modo 100g
+            setInputMode('100g');
+            setPrevInputMode('100g');
+            setLabelPortionSize(100);
+        }
     };
 
     // Check if query is a barcode (only numbers, 8-13 digits)
@@ -330,18 +545,18 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                 fillFormWithProduct(data.product);
                 setSearchQuery('');
 
-                toast({
-                    title: 'Produto encontrado!',
-                    description: 'Campos preenchidos automaticamente.',
-                });
-            } catch (error) {
-                console.error('Erro ao buscar produto:', error);
-                toast({
-                    title: 'Erro',
-                    description: 'Não foi possível buscar o produto. Verifique sua conexão.',
-                    variant: 'destructive'
-                });
-            } finally {
+            toast({
+                title: 'Produto encontrado!',
+                description: 'Campos preenchidos automaticamente.',
+            });
+        } catch (error) {
+            console.error('Erro ao buscar produto:', error);
+            toast({
+                title: 'Erro',
+                description: 'Não foi possível buscar o produto. Verifique sua conexão.',
+                variant: 'destructive'
+            });
+        } finally {
                 setSearchLoading(false);
             }
         } else {
@@ -1090,7 +1305,7 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                             <Input
                                 id="searchQuery"
                                 placeholder="Digite o código de barras (ex: 7891000100103) ou nome do produto (ex: Whey Protein)"
@@ -1101,24 +1316,25 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                         handleSearch();
                                     }
                                 }}
-                                className="flex-1"
+                                className="flex-1 w-full"
                             />
                             <Button
                                 onClick={handleSearch}
                                 disabled={searchLoading || !searchQuery.trim()}
-                                className="bg-green-600 hover:bg-green-700 text-white"
+                                className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto flex-shrink-0"
                             >
                                 {searchLoading ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                     <>
                                         <Search className="h-4 w-4 mr-2" />
-                                        Buscar
+                                        <span className="hidden sm:inline">Buscar</span>
+                                        <span className="sm:hidden">Buscar</span>
                                     </>
                                 )}
                             </Button>
                         </div>
-                        <p className="text-xs text-green-700 dark:text-green-300">
+                        <p className="text-xs text-green-700 dark:text-green-300 break-words">
                             💡 Dica: Digite apenas números para buscar por código de barras, ou texto para buscar por nome do produto
                         </p>
                     </CardContent>
@@ -1127,14 +1343,14 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
 
             {/* Dialog for Product Selection */}
             <Dialog open={showResultsDialog} onOpenChange={setShowResultsDialog}>
-                <DialogContent className="max-w-2xl max-h-[80vh]">
-                    <DialogHeader>
-                        <DialogTitle>Selecione o Produto</DialogTitle>
-                        <DialogDescription>
+                <DialogContent className="max-w-2xl max-h-[90vh] w-[95vw] sm:w-full p-4 sm:p-6">
+                    <DialogHeader className="pb-3">
+                        <DialogTitle className="text-base sm:text-lg">Selecione o Produto</DialogTitle>
+                        <DialogDescription className="text-xs sm:text-sm">
                             Encontramos {searchResults.length} produto(s). Selecione o produto correto para preencher os dados automaticamente.
                         </DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[60vh] pr-4">
+                    <ScrollArea className="max-h-[calc(90vh-140px)] sm:max-h-[60vh] pr-2 sm:pr-4">
                         <div className="space-y-2">
                             {searchResults.map((product) => (
                                 <Card
@@ -1142,29 +1358,29 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                     className="cursor-pointer hover:bg-muted transition-colors"
                                     onClick={() => handleSelectProduct(product.code)}
                                 >
-                                    <CardContent className="p-4">
-                                        <div className="flex items-start gap-4">
+                                    <CardContent className="p-3 sm:p-4">
+                                        <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                                             {product.image_url && (
                                                 <img
                                                     src={product.image_url}
                                                     alt={product.product_name}
-                                                    className="w-16 h-16 object-cover rounded-lg"
+                                                    className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg flex-shrink-0"
                                                     onError={(e) => {
                                                         e.target.style.display = 'none';
                                                     }}
                                                 />
                                             )}
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-semibold text-sm truncate">
+                                            <div className="flex-1 min-w-0 w-full sm:w-auto">
+                                                <h4 className="font-semibold text-xs sm:text-sm truncate">
                                                     {product.product_name || 'Produto sem nome'}
                                                 </h4>
                                                 {product.brands && (
-                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                    <p className="text-xs text-muted-foreground mt-1 truncate">
                                                         Marca: {product.brands.split(',')[0].trim()}
                                                     </p>
                                                 )}
                                                 {product.code && (
-                                                    <p className="text-xs text-muted-foreground">
+                                                    <p className="text-xs text-muted-foreground truncate">
                                                         Código: {product.code}
                                                     </p>
                                                 )}
@@ -1176,6 +1392,7 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                                     e.stopPropagation();
                                                     handleSelectProduct(product.code);
                                                 }}
+                                                className="w-full sm:w-auto flex-shrink-0 mt-2 sm:mt-0"
                                             >
                                                 Selecionar
                                             </Button>
