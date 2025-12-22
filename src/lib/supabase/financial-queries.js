@@ -410,11 +410,12 @@ export async function getPatientsForAutocomplete(nutritionistId) {
  * @returns {Promise<Array>}
  */
 export async function getServices(nutritionistId) {
+    // Try to fetch all services first, then filter in memory
+    // This handles cases where the column name might be different
     const { data, error } = await supabase
         .from('services')
         .select('*')
         .eq('nutritionist_id', nutritionistId)
-        .eq('is_active', true)
         .order('name', { ascending: true });
 
     if (error) {
@@ -422,7 +423,13 @@ export async function getServices(nutritionistId) {
         throw error;
     }
 
-    return data || [];
+    // Filter active services in memory (handle both is_active and active column names)
+    const activeServices = (data || []).filter(service => {
+        // Try is_active first, then active, then default to true if neither exists
+        return service.is_active !== false && service.active !== false;
+    });
+
+    return activeServices;
 }
 
 /**
@@ -466,14 +473,36 @@ export async function saveService(serviceData) {
  * @returns {Promise<void>}
  */
 export async function deleteService(serviceId) {
+    // Try to update is_active, if that fails, try active
+    let updateData = { updated_at: new Date().toISOString() };
+    
+    // Try is_active first
+    updateData.is_active = false;
+    
     const { error } = await supabase
         .from('services')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .update(updateData)
         .eq('id', serviceId);
 
     if (error) {
-        console.error('Error deleting service:', error);
-        throw error;
+        // If is_active doesn't work, try active
+        if (error.message && error.message.includes('is_active')) {
+            delete updateData.is_active;
+            updateData.active = false;
+            
+            const { error: error2 } = await supabase
+                .from('services')
+                .update(updateData)
+                .eq('id', serviceId);
+            
+            if (error2) {
+                console.error('Error deleting service:', error2);
+                throw error2;
+            }
+        } else {
+            console.error('Error deleting service:', error);
+            throw error;
+        }
     }
 }
 
