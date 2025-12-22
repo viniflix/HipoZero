@@ -87,19 +87,12 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             let carbsVal = parseFloat(carbs) || 0;
             let fatVal = parseFloat(fat) || 0;
             
-            // If in portion mode, calculate calories based on portion values first, then normalize
-            if (inputMode === 'portion' && labelPortionSize > 0) {
-                // Calculate calories for the portion
-                const portionCalories = (proteinVal * 4) + (carbsVal * 4) + (fatVal * 9);
-                // Normalize to 100g
-                const factor = 100 / labelPortionSize;
-                const calculated = portionCalories * factor;
-                setCalories(Math.round(calculated * 100) / 100);
-            } else {
-                // Calories = (Protein * 4) + (Carbs * 4) + (Fat * 9)
-                const calculated = (proteinVal * 4) + (carbsVal * 4) + (fatVal * 9);
-                setCalories(Math.round(calculated * 100) / 100); // Round to 2 decimals
-            }
+            // Always calculate calories directly from the entered macros
+            // Calories = (Protein × 4) + (Carbs × 4) + (Fat × 9)
+            // In portion mode, this gives calories for the portion size
+            // In 100g mode, this gives calories for 100g
+            const calculated = (proteinVal * 4) + (carbsVal * 4) + (fatVal * 9);
+            setCalories(Math.round(calculated * 100) / 100); // Round to 2 decimals
         }
     }, [protein, carbs, fat, autoCalcCalories, inputMode, labelPortionSize]);
 
