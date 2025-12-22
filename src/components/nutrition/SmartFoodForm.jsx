@@ -322,187 +322,236 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
     };
 
     // Fill form with OpenFoodFacts data
+    // IMPORTANTE: O HipoZero sempre trabalha com base 100g no banco de dados
+    // Se o OpenFoodFacts tiver dados de porção, normalizamos para 100g primeiro
     const fillFormWithProduct = (product) => {
         const nutriments = product.nutriments || {};
 
         if (product.product_name) setName(product.product_name);
         if (product.brands) setBrand(product.brands.split(',')[0].trim());
 
-        // Detectar se há dados de porção no OpenFoodFacts
-        const hasServingData = nutriments.serving_size !== undefined || 
-                               nutriments.proteins_serving !== undefined ||
-                               nutriments.energy_kcal_serving !== undefined;
-        
-        // Detectar tamanho da porção (em gramas)
-        let servingSize = 100; // Default
-        if (nutriments.serving_size !== undefined) {
+        // Detectar tamanho da porção (em gramas) - pode estar em vários lugares
+        let servingSize = null;
+        if (nutriments.serving_size !== undefined && nutriments.serving_size > 0) {
             servingSize = nutriments.serving_size;
-        } else if (product.serving_size !== undefined) {
+        } else if (product.serving_size !== undefined && product.serving_size > 0) {
             servingSize = product.serving_size;
-        } else if (product.serving_quantity !== undefined && product.serving_quantity_unit === 'g') {
+        } else if (product.serving_quantity !== undefined && product.serving_quantity_unit === 'g' && product.serving_quantity > 0) {
             servingSize = product.serving_quantity;
         }
 
-        // Se tem dados de porção, preencher com valores da porção
-        if (hasServingData && servingSize !== 100) {
-            // Preencher com valores da porção
-            if (nutriments.proteins_serving !== undefined) {
-                setProtein(nutriments.proteins_serving.toString());
-            } else if (nutriments.proteins_100g !== undefined) {
-                // Calcular da porção baseado em 100g
-                const factor = servingSize / 100;
-                setProtein((nutriments.proteins_100g * factor).toFixed(2));
-            }
+        // Verificar se há valores de porção disponíveis
+        const hasServingValues = nutriments.proteins_serving !== undefined || 
+                                 nutriments.carbohydrates_serving !== undefined ||
+                                 nutriments.fat_serving !== undefined ||
+                                 nutriments.energy_kcal_serving !== undefined;
 
-            if (nutriments.carbohydrates_serving !== undefined) {
-                setCarbs(nutriments.carbohydrates_serving.toString());
-            } else if (nutriments.carbohydrates_100g !== undefined) {
-                const factor = servingSize / 100;
-                setCarbs((nutriments.carbohydrates_100g * factor).toFixed(2));
-            }
+        // SEMPRE normalizar para 100g (padrão do HipoZero)
+        // Se tiver dados de porção, normalizar os valores da porção para 100g
+        // Se não tiver dados de porção, usar diretamente os valores por 100g
 
-            if (nutriments.fat_serving !== undefined) {
-                setFat(nutriments.fat_serving.toString());
-            } else if (nutriments.fat_100g !== undefined) {
-                const factor = servingSize / 100;
-                setFat((nutriments.fat_100g * factor).toFixed(2));
-            }
+        // Proteína
+        if (hasServingValues && servingSize && nutriments.proteins_serving !== undefined) {
+            // Normalizar valor da porção para 100g
+            const factor = 100 / servingSize;
+            setProtein((nutriments.proteins_serving * factor).toFixed(2));
+        } else if (nutriments.proteins_100g !== undefined) {
+            setProtein(nutriments.proteins_100g.toString());
+        }
 
-            if (nutriments.fiber_serving !== undefined) {
-                setFiber(nutriments.fiber_serving.toString());
-            } else if (nutriments.fiber_100g !== undefined) {
-                const factor = servingSize / 100;
-                setFiber((nutriments.fiber_100g * factor).toFixed(2));
-            }
+        // Carboidratos
+        if (hasServingValues && servingSize && nutriments.carbohydrates_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setCarbs((nutriments.carbohydrates_serving * factor).toFixed(2));
+        } else if (nutriments.carbohydrates_100g !== undefined) {
+            setCarbs(nutriments.carbohydrates_100g.toString());
+        }
 
-            if (nutriments.sodium_serving !== undefined) {
-                setSodium((nutriments.sodium_serving * 1000).toString());
-            } else if (nutriments.sodium_100g !== undefined) {
-                const factor = servingSize / 100;
-                setSodium((nutriments.sodium_100g * factor * 1000).toFixed(0));
-            }
+        // Gorduras
+        if (hasServingValues && servingSize && nutriments.fat_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setFat((nutriments.fat_serving * factor).toFixed(2));
+        } else if (nutriments.fat_100g !== undefined) {
+            setFat(nutriments.fat_100g.toString());
+        }
 
-            if (nutriments.sugars_serving !== undefined) {
-                setSugar(nutriments.sugars_serving.toString());
-            } else if (nutriments.sugars_100g !== undefined) {
-                const factor = servingSize / 100;
-                setSugar((nutriments.sugars_100g * factor).toFixed(2));
-            }
+        // Calorias
+        if (hasServingValues && servingSize && nutriments.energy_kcal_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setCalories((nutriments.energy_kcal_serving * factor).toFixed(2));
+            setAutoCalcCalories(false);
+        } else if (hasServingValues && servingSize && nutriments.energy_serving !== undefined) {
+            const factor = 100 / servingSize;
+            const kcal = (nutriments.energy_serving * factor) / 4.184;
+            setCalories(kcal.toFixed(2));
+            setAutoCalcCalories(false);
+        } else if (nutriments.energy_kcal_100g !== undefined) {
+            setCalories(nutriments.energy_kcal_100g.toString());
+            setAutoCalcCalories(false);
+        } else if (nutriments.energy_100g !== undefined) {
+            const kcal = nutriments.energy_100g / 4.184;
+            setCalories(kcal.toFixed(2));
+            setAutoCalcCalories(false);
+        }
 
-            if (nutriments.saturated_fat_serving !== undefined) {
-                setSaturatedFat(nutriments.saturated_fat_serving.toString());
-            } else if (nutriments.saturated_fat_100g !== undefined) {
-                const factor = servingSize / 100;
-                setSaturatedFat((nutriments.saturated_fat_100g * factor).toFixed(2));
-            }
+        // Fibra
+        if (hasServingValues && servingSize && nutriments.fiber_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setFiber((nutriments.fiber_serving * factor).toFixed(2));
+        } else if (nutriments.fiber_100g !== undefined) {
+            setFiber(nutriments.fiber_100g.toString());
+        }
 
-            // Micronutrientes (sempre calcular da porção se não tiver serving)
-            if (nutriments.calcium_100g !== undefined) {
-                const factor = servingSize / 100;
-                setCalcium((nutriments.calcium_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.iron_100g !== undefined) {
-                const factor = servingSize / 100;
-                setIron((nutriments.iron_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.vitamin_c_100g !== undefined) {
-                const factor = servingSize / 100;
-                setVitaminC((nutriments.vitamin_c_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.vitamin_a_100g !== undefined) {
-                const factor = servingSize / 100;
-                setVitaminA((nutriments.vitamin_a_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.vitamin_d_100g !== undefined) {
-                const factor = servingSize / 100;
-                setVitaminD((nutriments.vitamin_d_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.vitamin_e_100g !== undefined) {
-                const factor = servingSize / 100;
-                setVitaminE((nutriments.vitamin_e_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.vitamin_b12_100g !== undefined) {
-                const factor = servingSize / 100;
-                setVitaminB12((nutriments.vitamin_b12_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.folate_100g !== undefined) {
-                const factor = servingSize / 100;
-                setFolate((nutriments.folate_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.magnesium_100g !== undefined) {
-                const factor = servingSize / 100;
-                setMagnesium((nutriments.magnesium_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.phosphorus_100g !== undefined) {
-                const factor = servingSize / 100;
-                setPhosphorus((nutriments.phosphorus_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.potassium_100g !== undefined) {
-                const factor = servingSize / 100;
-                setPotassium((nutriments.potassium_100g * factor * 1000).toFixed(0));
-            }
-            if (nutriments.zinc_100g !== undefined) {
-                const factor = servingSize / 100;
-                setZinc((nutriments.zinc_100g * factor * 1000).toFixed(0));
-            }
+        // Sódio (em mg)
+        if (hasServingValues && servingSize && nutriments.sodium_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setSodium((nutriments.sodium_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.sodium_100g !== undefined) {
+            setSodium((nutriments.sodium_100g * 1000).toString());
+        }
 
-            // Calorias da porção
-            if (nutriments.energy_kcal_serving !== undefined) {
-                setCalories(nutriments.energy_kcal_serving.toString());
-                setAutoCalcCalories(false);
-            } else if (nutriments.energy_serving !== undefined) {
-                const kcal = nutriments.energy_serving / 4.184;
-                setCalories(kcal.toFixed(2));
-                setAutoCalcCalories(false);
-            } else if (nutriments.energy_kcal_100g !== undefined) {
-                const factor = servingSize / 100;
-                setCalories((nutriments.energy_kcal_100g * factor).toFixed(2));
-                setAutoCalcCalories(false);
-            } else if (nutriments.energy_100g !== undefined) {
-                const factor = servingSize / 100;
-                const kcal = (nutriments.energy_100g * factor) / 4.184;
-                setCalories(kcal.toFixed(2));
-                setAutoCalcCalories(false);
-            }
+        // Açúcares
+        if (hasServingValues && servingSize && nutriments.sugars_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setSugar((nutriments.sugars_serving * factor).toFixed(2));
+        } else if (nutriments.sugars_100g !== undefined) {
+            setSugar(nutriments.sugars_100g.toString());
+        }
 
-            // Configurar para modo porção
-            setInputMode('portion');
-            setPrevInputMode('portion');
+        // Gordura saturada
+        if (hasServingValues && servingSize && nutriments.saturated_fat_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setSaturatedFat((nutriments.saturated_fat_serving * factor).toFixed(2));
+        } else if (nutriments.saturated_fat_100g !== undefined) {
+            setSaturatedFat(nutriments.saturated_fat_100g.toString());
+        }
+
+        // Gordura trans
+        if (hasServingValues && servingSize && nutriments.trans_fat_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setTransFat((nutriments.trans_fat_serving * factor).toFixed(2));
+        } else if (nutriments.trans_fat_100g !== undefined) {
+            setTransFat(nutriments.trans_fat_100g.toString());
+        }
+
+        // Gordura monoinsaturada
+        if (hasServingValues && servingSize && nutriments.monounsaturated_fat_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setMonounsaturatedFat((nutriments.monounsaturated_fat_serving * factor).toFixed(2));
+        } else if (nutriments.monounsaturated_fat_100g !== undefined) {
+            setMonounsaturatedFat(nutriments.monounsaturated_fat_100g.toString());
+        }
+
+        // Gordura poliinsaturada
+        if (hasServingValues && servingSize && nutriments.polyunsaturated_fat_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setPolyunsaturatedFat((nutriments.polyunsaturated_fat_serving * factor).toFixed(2));
+        } else if (nutriments.polyunsaturated_fat_100g !== undefined) {
+            setPolyunsaturatedFat(nutriments.polyunsaturated_fat_100g.toString());
+        }
+
+        // Colesterol (em mg)
+        if (hasServingValues && servingSize && nutriments.cholesterol_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setCholesterol((nutriments.cholesterol_serving * factor).toFixed(0));
+        } else if (nutriments.cholesterol_100g !== undefined) {
+            setCholesterol((nutriments.cholesterol_100g * 1000).toFixed(0));
+        }
+
+        // Micronutrientes (sempre em mg, normalizar de 100g ou serving)
+        if (hasServingValues && servingSize && nutriments.calcium_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setCalcium((nutriments.calcium_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.calcium_100g !== undefined) {
+            setCalcium((nutriments.calcium_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.iron_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setIron((nutriments.iron_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.iron_100g !== undefined) {
+            setIron((nutriments.iron_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.vitamin_c_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setVitaminC((nutriments.vitamin_c_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.vitamin_c_100g !== undefined) {
+            setVitaminC((nutriments.vitamin_c_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.vitamin_a_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setVitaminA((nutriments.vitamin_a_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.vitamin_a_100g !== undefined) {
+            setVitaminA((nutriments.vitamin_a_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.vitamin_d_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setVitaminD((nutriments.vitamin_d_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.vitamin_d_100g !== undefined) {
+            setVitaminD((nutriments.vitamin_d_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.vitamin_e_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setVitaminE((nutriments.vitamin_e_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.vitamin_e_100g !== undefined) {
+            setVitaminE((nutriments.vitamin_e_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.vitamin_b12_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setVitaminB12((nutriments.vitamin_b12_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.vitamin_b12_100g !== undefined) {
+            setVitaminB12((nutriments.vitamin_b12_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.folate_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setFolate((nutriments.folate_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.folate_100g !== undefined) {
+            setFolate((nutriments.folate_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.magnesium_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setMagnesium((nutriments.magnesium_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.magnesium_100g !== undefined) {
+            setMagnesium((nutriments.magnesium_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.phosphorus_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setPhosphorus((nutriments.phosphorus_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.phosphorus_100g !== undefined) {
+            setPhosphorus((nutriments.phosphorus_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.potassium_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setPotassium((nutriments.potassium_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.potassium_100g !== undefined) {
+            setPotassium((nutriments.potassium_100g * 1000).toString());
+        }
+
+        if (hasServingValues && servingSize && nutriments.zinc_serving !== undefined) {
+            const factor = 100 / servingSize;
+            setZinc((nutriments.zinc_serving * factor * 1000).toFixed(0));
+        } else if (nutriments.zinc_100g !== undefined) {
+            setZinc((nutriments.zinc_100g * 1000).toString());
+        }
+
+        // SEMPRE iniciar no modo 100g (padrão do HipoZero)
+        // Se tiver tamanho de porção detectado, salvar para uso futuro
+        setInputMode('100g');
+        setPrevInputMode('100g');
+        
+        // Se detectou tamanho de porção, salvar para quando o usuário mudar para modo "portion"
+        if (servingSize && servingSize > 0 && servingSize !== 100) {
             setLabelPortionSize(servingSize);
         } else {
-            // Não tem dados de porção, usar valores por 100g
-            if (nutriments.proteins_100g !== undefined) setProtein(nutriments.proteins_100g.toString());
-            if (nutriments.carbohydrates_100g !== undefined) setCarbs(nutriments.carbohydrates_100g.toString());
-            if (nutriments.fat_100g !== undefined) setFat(nutriments.fat_100g.toString());
-            if (nutriments.fiber_100g !== undefined) setFiber(nutriments.fiber_100g.toString());
-            if (nutriments.sodium_100g !== undefined) setSodium((nutriments.sodium_100g * 1000).toString());
-            if (nutriments.sugars_100g !== undefined) setSugar(nutriments.sugars_100g.toString());
-            if (nutriments.saturated_fat_100g !== undefined) setSaturatedFat(nutriments.saturated_fat_100g.toString());
-            if (nutriments.calcium_100g !== undefined) setCalcium((nutriments.calcium_100g * 1000).toString());
-            if (nutriments.iron_100g !== undefined) setIron((nutriments.iron_100g * 1000).toString());
-            if (nutriments.vitamin_c_100g !== undefined) setVitaminC((nutriments.vitamin_c_100g * 1000).toString());
-            if (nutriments.vitamin_a_100g !== undefined) setVitaminA((nutriments.vitamin_a_100g * 1000).toString());
-            if (nutriments.vitamin_d_100g !== undefined) setVitaminD((nutriments.vitamin_d_100g * 1000).toString());
-            if (nutriments.vitamin_e_100g !== undefined) setVitaminE((nutriments.vitamin_e_100g * 1000).toString());
-            if (nutriments.vitamin_b12_100g !== undefined) setVitaminB12((nutriments.vitamin_b12_100g * 1000).toString());
-            if (nutriments.folate_100g !== undefined) setFolate((nutriments.folate_100g * 1000).toString());
-            if (nutriments.magnesium_100g !== undefined) setMagnesium((nutriments.magnesium_100g * 1000).toString());
-            if (nutriments.phosphorus_100g !== undefined) setPhosphorus((nutriments.phosphorus_100g * 1000).toString());
-            if (nutriments.potassium_100g !== undefined) setPotassium((nutriments.potassium_100g * 1000).toString());
-            if (nutriments.zinc_100g !== undefined) setZinc((nutriments.zinc_100g * 1000).toString());
-
-            if (nutriments.energy_kcal_100g !== undefined) {
-                setCalories(nutriments.energy_kcal_100g.toString());
-                setAutoCalcCalories(false);
-            } else if (nutriments.energy_100g !== undefined) {
-                const kcal = nutriments.energy_100g / 4.184;
-                setCalories(kcal.toFixed(2));
-                setAutoCalcCalories(false);
-            }
-
-            // Configurar para modo 100g
-            setInputMode('100g');
-            setPrevInputMode('100g');
             setLabelPortionSize(100);
         }
     };
