@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { createFood } from '@/lib/supabase/foodService';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -506,8 +507,8 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
 
     return (
         <div className={isCompact ? "space-y-3" : "space-y-6"}>
-            {/* Progress Bar */}
-            {!isCompact && (
+            {/* Progress Bar - Always show in full mode */}
+            {mode !== 'compact' && (
                 <Card>
                     <CardContent className="pt-6">
                         <div className="space-y-2">
@@ -524,7 +525,7 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             )}
 
             {/* Search Section - Only in full mode and step 1 */}
-            {!isCompact && currentStep === 1 && (
+            {mode !== 'compact' && currentStep === 1 && (
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base flex items-center gap-2">
@@ -1093,60 +1094,67 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                 </CardContent>
             </Card>
 
-            {/* Navigation Buttons */}
-            {!isCompact && (
-                <div className="flex items-center justify-between gap-2 pt-4 border-t">
-                    <div className="flex gap-2">
-                        {currentStep > 1 && (
-                            <Button
-                                variant="outline"
-                                onClick={prevStep}
-                                disabled={loading}
-                            >
-                                <ChevronLeft className="h-4 w-4 mr-2" />
-                                Anterior
-                            </Button>
-                        )}
-                    </div>
-                    <div className="flex gap-2">
-                        {(currentStep === 3 || currentStep === 4 || currentStep === 5) && (
-                            <Button
-                                variant="ghost"
-                                onClick={nextStep}
-                                disabled={loading}
-                            >
-                                Pular
-                            </Button>
-                        )}
-                        {currentStep < totalSteps ? (
-                            <Button
-                                onClick={nextStep}
-                                disabled={loading}
-                            >
-                                Próximo
-                                <ChevronRight className="h-4 w-4 ml-2" />
-                            </Button>
-                        ) : (
-                            <Button
-                                onClick={handleSubmit}
-                                disabled={loading}
-                                size="lg"
-                            >
-                                {loading ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        {initialData ? 'Atualizando...' : 'Criando...'}
-                                    </>
-                                ) : (
-                                    <>
-                                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                                        {initialData ? 'Atualizar Alimento' : 'Criar Alimento'}
-                                    </>
+            {/* Navigation Buttons - Always show in full mode */}
+            {mode !== 'compact' && (
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex gap-2">
+                                {currentStep > 1 && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={prevStep}
+                                        disabled={loading}
+                                        size="lg"
+                                    >
+                                        <ChevronLeft className="h-4 w-4 mr-2" />
+                                        Anterior
+                                    </Button>
                                 )}
-                            </Button>
-                        )}
-                    </div>
-                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                {(currentStep === 3 || currentStep === 4 || currentStep === 5) && (
+                                    <Button
+                                        variant="ghost"
+                                        onClick={nextStep}
+                                        disabled={loading}
+                                        size="lg"
+                                    >
+                                        Pular
+                                    </Button>
+                                )}
+                                {currentStep < totalSteps ? (
+                                    <Button
+                                        onClick={nextStep}
+                                        disabled={loading}
+                                        size="lg"
+                                    >
+                                        Próximo
+                                        <ChevronRight className="h-4 w-4 ml-2" />
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        onClick={handleSubmit}
+                                        disabled={loading}
+                                        size="lg"
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                {initialData ? 'Atualizando...' : 'Criando...'}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                                {initialData ? 'Atualizar Alimento' : 'Criar Alimento'}
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
             )}
         </div>
     );
