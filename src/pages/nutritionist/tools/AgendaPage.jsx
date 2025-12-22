@@ -17,171 +17,9 @@ import { format, isToday, isTomorrow, isThisWeek, isThisMonth, startOfDay, addDa
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { exportAgendaToPdf } from '@/lib/pdfUtils';
-
-const AppointmentForm = ({ appointment, patients, onSave, onCancel, preSelectedDate }) => {
-    const [formData, setFormData] = useState({
-        patient_id: appointment?.patient_id || '',
-        appointment_time_date: appointment
-            ? format(new Date(appointment.appointment_time), 'yyyy-MM-dd')
-            : preSelectedDate
-                ? format(preSelectedDate, 'yyyy-MM-dd')
-                : '',
-        appointment_time_hour: appointment ? format(new Date(appointment.appointment_time), 'HH:mm') : '',
-        duration: appointment?.duration || 60, // Duração padrão: 60 minutos
-        appointment_type: appointment?.appointment_type || 'first_appointment', // Tipo padrão
-        status: appointment?.status || 'scheduled', // Status padrão
-        notes: appointment?.notes || ''
-    });
-
-    const [patientSearchTerm, setPatientSearchTerm] = useState(
-        appointment?.patient_id ? patients.find(p => p.id === appointment.patient_id)?.name || '' : ''
-    );
-    const [showPatientSuggestions, setShowPatientSuggestions] = useState(false);
-
-    const filteredPatients = patients.filter(p =>
-        p.name.toLowerCase().includes(patientSearchTerm.toLowerCase())
-    ).slice(0, 5);
-
-    const appointmentTypes = [
-        { value: 'first_appointment', label: 'Primeira Consulta' },
-        { value: 'return', label: 'Retorno' },
-        { value: 'evaluation', label: 'Avaliação' },
-        { value: 'online', label: 'Online' },
-        { value: 'in_person', label: 'Presencial' }
-    ];
-
-    const statusOptions = [
-        { value: 'scheduled', label: 'Agendada' },
-        { value: 'confirmed', label: 'Confirmada' },
-        { value: 'awaiting_confirmation', label: 'Aguardando Confirmação' },
-        { value: 'completed', label: 'Realizada' },
-        { value: 'cancelled', label: 'Cancelada' },
-        { value: 'no_show', label: 'Faltou' }
-    ];
-
-    const durationOptions = [
-        { value: 30, label: '30 minutos' },
-        { value: 45, label: '45 minutos' },
-        { value: 60, label: '1 hora' },
-        { value: 90, label: '1h 30min' },
-        { value: 120, label: '2 horas' }
-    ];
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        const [year, month, day] = formData.appointment_time_date.split('-').map(Number);
-        const [hours, minutes] = formData.appointment_time_hour.split(':').map(Number);
-        const appointment_time = new Date(year, month - 1, day, hours, minutes);
-        onSave({
-            ...appointment,
-            ...formData,
-            appointment_time: appointment_time.toISOString()
-        });
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-            <div className="relative">
-                <Label htmlFor="patient_search">Paciente *</Label>
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                        id="patient_search"
-                        type="text"
-                        placeholder="Buscar paciente pelo nome..."
-                        value={patientSearchTerm}
-                        onChange={(e) => {
-                            setPatientSearchTerm(e.target.value);
-                            setShowPatientSuggestions(true);
-                            if (!e.target.value) {
-                                setFormData(prev => ({ ...prev, patient_id: '' }));
-                            }
-                        }}
-                        onFocus={() => setShowPatientSuggestions(true)}
-                        className="pl-9"
-                        required={!formData.patient_id}
-                    />
-                </div>
-
-                {showPatientSuggestions && patientSearchTerm && filteredPatients.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
-                        {filteredPatients.map(patient => (
-                            <button
-                                key={patient.id}
-                                type="button"
-                                className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground text-sm"
-                                onClick={() => {
-                                    setFormData(prev => ({ ...prev, patient_id: patient.id }));
-                                    setPatientSearchTerm(patient.name);
-                                    setShowPatientSuggestions(false);
-                                }}
-                            >
-                                {patient.name}
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                {patientSearchTerm && filteredPatients.length === 0 && showPatientSuggestions && (
-                    <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg px-3 py-2 text-sm text-muted-foreground">
-                        Nenhum paciente encontrado
-                    </div>
-                )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <Label htmlFor="date">Data *</Label>
-                    <Input id="date" type="date" required value={formData.appointment_time_date} onChange={e => setFormData(prev => ({ ...prev, appointment_time_date: e.target.value }))} />
-                </div>
-                <div>
-                    <Label htmlFor="time">Hora *</Label>
-                    <Input id="time" type="time" required value={formData.appointment_time_hour} onChange={e => setFormData(prev => ({ ...prev, appointment_time_hour: e.target.value }))} />
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <Label htmlFor="duration">Duração *</Label>
-                    <Select required value={String(formData.duration)} onValueChange={(value) => setFormData(prev => ({ ...prev, duration: Number(value) }))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            {durationOptions.map(opt => <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div>
-                    <Label htmlFor="appointment_type">Tipo *</Label>
-                    <Select required value={formData.appointment_type} onValueChange={(value) => setFormData(prev => ({ ...prev, appointment_type: value }))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            {appointmentTypes.map(type => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-
-            <div>
-                <Label htmlFor="status">Status *</Label>
-                <Select required value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                        {statusOptions.map(status => <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
-
-            <div>
-                <Label htmlFor="notes">Observações</Label>
-                <Input id="notes" value={formData.notes} onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))} placeholder="Informações adicionais (opcional)" />
-            </div>
-            <DialogFooter>
-                <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-                <Button type="submit">Salvar</Button>
-            </DialogFooter>
-        </form>
-    );
-};
+import AppointmentDialog from '@/components/agenda/AppointmentDialog';
+import { createAppointmentWithFinance, updateAppointment } from '@/lib/supabase/agenda-queries';
+import { getServices } from '@/lib/supabase/financial-queries';
 
 export default function AgendaPage() {
     const { user, signOut } = useAuth();
@@ -223,15 +61,26 @@ export default function AgendaPage() {
 
         if (patientsError) toast({ title: "Erro", description: "Não foi possível carregar os pacientes.", variant: "destructive" });
         else setPatients(patientsData || []);
+
+        // Load services
+        if (services.length === 0) {
+            try {
+                const servicesData = await getServices(user.id);
+                setServices(servicesData);
+            } catch (error) {
+                console.error('Error loading services:', error);
+            }
+        }
+
         setLoading(false);
-    }, [user, toast]);
+    }, [user, toast, services.length]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
 
-    const handleSaveAppointment = async (data) => {
-        const { patient_id, appointment_time, notes, duration, appointment_type, status } = data;
+    const handleSaveAppointment = async (appointmentData, financialData) => {
+        const { patient_id, appointment_time, notes, duration, appointment_type, status } = appointmentData;
 
         // Validação de conflitos de horário
         const startTime = new Date(appointment_time);
@@ -239,7 +88,7 @@ export default function AgendaPage() {
 
         const hasConflict = appointments.some(appt => {
             // Ignora o próprio agendamento ao editar
-            if (data.id && appt.id === data.id) return false;
+            if (appointmentData.id && appt.id === appointmentData.id) return false;
 
             const apptStart = new Date(appt.appointment_time);
             const apptEnd = new Date(apptStart.getTime() + (appt.duration || 60) * 60000);
@@ -257,32 +106,55 @@ export default function AgendaPage() {
             return;
         }
 
-        const payload = {
-            nutritionist_id: user.id,
-            patient_id,
-            appointment_time,
-            notes,
-            duration: duration || 60,
-            appointment_type: appointment_type || 'first_appointment',
-            status: status || 'scheduled'
-        };
+        try {
+            if (appointmentData.id) {
+                // Update existing appointment (no financial transaction)
+                await updateAppointment(appointmentData.id, {
+                    patient_id,
+                    appointment_time,
+                    notes,
+                    duration: duration || 60,
+                    appointment_type: appointment_type || 'first_appointment',
+                    status: status || 'scheduled'
+                });
+                toast({ title: "Sucesso!", description: "Agendamento atualizado com sucesso." });
+            } else {
+                // Create new appointment with financial transaction
+                const payload = {
+                    nutritionist_id: user.id,
+                    patient_id,
+                    appointment_time,
+                    notes,
+                    duration: duration || 60,
+                    appointment_type: appointment_type || 'first_appointment',
+                    status: status || 'scheduled'
+                };
 
-        let query;
-        if (data.id) {
-            query = supabase.from('appointments').update(payload).eq('id', data.id);
-        } else {
-            query = supabase.from('appointments').insert(payload);
-        }
+                const { appointment, transaction } = await createAppointmentWithFinance(payload, financialData);
+                
+                if (transaction) {
+                    toast({ 
+                        title: "Sucesso!", 
+                        description: "Agendamento criado e registro financeiro gerado automaticamente." 
+                    });
+                } else {
+                    toast({ 
+                        title: "Sucesso!", 
+                        description: "Agendamento criado com sucesso." 
+                    });
+                }
+            }
 
-        const { error } = await query;
-
-        if (error) {
-            toast({ title: "Erro", description: `Não foi possível salvar o agendamento. ${error.message}`, variant: "destructive" });
-        } else {
-            toast({ title: "Sucesso!", description: `Agendamento ${data.id ? 'atualizado' : 'criado'} com sucesso.` });
             setIsFormOpen(false);
             setEditingAppointment(null);
             loadData();
+        } catch (error) {
+            console.error('Error saving appointment:', error);
+            toast({ 
+                title: "Erro", 
+                description: `Não foi possível salvar o agendamento. ${error.message}`, 
+                variant: "destructive" 
+            });
         }
     };
 
@@ -561,25 +433,15 @@ export default function AgendaPage() {
                         >
                             <FileDown className="w-4 h-4 mr-2" /> Exportar PDF
                         </Button>
-                        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                            <DialogTrigger asChild>
-                                <Button onClick={() => setEditingAppointment(null)} className="bg-primary hover:bg-primary/90">
-                                    <Plus className="w-4 h-4 mr-2" /> Novo Agendamento
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>{editingAppointment ? 'Editar' : 'Novo'} Agendamento</DialogTitle>
-                                </DialogHeader>
-                                <AppointmentForm
-                                    appointment={editingAppointment}
-                                    patients={patients}
-                                    onSave={handleSaveAppointment}
-                                    onCancel={() => setIsFormOpen(false)}
-                                    preSelectedDate={selectedDate}
-                                />
-                            </DialogContent>
-                        </Dialog>
+                        <Button 
+                            onClick={() => {
+                                setEditingAppointment(null);
+                                setIsFormOpen(true);
+                            }} 
+                            className="bg-primary hover:bg-primary/90"
+                        >
+                            <Plus className="w-4 h-4 mr-2" /> Novo Agendamento
+                        </Button>
                     </div>
                 </div>
 
@@ -1142,6 +1004,18 @@ export default function AgendaPage() {
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+
+                {/* Appointment Dialog */}
+                <AppointmentDialog
+                    open={isFormOpen}
+                    onOpenChange={setIsFormOpen}
+                    appointment={editingAppointment}
+                    patients={patients}
+                    services={services}
+                    nutritionistId={user?.id}
+                    preSelectedDate={selectedDate}
+                    onSave={handleSaveAppointment}
+                />
 
                 {/* Dialog de Confirmação de Exclusão */}
                 <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

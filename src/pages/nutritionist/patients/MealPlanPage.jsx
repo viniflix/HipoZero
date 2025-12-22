@@ -58,6 +58,8 @@ import { generateShoppingList } from '@/lib/pdf/shoppingListGenerator';
 import { translateMealType } from '@/utils/mealTranslations';
 import { formatQuantityWithUnit } from '@/lib/utils/measureTranslations';
 import { useAuth } from '@/contexts/AuthContext';
+import { getLatestEnergyCalculation } from '@/lib/supabase/energy-queries';
+import PlanTargetMonitor from '@/components/meal-plan/PlanTargetMonitor';
 
 const MealPlanPage = () => {
     const { patientId } = useParams();
@@ -83,6 +85,7 @@ const MealPlanPage = () => {
     const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
     const [templateName, setTemplateName] = useState('');
     const [templateTags, setTemplateTags] = useState('');
+    const [energyCalculation, setEnergyCalculation] = useState(null);
 
     // Obter ID do nutricionista
     useEffect(() => {
@@ -160,6 +163,22 @@ const MealPlanPage = () => {
         };
         loadReferenceValues();
     }, [activePlan?.id]);
+
+    // Carregar cálculo de energia
+    useEffect(() => {
+        const loadEnergyCalculation = async () => {
+            if (!patientId) return;
+            
+            try {
+                const { data, error } = await getLatestEnergyCalculation(patientId);
+                if (error) throw error;
+                setEnergyCalculation(data);
+            } catch (error) {
+                console.error('Erro ao carregar cálculo de energia:', error);
+            }
+        };
+        loadEnergyCalculation();
+    }, [patientId]);
 
     // Criar ou atualizar plano
     const handleSubmit = async (planData, planId = null) => {
@@ -572,6 +591,14 @@ const MealPlanPage = () => {
                     </Button>
                 </div>
             </div>
+
+            {/* Target Monitor */}
+            <PlanTargetMonitor
+                targetCalories={energyCalculation?.get_with_activities || energyCalculation?.get || null}
+                currentCalories={activePlan?.daily_calories || 0}
+                patientId={patientId}
+                energyCalculation={energyCalculation}
+            />
 
             {/* Plano Ativo */}
             {activePlan && (
