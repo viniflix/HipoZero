@@ -356,24 +356,24 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             const factor = 100 / servingSize;
             setProtein((nutriments.proteins_serving * factor).toFixed(2));
         } else if (nutriments.proteins_100g !== undefined) {
-            setProtein(nutriments.proteins_100g.toString());
-        }
+                setProtein(nutriments.proteins_100g.toString());
+            }
 
         // Carboidratos
         if (hasServingValues && servingSize && nutriments.carbohydrates_serving !== undefined) {
             const factor = 100 / servingSize;
             setCarbs((nutriments.carbohydrates_serving * factor).toFixed(2));
         } else if (nutriments.carbohydrates_100g !== undefined) {
-            setCarbs(nutriments.carbohydrates_100g.toString());
-        }
+                setCarbs(nutriments.carbohydrates_100g.toString());
+            }
 
         // Gorduras
         if (hasServingValues && servingSize && nutriments.fat_serving !== undefined) {
             const factor = 100 / servingSize;
             setFat((nutriments.fat_serving * factor).toFixed(2));
         } else if (nutriments.fat_100g !== undefined) {
-            setFat(nutriments.fat_100g.toString());
-        }
+                setFat(nutriments.fat_100g.toString());
+            }
 
         // Calorias
         if (hasServingValues && servingSize && nutriments.energy_kcal_serving !== undefined) {
@@ -386,13 +386,13 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
             setCalories(kcal.toFixed(2));
             setAutoCalcCalories(false);
         } else if (nutriments.energy_kcal_100g !== undefined) {
-            setCalories(nutriments.energy_kcal_100g.toString());
+                setCalories(nutriments.energy_kcal_100g.toString());
             setAutoCalcCalories(false);
-        } else if (nutriments.energy_100g !== undefined) {
-            const kcal = nutriments.energy_100g / 4.184;
-            setCalories(kcal.toFixed(2));
-            setAutoCalcCalories(false);
-        }
+            } else if (nutriments.energy_100g !== undefined) {
+                const kcal = nutriments.energy_100g / 4.184;
+                setCalories(kcal.toFixed(2));
+                setAutoCalcCalories(false);
+            }
 
         // Fibra
         if (hasServingValues && servingSize && nutriments.fiber_serving !== undefined) {
@@ -545,7 +545,7 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
 
         // SEMPRE iniciar no modo 100g (padrão do HipoZero)
         // Se tiver tamanho de porção detectado, salvar para uso futuro
-        setInputMode('100g');
+            setInputMode('100g');
         setPrevInputMode('100g');
         
         // Se detectou tamanho de porção, salvar para quando o usuário mudar para modo "portion"
@@ -1392,14 +1392,14 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
 
             {/* Dialog for Product Selection */}
             <Dialog open={showResultsDialog} onOpenChange={setShowResultsDialog}>
-                <DialogContent className="max-w-2xl max-h-[90vh] w-[95vw] sm:w-full p-4 sm:p-6 overflow-hidden flex flex-col">
+                <DialogContent className="max-w-2xl max-h-[90vh] w-[95vw] sm:w-full p-4 sm:p-6 flex flex-col">
                     <DialogHeader className="pb-3 flex-shrink-0">
                         <DialogTitle className="text-base sm:text-lg">Selecione o Produto</DialogTitle>
                         <DialogDescription className="text-xs sm:text-sm">
                             Encontramos {searchResults.length} produto(s). Selecione o produto correto para preencher os dados automaticamente.
                         </DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="flex-1 min-h-0 pr-2 sm:pr-4">
+                    <div className="flex-1 min-h-0 overflow-y-auto pr-2 sm:pr-4">
                         <div className="space-y-2">
                             {searchResults.map((product) => (
                                 <Card
@@ -1451,7 +1451,7 @@ const SmartFoodForm = forwardRef(function SmartFoodForm({
                                 </Card>
                             ))}
                         </div>
-                    </ScrollArea>
+                    </div>
                 </DialogContent>
             </Dialog>
 
