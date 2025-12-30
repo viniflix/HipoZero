@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calculator, Save, Loader2, Target, TrendingUp, Database, User, Activity } from 'lucide-react';
+import { ArrowLeft, Calculator, Save, Loader2, Target, TrendingUp, Database, User, Activity, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,11 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
-import { ProtocolComparisonTable } from '@/components/energy';
 import ActivityLevelSelector from '@/components/energy/ActivityLevelSelector';
 import WeightProjectionCard from '@/components/energy/WeightProjectionCard';
 import CalculationInfoTooltip from '@/components/energy/CalculationInfoTooltip';
 import ExerciseSelector, { calculateExerciseCalories, EXERCISE_DATABASE } from '@/components/energy/ExerciseSelector';
+import ProtocolComparisonModal from '@/components/energy/ProtocolComparisonModal';
 import { getLatestAnamnesisForEnergy, getActiveGoalForEnergy } from '@/lib/supabase/patient-queries';
 import { 
     calculateAllProtocols, 
@@ -32,16 +32,15 @@ const EnergyExpenditurePage = () => {
     const [saving, setSaving] = useState(false);
     const [patientName, setPatientName] = useState('');
 
-    // Parâmetros biológicos (com flags de origem)
+    // Parâmetros biológicos
     const [weight, setWeight] = useState('');
     const [height, setHeight] = useState('');
     const [age, setAge] = useState('');
     const [gender, setGender] = useState('');
     const [leanMass, setLeanMass] = useState('');
     
-    // Flags para indicar origem dos dados
     const [dataSource, setDataSource] = useState({
-        weight: null, // 'anthropometry' | 'profile' | 'manual'
+        weight: null,
         height: null,
         leanMass: null
     });
@@ -53,15 +52,15 @@ const EnergyExpenditurePage = () => {
     const [selectedProtocol, setSelectedProtocol] = useState('mifflin');
 
     // Goal (Deficit/Superavit)
-    const [goalAdjustment, setGoalAdjustment] = useState(0); // -1000 to +1000
+    const [goalAdjustment, setGoalAdjustment] = useState(0);
 
     // Exercícios físicos
     const [selectedExercises, setSelectedExercises] = useState([]);
 
-    // Smart Defaults (sugestões baseadas em anamnese/objetivos)
+    // Smart Defaults
     const [suggestedActivity, setSuggestedActivity] = useState(null);
     const [suggestedGoal, setSuggestedGoal] = useState(null);
-    const [goalSuggestionSource, setGoalSuggestionSource] = useState(null); // 'goal' | null
+    const [goalSuggestionSource, setGoalSuggestionSource] = useState(null);
 
     // Resultados calculados
     const [protocols, setProtocols] = useState([]);
@@ -70,7 +69,7 @@ const EnergyExpenditurePage = () => {
     const [goalCalories, setGoalCalories] = useState(0);
     const [exerciseCalories, setExerciseCalories] = useState(0);
 
-    // Carregar dados do paciente (SMART FETCHING)
+    // Carregar dados do paciente
     useEffect(() => {
         loadPatientData();
     }, [patientId]);
@@ -86,7 +85,6 @@ const EnergyExpenditurePage = () => {
     useEffect(() => {
         if (selectedExercises.length > 0 && weight) {
             const totalWeekly = selectedExercises.reduce((total, exercise) => {
-                // Buscar MET do exercício na base de dados
                 const exerciseData = EXERCISE_DATABASE.find(e => e.id === exercise.id);
                 if (!exerciseData) return total;
                 
@@ -97,7 +95,7 @@ const EnergyExpenditurePage = () => {
                 );
                 return total + (caloriesPerSession * exercise.daysPerWeek);
             }, 0);
-            setExerciseCalories(totalWeekly / 7); // Média diária
+            setExerciseCalories(totalWeekly / 7);
         } else {
             setExerciseCalories(0);
         }
@@ -108,7 +106,6 @@ const EnergyExpenditurePage = () => {
         if (selectedProtocolData) {
             const get = calculateGET(selectedProtocolData.bmr, activityFactor);
             setFinalGET(get);
-            // GET com exercícios = GET base + calorias médias diárias dos exercícios
             const getWithExercises = get + exerciseCalories;
             setGoalCalories(getWithExercises + goalAdjustment);
         }
@@ -117,7 +114,6 @@ const EnergyExpenditurePage = () => {
     const loadPatientData = async () => {
         setLoading(true);
         try {
-            // 1. Buscar perfil do paciente
             const { data: profile, error: profileError } = await supabase
                 .from('user_profiles')
                 .select('name, birth_date, gender, weight, height')
@@ -129,7 +125,6 @@ const EnergyExpenditurePage = () => {
             setPatientName(profile.name || 'Paciente');
             setGender(profile.gender || '');
 
-            // Calcular idade
             if (profile.birth_date) {
                 const birthDate = new Date(profile.birth_date);
                 const today = new Date();
@@ -141,7 +136,6 @@ const EnergyExpenditurePage = () => {
                 setAge(ageValue.toString());
             }
 
-            // 2. Buscar último registro de ANTROPOMETRIA (prioridade)
             const { data: latestAnthropometry } = await supabase
                 .from('growth_records')
                 .select('weight, height, results, record_date')
@@ -150,7 +144,6 @@ const EnergyExpenditurePage = () => {
                 .limit(1)
                 .maybeSingle();
 
-            // Lógica: Antropometria > Perfil > Vazio
             if (latestAnthropometry?.weight) {
                 setWeight(latestAnthropometry.weight.toString());
                 setDataSource(prev => ({ ...prev, weight: 'anthropometry' }));
@@ -167,23 +160,19 @@ const EnergyExpenditurePage = () => {
                 setDataSource(prev => ({ ...prev, height: 'profile' }));
             }
 
-            // Massa magra apenas de antropometria
             if (latestAnthropometry?.results?.lean_mass_kg) {
                 setLeanMass(latestAnthropometry.results.lean_mass_kg.toString());
                 setDataSource(prev => ({ ...prev, leanMass: 'anthropometry' }));
             }
 
-            // 3. Buscar anamnese e objetivos para smart defaults
             const [anamnesisResult, goalResult] = await Promise.all([
                 getLatestAnamnesisForEnergy(patientId),
                 getActiveGoalForEnergy(patientId)
             ]);
 
-            // 4. Auto-selecionar atividade baseado em anamnese
             if (anamnesisResult.data?.exerciseFrequency) {
                 const freq = anamnesisResult.data.exerciseFrequency.toString().toLowerCase();
                 
-                // Mapear frequência de exercício para fator de atividade
                 if (freq.includes('sedent') || freq.includes('não') || freq.includes('nao') || freq === '0') {
                     setActivityFactor(1.2);
                     setSuggestedActivity('Sedentário (baseado na anamnese)');
@@ -202,7 +191,6 @@ const EnergyExpenditurePage = () => {
                 }
             }
 
-            // 5. Auto-ajustar objetivo calórico baseado em meta ativa
             if (goalResult.data) {
                 const goalType = goalResult.data.type?.toLowerCase();
                 
@@ -221,7 +209,6 @@ const EnergyExpenditurePage = () => {
                 }
             }
 
-            // 6. Buscar cálculo salvo anteriormente (sobrescreve apenas se não houver sugestões)
             const { data: savedCalc } = await supabase
                 .from('energy_expenditure_calculations')
                 .select('*')
@@ -231,27 +218,29 @@ const EnergyExpenditurePage = () => {
                 .maybeSingle();
 
             if (savedCalc) {
-                // Só aplicar se não tivermos sugestão de atividade
                 if (!suggestedActivity) {
                     setActivityFactor(parseFloat(savedCalc.activity_level) || 1.55);
                 }
-                // Só aplicar se não tivermos sugestão de objetivo
                 if (!goalSuggestionSource && savedCalc.get_with_activities && savedCalc.get) {
                     setGoalAdjustment(savedCalc.get_with_activities - savedCalc.get);
                 }
-                // Restaurar protocolo (sempre)
                 if (savedCalc.protocol) {
                     const protocolMap = {
                         'harris-benedict': 'harris',
                         'mifflin-st-jeor': 'mifflin',
                         'fao-who': 'fao',
-                        'harris': 'harris',
-                        'mifflin': 'mifflin',
-                        'fao': 'fao',
+                        'fao-oms-2001': 'fao2001',
+                        'schofield': 'schofield',
+                        'owen': 'owen',
                         'cunningham': 'cunningham',
-                        'tinsley': 'tinsley'
+                        'tinsley': 'tinsley',
+                        'katch-mcardle': 'katch',
+                        'de-lorenzo': 'delorenzo'
                     };
                     setSelectedProtocol(protocolMap[savedCalc.protocol] || 'mifflin');
+                }
+                if (savedCalc.activities) {
+                    setSelectedExercises(savedCalc.activities);
                 }
             }
 
@@ -284,7 +273,6 @@ const EnergyExpenditurePage = () => {
         const calculatedProtocols = calculateAllProtocols(data);
         setProtocols(calculatedProtocols);
 
-        // Atualizar protocolo selecionado
         const currentProtocol = calculatedProtocols.find(p => p.id === selectedProtocol);
         if (!currentProtocol && calculatedProtocols.length > 0) {
             const recommended = calculatedProtocols.find(p => p.recommended) || calculatedProtocols[0];
@@ -340,7 +328,6 @@ const EnergyExpenditurePage = () => {
                 updated_at: new Date().toISOString()
             };
 
-            // Verificar se já existe um registro
             const { data: existing } = await supabase
                 .from('energy_expenditure_calculations')
                 .select('id')
@@ -402,123 +389,133 @@ const EnergyExpenditurePage = () => {
 
     return (
         <div className="min-h-screen bg-background">
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 {/* Header */}
-                <div className="flex items-center gap-4 mb-6">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigate(-1)}
-                    >
-                        <ArrowLeft className="w-5 h-5" />
-                    </Button>
-                    <div>
-                        <h1 className="text-3xl font-bold">Centro de Controle Metabólico</h1>
-                        <p className="text-muted-foreground">
-                            {patientName} - Análise e Planejamento Energético
-                        </p>
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(-1)}
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </Button>
+                        <div>
+                            <h1 className="text-2xl font-bold">Gastos Energéticos</h1>
+                            <p className="text-sm text-muted-foreground">
+                                {patientName}
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                {/* Split View Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    {/* LEFT COLUMN: Parameters */}
-                    <div className="lg:col-span-1 space-y-6">
+                {/* Layout Principal - 2 Colunas */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* COLUNA ESQUERDA: Entrada de Dados */}
+                    <div className="space-y-6">
                         {/* Dados Biológicos */}
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="text-lg flex items-center gap-2">
                                     <Calculator className="w-5 h-5" />
                                     Dados Biológicos
                                 </CardTitle>
                                 <CardDescription>
-                                    Parâmetros para cálculo da TMB
+                                    Informações necessárias para cálculo da TMB
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="weight" className="flex items-center">
-                                        Peso (kg) *
-                                        {getDataSourceBadge('weight')}
-                                    </Label>
-                                    <Input
-                                        id="weight"
-                                        type="number"
-                                        step="0.1"
-                                        min="1"
-                                        value={weight}
-                                        onChange={(e) => {
-                                            setWeight(e.target.value);
-                                            setDataSource(prev => ({ ...prev, weight: 'manual' }));
-                                        }}
-                                        placeholder="70.0"
-                                    />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="weight" className="flex items-center text-sm">
+                                            Peso (kg) *
+                                            {getDataSourceBadge('weight')}
+                                        </Label>
+                                        <Input
+                                            id="weight"
+                                            type="number"
+                                            step="0.1"
+                                            min="1"
+                                            value={weight}
+                                            onChange={(e) => {
+                                                setWeight(e.target.value);
+                                                setDataSource(prev => ({ ...prev, weight: 'manual' }));
+                                            }}
+                                            placeholder="70.0"
+                                            className="h-10"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="height" className="flex items-center text-sm">
+                                            Altura (cm) *
+                                            {getDataSourceBadge('height')}
+                                        </Label>
+                                        <Input
+                                            id="height"
+                                            type="number"
+                                            step="0.1"
+                                            min="50"
+                                            value={height}
+                                            onChange={(e) => {
+                                                setHeight(e.target.value);
+                                                setDataSource(prev => ({ ...prev, height: 'manual' }));
+                                            }}
+                                            placeholder="175.0"
+                                            className="h-10"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="height" className="flex items-center">
-                                        Altura (cm) *
-                                        {getDataSourceBadge('height')}
-                                    </Label>
-                                    <Input
-                                        id="height"
-                                        type="number"
-                                        step="0.1"
-                                        min="50"
-                                        value={height}
-                                        onChange={(e) => {
-                                            setHeight(e.target.value);
-                                            setDataSource(prev => ({ ...prev, height: 'manual' }));
-                                        }}
-                                        placeholder="175.0"
-                                    />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="age" className="text-sm">Idade (anos) *</Label>
+                                        <Input
+                                            id="age"
+                                            type="number"
+                                            min="1"
+                                            max="120"
+                                            value={age}
+                                            onChange={(e) => setAge(e.target.value)}
+                                            placeholder="30"
+                                            className="h-10"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="leanMass" className="flex items-center text-sm">
+                                            Massa Magra (kg)
+                                            {getDataSourceBadge('leanMass')}
+                                        </Label>
+                                        <Input
+                                            id="leanMass"
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={leanMass}
+                                            onChange={(e) => {
+                                                setLeanMass(e.target.value);
+                                                setDataSource(prev => ({ ...prev, leanMass: 'manual' }));
+                                            }}
+                                            placeholder="Opcional"
+                                            className="h-10"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="age">Idade (anos) *</Label>
-                                    <Input
-                                        id="age"
-                                        type="number"
-                                        min="1"
-                                        max="120"
-                                        value={age}
-                                        onChange={(e) => setAge(e.target.value)}
-                                        placeholder="30"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="leanMass" className="flex items-center">
-                                        Massa Magra (kg)
-                                        {getDataSourceBadge('leanMass')}
-                                    </Label>
-                                    <Input
-                                        id="leanMass"
-                                        type="number"
-                                        step="0.1"
-                                        min="0"
-                                        value={leanMass}
-                                        onChange={(e) => {
-                                            setLeanMass(e.target.value);
-                                            setDataSource(prev => ({ ...prev, leanMass: 'manual' }));
-                                        }}
-                                        placeholder="Opcional - Desbloqueia protocolos de atleta"
-                                    />
+                                {leanMass && (
                                     <p className="text-xs text-muted-foreground">
-                                        {dataSource.leanMass === 'anthropometry' 
-                                            ? 'Valor obtido do último registro de antropometria.'
-                                            : 'Preencha para habilitar protocolos Cunningham e Tinsley.'}
+                                        Massa magra desbloqueia protocolos específicos para atletas
                                     </p>
-                                </div>
+                                )}
                             </CardContent>
                         </Card>
 
                         {/* Nível de Atividade */}
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="text-lg flex items-center gap-2">
                                     <TrendingUp className="w-5 h-5" />
                                     Nível de Atividade
                                 </CardTitle>
                                 <CardDescription>
-                                    Selecione o fator de atividade física
+                                    Selecione o fator de atividade física diária
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -528,19 +525,16 @@ const EnergyExpenditurePage = () => {
                                 />
                             </CardContent>
                         </Card>
-                    </div>
 
-                    {/* MIDDLE COLUMN: Exercises */}
-                    <div className="lg:col-span-1 space-y-6">
                         {/* Exercícios Físicos */}
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="text-lg flex items-center gap-2">
                                     <Activity className="w-5 h-5" />
                                     Exercícios Físicos
                                 </CardTitle>
                                 <CardDescription>
-                                    Adicione exercícios específicos para cálculo preciso
+                                    Adicione exercícios específicos para cálculo mais preciso
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -553,51 +547,45 @@ const EnergyExpenditurePage = () => {
                         </Card>
                     </div>
 
-                    {/* RIGHT COLUMN: The Lab & Strategy */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Comparativo Científico */}
-                        {protocols.length > 0 && (
+                    {/* COLUNA DIREITA: Resultados e Meta */}
+                    <div className="space-y-6">
+                        {/* Protocolo e GET */}
+                        {selectedProtocolData && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Comparativo Científico</CardTitle>
-                                    <CardDescription>
-                                        Compare diferentes fórmulas de cálculo de TMB
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ProtocolComparisonTable
-                                        protocols={protocols}
-                                        activityFactor={activityFactor}
-                                        selectedProtocolId={selectedProtocol}
-                                        onSelect={handleProtocolSelect}
-                                        patientData={{
-                                            weight: parseFloat(weight) || 0,
-                                            height: parseFloat(height) || 0,
-                                            age: parseInt(age) || 0,
-                                            gender: gender || '',
-                                            leanMass: leanMass ? parseFloat(leanMass) : null
-                                        }}
-                                    />
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Definição de Meta */}
-                        {selectedProtocolData && (
-                            <Card className="sticky top-6">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Target className="w-5 h-5" />
-                                        Definição de Meta
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Configure o objetivo calórico final
-                                    </CardDescription>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardTitle className="text-lg flex items-center gap-2">
+                                                <Target className="w-5 h-5" />
+                                                Resultado e Meta
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Configure o protocolo e objetivo calórico
+                                            </CardDescription>
+                                        </div>
+                                        {protocols.length > 1 && (
+                                            <ProtocolComparisonModal
+                                                protocols={protocols}
+                                                activityFactor={activityFactor}
+                                                selectedProtocolId={selectedProtocol}
+                                                onSelect={handleProtocolSelect}
+                                                patientData={{
+                                                    weight: parseFloat(weight) || 0,
+                                                    height: parseFloat(height) || 0,
+                                                    age: parseInt(age) || 0,
+                                                    gender: gender || '',
+                                                    leanMass: leanMass ? parseFloat(leanMass) : null
+                                                }}
+                                            />
+                                        )}
+                                    </div>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
-                                    {/* Protocolo Base */}
+                                    {/* Seleção de Protocolo */}
                                     <div className="space-y-2">
-                                        <Label htmlFor="protocolSelect">Protocolo Base</Label>
+                                        <Label htmlFor="protocolSelect" className="text-sm font-medium">
+                                            Protocolo de Cálculo
+                                        </Label>
                                         <Select
                                             value={selectedProtocol}
                                             onValueChange={(value) => {
@@ -607,14 +595,14 @@ const EnergyExpenditurePage = () => {
                                                 }
                                             }}
                                         >
-                                            <SelectTrigger id="protocolSelect">
+                                            <SelectTrigger id="protocolSelect" className="h-10">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {protocols.map((protocol) => (
                                                     <SelectItem key={protocol.id} value={protocol.id}>
                                                         {protocol.name}
-                                                        {protocol.recommended && ' (Recomendado)'}
+                                                        {protocol.recommended && ' ⭐ (Recomendado)'}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -622,63 +610,58 @@ const EnergyExpenditurePage = () => {
                                     </div>
 
                                     {/* GET Base */}
-                                    <div className="p-4 bg-muted/50 rounded-lg">
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-sm text-muted-foreground">Gasto Energético Total (GET)</p>
-                                                    {selectedProtocolData && (() => {
-                                                        const activityInfo = ACTIVITY_FACTORS.find(f => f.value === activityFactor);
-                                                        const breakdown = getGETBreakdown(
-                                                            selectedProtocolData.bmr,
-                                                            activityFactor,
-                                                            activityInfo?.label
-                                                        );
-                                                        return breakdown ? (
-                                                            <CalculationInfoTooltip breakdown={breakdown} variant="compact" />
-                                                        ) : null;
-                                                    })()}
-                                                </div>
-                                                <p className="text-2xl font-bold text-primary mt-1">
-                                                    {Math.round(finalGET)} <span className="text-base font-normal">kcal/dia</span>
-                                                </p>
-                                                {exerciseCalories > 0 && (
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        + {Math.round(exerciseCalories)} kcal/dia de exercícios
-                                                    </p>
-                                                )}
+                                    <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-medium">Gasto Energético Total (GET)</p>
+                                                {selectedProtocolData && (() => {
+                                                    const activityInfo = ACTIVITY_FACTORS.find(f => f.value === activityFactor);
+                                                    const breakdown = getGETBreakdown(
+                                                        selectedProtocolData.bmr,
+                                                        activityFactor,
+                                                        activityInfo?.label
+                                                    );
+                                                    return breakdown ? (
+                                                        <CalculationInfoTooltip breakdown={breakdown} variant="compact" />
+                                                    ) : null;
+                                                })()}
                                             </div>
-                                            <div className="text-right text-sm text-muted-foreground">
+                                        </div>
+                                        <div className="flex items-baseline justify-between">
+                                            <p className="text-3xl font-bold text-primary">
+                                                {Math.round(finalGET)} <span className="text-lg font-normal text-muted-foreground">kcal/dia</span>
+                                            </p>
+                                            <div className="text-right text-xs text-muted-foreground space-y-0.5">
                                                 <p>TMB: {Math.round(selectedProtocolData.bmr)} kcal</p>
                                                 <p>NAF: x{activityFactor}</p>
                                                 {exerciseCalories > 0 && (
                                                     <p className="text-green-600 font-medium">
-                                                        + {Math.round(exerciseCalories)} kcal
+                                                        + {Math.round(exerciseCalories)} kcal exercícios
                                                     </p>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Slider VET Alvo */}
-                                    <div className="space-y-4">
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex justify-between items-center">
-                                                <Label htmlFor="goalAdjustment">Ajuste de Objetivo (Déficit/Superávit)</Label>
-                                                <span className={`text-sm font-semibold ${
-                                                    goalAdjustment > 0 ? 'text-green-600' : 
-                                                    goalAdjustment < 0 ? 'text-red-600' : 
-                                                    'text-muted-foreground'
-                                                }`}>
-                                                    {goalAdjustment > 0 ? '+' : ''}{goalAdjustment} kcal
-                                                </span>
-                                            </div>
-                                            {suggestedGoal && goalSuggestionSource && (
-                                                <Badge variant="outline" className="self-start text-xs">
-                                                    💡 Sugestão baseada no objetivo: <strong>{suggestedGoal}</strong>
-                                                </Badge>
-                                            )}
+                                    {/* Ajuste de Objetivo */}
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <Label htmlFor="goalAdjustment" className="text-sm font-medium">
+                                                Ajuste de Objetivo
+                                            </Label>
+                                            <span className={`text-sm font-semibold ${
+                                                goalAdjustment > 0 ? 'text-green-600' : 
+                                                goalAdjustment < 0 ? 'text-red-600' : 
+                                                'text-muted-foreground'
+                                            }`}>
+                                                {goalAdjustment > 0 ? '+' : ''}{goalAdjustment} kcal
+                                            </span>
                                         </div>
+                                        {suggestedGoal && goalSuggestionSource && (
+                                            <Badge variant="outline" className="text-xs">
+                                                💡 Sugestão: {suggestedGoal}
+                                            </Badge>
+                                        )}
                                         <Slider
                                             id="goalAdjustment"
                                             min={-1000}
@@ -690,31 +673,30 @@ const EnergyExpenditurePage = () => {
                                         />
                                         <div className="flex justify-between text-xs text-muted-foreground">
                                             <span>Déficit -1000</span>
-                                            <span>Equilíbrio 0</span>
+                                            <span>0</span>
                                             <span>Superávit +1000</span>
                                         </div>
                                     </div>
 
-                                    {/* Meta Final (BIG NUMBER) */}
+                                    {/* Meta Final */}
                                     <div className="p-6 bg-primary/10 border-2 border-primary/20 rounded-lg">
                                         <div className="text-center">
-                                            <p className="text-sm text-muted-foreground mb-2">Meta da Dieta</p>
-                                            <p className="text-5xl font-bold text-primary">
-                                                {Math.round(goalCalories)} <span className="text-3xl font-normal">kcal</span>
+                                            <p className="text-sm text-muted-foreground mb-2">Meta Calórica Diária</p>
+                                            <p className="text-4xl font-bold text-primary">
+                                                {Math.round(goalCalories)} <span className="text-2xl font-normal">kcal</span>
                                             </p>
-                                            <p className="text-sm text-muted-foreground mt-2">por dia</p>
                                         </div>
                                     </div>
 
-                                    {/* Weight Projection Card */}
+                                    {/* Projeção de Peso */}
                                     <WeightProjectionCard dailyDeficit={goalAdjustment} />
 
-                                    {/* Floating Action Button */}
+                                    {/* Botão Salvar */}
                                     <Button
                                         onClick={handleSave}
                                         disabled={saving}
                                         size="lg"
-                                        className="w-full"
+                                        className="w-full h-11"
                                     >
                                         {saving ? (
                                             <>
@@ -728,6 +710,18 @@ const EnergyExpenditurePage = () => {
                                             </>
                                         )}
                                     </Button>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Mensagem quando não há dados */}
+                        {!selectedProtocolData && (
+                            <Card>
+                                <CardContent className="p-8 text-center">
+                                    <Info className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                                    <p className="text-sm text-muted-foreground">
+                                        Preencha os dados biológicos para calcular o gasto energético
+                                    </p>
                                 </CardContent>
                             </Card>
                         )}

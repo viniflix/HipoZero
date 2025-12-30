@@ -203,41 +203,45 @@ export default function ExerciseSelector({
       </div>
 
       {/* Lista de Exercícios Disponíveis */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[300px] overflow-y-auto">
+      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
         {filteredExercises.map(exercise => {
           const isSelected = selectedExercises.some(e => e.id === exercise.id);
           
           return (
-            <Card
+            <button
               key={exercise.id}
-              className={cn(
-                "cursor-pointer transition-all hover:shadow-md",
-                isSelected ? "border-primary bg-primary/5" : "hover:border-primary/50"
-              )}
+              type="button"
               onClick={() => !isSelected && handleAddExercise(exercise.id)}
+              disabled={isSelected}
+              className={cn(
+                "w-full p-3 rounded-lg border-2 transition-all duration-200 text-left",
+                "hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                isSelected 
+                  ? "border-primary bg-primary/5" 
+                  : "border-border bg-card hover:border-primary/50"
+              )}
             >
-              <CardContent className="p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{exercise.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">
-                        MET {exercise.met}
-                      </Badge>
-                      <Badge 
-                        variant="outline" 
-                        className={cn("text-xs", getIntensityColor(exercise.intensity))}
-                      >
-                        {exercise.intensity}
-                      </Badge>
-                    </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{exercise.name}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant="outline" className="text-xs">
+                      MET {exercise.met}
+                    </Badge>
+                    <Badge 
+                      variant="outline" 
+                      className={cn("text-xs", getIntensityColor(exercise.intensity))}
+                    >
+                      {exercise.intensity}
+                    </Badge>
                   </div>
-                  {isSelected && (
-                    <Badge className="bg-primary">Adicionado</Badge>
-                  )}
                 </div>
-              </CardContent>
-            </Card>
+                {isSelected && (
+                  <Badge className="bg-primary text-xs">✓ Adicionado</Badge>
+                )}
+              </div>
+            </button>
           );
         })}
       </div>
@@ -266,19 +270,29 @@ export default function ExerciseSelector({
               return (
                 <div
                   key={exercise.id}
-                  className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 border rounded-lg"
+                  className="p-4 border rounded-lg space-y-3"
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{exerciseData.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {Math.round(caloriesPerSession)} kcal/sessão × {exercise.daysPerWeek} dias = {Math.round(weeklyCalories)} kcal/semana
-                    </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{exerciseData.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {Math.round(caloriesPerSession)} kcal/sessão × {exercise.daysPerWeek} dias = <strong>{Math.round(weeklyCalories)} kcal/semana</strong>
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 flex-shrink-0"
+                      onClick={() => handleRemoveExercise(exercise.id)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
                   
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-1">
-                      <Label htmlFor={`${exercise.id}-minutes`} className="text-xs whitespace-nowrap">
-                        Min:
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor={`${exercise.id}-minutes`} className="text-xs">
+                        Duração (min)
                       </Label>
                       <Input
                         id={`${exercise.id}-minutes`}
@@ -287,14 +301,13 @@ export default function ExerciseSelector({
                         max="300"
                         value={exercise.minutes}
                         onChange={(e) => handleUpdateExercise(exercise.id, 'minutes', e.target.value)}
-                        className="w-16 h-8 text-sm"
-                        onClick={(e) => e.stopPropagation()}
+                        className="h-9"
                       />
                     </div>
                     
-                    <div className="flex items-center gap-1">
-                      <Label htmlFor={`${exercise.id}-days`} className="text-xs whitespace-nowrap">
-                        Dias/sem:
+                    <div className="space-y-1">
+                      <Label htmlFor={`${exercise.id}-days`} className="text-xs">
+                        Dias por semana
                       </Label>
                       <Input
                         id={`${exercise.id}-days`}
@@ -303,19 +316,9 @@ export default function ExerciseSelector({
                         max="7"
                         value={exercise.daysPerWeek}
                         onChange={(e) => handleUpdateExercise(exercise.id, 'daysPerWeek', e.target.value)}
-                        className="w-16 h-8 text-sm"
-                        onClick={(e) => e.stopPropagation()}
+                        className="h-9"
                       />
                     </div>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleRemoveExercise(exercise.id)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
                   </div>
                 </div>
               );
