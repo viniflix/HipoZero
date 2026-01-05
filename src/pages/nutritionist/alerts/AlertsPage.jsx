@@ -2,12 +2,9 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { ArrowLeft, Bell, Calendar } from 'lucide-react';
 
 const AlertsPage = () => {
-    const { user, signOut } = useAuth();
-
     return (
         <div className="flex flex-col min-h-screen bg-background">
             
@@ -31,9 +28,25 @@ const AlertsPage = () => {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-muted-foreground text-center py-8">
-                            (Módulo de Alertas em construção)
-                        </p>
+                        <div className="space-y-4">
+                            <p className="text-muted-foreground text-center py-6">
+                                (Módulo de Alertas em construção)
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                <Button asChild variant="outline">
+                                    <Link to="/nutritionist/agenda" className="inline-flex items-center">
+                                        <Calendar className="w-4 h-4 mr-2" />
+                                        Ver agenda
+                                    </Link>
+                                </Button>
+                                <Button asChild variant="outline">
+                                    <Link to="/nutritionist/notifications" className="inline-flex items-center">
+                                        <Bell className="w-4 h-4 mr-2" />
+                                        Ver notificações
+                                    </Link>
+                                </Button>
+                            </div>
+                        </div>
                         {/* Aqui listaremos no futuro:
                           - Aniversariantes do dia
                           - Consultas de hoje

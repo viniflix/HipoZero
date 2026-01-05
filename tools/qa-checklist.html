@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Checklist QA - HipoZero</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0f172a;
+        --panel: #111827;
+        --card: #0b1220;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #38bdf8;
+        --accent-strong: #0ea5e9;
+        --border: #1f2937;
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+        background: radial-gradient(circle at top, #1e293b 0%, #0f172a 55%);
+        color: var(--text);
+      }
+
+      header {
+        padding: 32px 24px 16px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(15, 23, 42, 0.9);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        backdrop-filter: blur(12px);
+      }
+
+      header h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+      }
+
+      header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px;
+        display: grid;
+        gap: 20px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+      }
+
+      .panel h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
+
+      .panel p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .meta-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      label {
+        display: block;
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text);
+        font-size: 14px;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 90px;
+      }
+
+      .section-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .section-header h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .badge {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        background: rgba(56, 189, 248, 0.15);
+        color: var(--accent);
+      }
+
+      .item {
+        display: grid;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(15, 23, 42, 0.8);
+      }
+
+      .item-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .item-title strong {
+        font-size: 14px;
+      }
+
+      .item-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      }
+
+      .status-chip {
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        font-size: 13px;
+      }
+
+      .status-chip option {
+        background: #0f172a;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      button {
+        border: none;
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: transform 0.1s ease;
+      }
+
+      button.primary {
+        background: var(--accent-strong);
+        color: #0f172a;
+        font-weight: 600;
+      }
+
+      button.secondary {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      .summary {
+        display: grid;
+        gap: 8px;
+      }
+
+      .summary-line {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .output {
+        background: #0b1020;
+        border: 1px solid var(--border);
+        padding: 16px;
+        border-radius: 12px;
+        white-space: pre-wrap;
+        font-family: "JetBrains Mono", "Fira Code", monospace;
+        font-size: 12px;
+        color: #e2e8f0;
+        min-height: 180px;
+      }
+
+      footer {
+        padding: 24px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        border: 1px solid var(--border);
+      }
+
+      .status-pill span {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+      }
+
+      .status-pass span {
+        background: var(--success);
+      }
+
+      .status-warn span {
+        background: var(--warning);
+      }
+
+      .status-fail span {
+        background: var(--danger);
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f8fafc;
+          --panel: #ffffff;
+          --card: #f1f5f9;
+          --text: #0f172a;
+          --muted: #475569;
+          --border: #e2e8f0;
+          --accent: #0284c7;
+          --accent-strong: #0ea5e9;
+        }
+
+        body {
+          background: #f8fafc;
+        }
+
+        .output {
+          background: #ffffff;
+          color: #0f172a;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Checklist QA - HipoZero</h1>
+      <p>Preencha o checklist, adicione anotações e gere um resumo final para enviar ao time.</p>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Informações da execução</h2>
+        <div class="meta-grid">
+          <div>
+            <label for="qa-name">QA responsável</label>
+            <input id="qa-name" type="text" placeholder="Nome do QA" />
+          </div>
+          <div>
+            <label for="qa-date">Data</label>
+            <input id="qa-date" type="date" />
+          </div>
+          <div>
+            <label for="qa-build">Build/versão testada</label>
+            <input id="qa-build" type="text" placeholder="ex: v0.18.3 / commit" />
+          </div>
+          <div>
+            <label for="qa-env">Ambiente</label>
+            <select id="qa-env">
+              <option value="local">Local</option>
+              <option value="staging">Staging</option>
+              <option value="prod">Produção</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Checklist por área</h2>
+        <p>Marque o status, registre erros e observações em cada item.</p>
+        <div id="checklist"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Resumo automático</h2>
+        <div class="summary" id="summary"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Prompt final para enviar</h2>
+        <div class="actions">
+          <button class="primary" id="generate">Gerar resumo</button>
+          <button class="secondary" id="copy">Copiar</button>
+          <button class="secondary" id="download">Baixar JSON</button>
+          <button class="secondary" id="reset">Limpar tudo</button>
+        </div>
+        <div class="output" id="output" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <footer>Checklist QA - HipoZero · use para reportar falhas e enviar o resumo para revisão técnica.</footer>
+
+    <script>
+      const sections = [
+        {
+          title: "Autenticação",
+          scope: "login / registro / reset",
+          items: [
+            { id: "auth-login", label: "Login com credenciais válidas" },
+            { id: "auth-login-error", label: "Login com credenciais inválidas" },
+            { id: "auth-register", label: "Registro (nutricionista e paciente)" },
+            { id: "auth-reset", label: "Recuperação de senha via e-mail" }
+          ]
+        },
+        {
+          title: "Dashboard Nutricionista",
+          scope: "painel geral",
+          items: [
+            { id: "nutri-dashboard", label: "Cards e indicadores carregam corretamente" },
+            { id: "nutri-notifications", label: "Notificações e alertas aparecem" }
+          ]
+        },
+        {
+          title: "Pacientes",
+          scope: "lista / hub / perfil",
+          items: [
+            { id: "patients-list", label: "Listagem e busca de pacientes" },
+            { id: "patients-hub", label: "Hub do paciente abre e navega nas abas" },
+            { id: "patients-profile", label: "Perfil do paciente salva alterações" }
+          ]
+        },
+        {
+          title: "Anamnese",
+          scope: "formulários e templates",
+          items: [
+            { id: "anamnesis-form", label: "Criar/editar anamnese" },
+            { id: "anamnesis-templates", label: "Aplicar template de anamnese" }
+          ]
+        },
+        {
+          title: "Antropometria",
+          scope: "dobras e cálculos",
+          items: [
+            { id: "anthro-new", label: "Registrar nova avaliação antropométrica" },
+            { id: "anthro-calcs", label: "Cálculos (densidade, % gordura, somatotipo)" }
+          ]
+        },
+        {
+          title: "Energia / GET",
+          scope: "protocolos e metas",
+          items: [
+            { id: "energy-calcs", label: "Cálculo de TMB/GET por protocolo" },
+            { id: "energy-save", label: "Salvar e reabrir cálculo" },
+            { id: "energy-impact", label: "Impacto em metas e sugestões" }
+          ]
+        },
+        {
+          title: "Plano Alimentar",
+          scope: "criação e monitor",
+          items: [
+            { id: "meal-plan-create", label: "Criar/editar plano alimentar" },
+            { id: "meal-plan-totals", label: "Totais por refeição e por dia" },
+            { id: "meal-plan-monitor", label: "Monitor de meta vs GET" }
+          ]
+        },
+        {
+          title: "Banco de Alimentos",
+          scope: "cadastro e medidas",
+          items: [
+            { id: "foods-search", label: "Buscar alimentos (base e personalizados)" },
+            { id: "foods-create", label: "Cadastrar alimento e validar macros" },
+            { id: "foods-measures", label: "Medidas caseiras e conversões" }
+          ]
+        },
+        {
+          title: "Diário Alimentar (Nutricionista)",
+          scope: "histórico e auditoria",
+          items: [
+            { id: "diary-history", label: "Histórico por período" },
+            { id: "diary-audit", label: "Logs e ações registradas" }
+          ]
+        },
+        {
+          title: "Paciente",
+          scope: "dash/diário/plano",
+          items: [
+            { id: "patient-dashboard", label: "Dashboard do paciente" },
+            { id: "patient-diary", label: "Registrar refeições e recalcular macros" },
+            { id: "patient-plan", label: "Visualização do plano alimentar" }
+          ]
+        },
+        {
+          title: "Exames Laboratoriais",
+          scope: "CRUD e PDF",
+          items: [
+            { id: "labs-crud", label: "Criar/editar/remover exames" },
+            { id: "labs-status", label: "Status (low/high/normal/pending)" },
+            { id: "labs-pdf", label: "Upload/Download PDF" }
+          ]
+        },
+        {
+          title: "Chat",
+          scope: "mensagens e mídia",
+          items: [
+            { id: "chat-messages", label: "Enviar/receber mensagens" },
+            { id: "chat-media", label: "Enviar mídia (imagem/pdf/áudio)" },
+            { id: "chat-realtime", label: "Atualização em tempo real" }
+          ]
+        },
+        {
+          title: "Financeiro",
+          scope: "transações",
+          items: [
+            { id: "finance-list", label: "Listagem, filtros e busca" },
+            { id: "finance-crud", label: "Criar/editar/excluir transações" },
+            { id: "finance-receipt", label: "Gerar recibo" }
+          ]
+        },
+        {
+          title: "Admin",
+          scope: "painel e broadcast",
+          items: [
+            { id: "admin-dashboard", label: "Painel administrativo" },
+            { id: "admin-broadcast", label: "Mensagem broadcast para usuários" }
+          ]
+        },
+        {
+          title: "Supabase / Backend",
+          scope: "RLS e storage",
+          items: [
+            { id: "supabase-rls", label: "Regras RLS por papel" },
+            { id: "supabase-rpc", label: "RPC/Triggers executam sem erro" },
+            { id: "supabase-storage", label: "Storage e permissões" }
+          ]
+        }
+      ];
+
+      const checklistRoot = document.getElementById("checklist");
+      const summaryRoot = document.getElementById("summary");
+      const output = document.getElementById("output");
+      const storageKey = "hipozero-qa-checklist";
+
+      const defaultState = {
+        meta: {
+          name: "",
+          date: "",
+          build: "",
+          env: "local"
+        },
+        items: {}
+      };
+
+      const getState = () => {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return structuredClone(defaultState);
+        try {
+          return JSON.parse(raw);
+        } catch (error) {
+          return structuredClone(defaultState);
+        }
+      };
+
+      const saveState = (state) => {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      };
+
+      const state = getState();
+
+      const buildItem = (item) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "item";
+
+        const title = document.createElement("div");
+        title.className = "item-title";
+        title.innerHTML = `<strong>${item.label}</strong>`;
+
+        const status = document.createElement("select");
+        status.className = "status-chip";
+        status.innerHTML = `
+          <option value="not-tested">Não testado</option>
+          <option value="pass">Passou</option>
+          <option value="warn">Passou com ressalvas</option>
+          <option value="fail">Falhou</option>
+        `;
+        status.value = state.items[item.id]?.status || "not-tested";
+        title.appendChild(status);
+
+        const grid = document.createElement("div");
+        grid.className = "item-grid";
+
+        const notes = document.createElement("div");
+        notes.innerHTML = `
+          <label>Notas / Observações</label>
+          <textarea placeholder="Ex: cenário testado, passos, prints">${state.items[item.id]?.notes || ""}</textarea>
+        `;
+
+        const errors = document.createElement("div");
+        errors.innerHTML = `
+          <label>Erros encontrados</label>
+          <textarea placeholder="Ex: erro 500 no endpoint X">${state.items[item.id]?.errors || ""}</textarea>
+        `;
+
+        const evidence = document.createElement("div");
+        evidence.innerHTML = `
+          <label>Evidências / Links</label>
+          <textarea placeholder="Links de logs, prints, vídeos">${state.items[item.id]?.evidence || ""}</textarea>
+        `;
+
+        grid.appendChild(notes);
+        grid.appendChild(errors);
+        grid.appendChild(evidence);
+
+        const updateState = () => {
+          state.items[item.id] = {
+            status: status.value,
+            notes: notes.querySelector("textarea").value.trim(),
+            errors: errors.querySelector("textarea").value.trim(),
+            evidence: evidence.querySelector("textarea").value.trim()
+          };
+          saveState(state);
+          renderSummary();
+        };
+
+        status.addEventListener("change", updateState);
+        notes.querySelector("textarea").addEventListener("input", updateState);
+        errors.querySelector("textarea").addEventListener("input", updateState);
+        evidence.querySelector("textarea").addEventListener("input", updateState);
+
+        wrapper.appendChild(title);
+        wrapper.appendChild(grid);
+        return wrapper;
+      };
+
+      const renderSections = () => {
+        checklistRoot.innerHTML = "";
+        sections.forEach((section) => {
+          const card = document.createElement("div");
+          card.className = "section-card";
+
+          const header = document.createElement("div");
+          header.className = "section-header";
+          header.innerHTML = `
+            <div>
+              <h3>${section.title}</h3>
+              <p class="muted">${section.scope}</p>
+            </div>
+            <span class="badge">${section.items.length} itens</span>
+          `;
+          card.appendChild(header);
+
+          section.items.forEach((item) => {
+            card.appendChild(buildItem(item));
+          });
+
+          checklistRoot.appendChild(card);
+        });
+      };
+
+      const renderSummary = () => {
+        const counts = { pass: 0, warn: 0, fail: 0, "not-tested": 0 };
+        Object.values(state.items).forEach((item) => {
+          counts[item.status || "not-tested"] += 1;
+        });
+
+        summaryRoot.innerHTML = `
+          <div class="summary-line">
+            <span>Passou</span><strong>${counts.pass}</strong>
+          </div>
+          <div class="summary-line">
+            <span>Passou com ressalvas</span><strong>${counts.warn}</strong>
+          </div>
+          <div class="summary-line">
+            <span>Falhou</span><strong>${counts.fail}</strong>
+          </div>
+          <div class="summary-line">
+            <span>Não testado</span><strong>${counts["not-tested"]}</strong>
+          </div>
+        `;
+      };
+
+      const bindMeta = () => {
+        const nameInput = document.getElementById("qa-name");
+        const dateInput = document.getElementById("qa-date");
+        const buildInput = document.getElementById("qa-build");
+        const envInput = document.getElementById("qa-env");
+
+        nameInput.value = state.meta.name || "";
+        dateInput.value = state.meta.date || "";
+        buildInput.value = state.meta.build || "";
+        envInput.value = state.meta.env || "local";
+
+        const updateMeta = () => {
+          state.meta = {
+            name: nameInput.value.trim(),
+            date: dateInput.value,
+            build: buildInput.value.trim(),
+            env: envInput.value
+          };
+          saveState(state);
+        };
+
+        nameInput.addEventListener("input", updateMeta);
+        dateInput.addEventListener("change", updateMeta);
+        buildInput.addEventListener("input", updateMeta);
+        envInput.addEventListener("change", updateMeta);
+      };
+
+      const generatePrompt = () => {
+        const meta = state.meta;
+        const itemsOutput = sections.flatMap((section) =>
+          section.items.map((item) => ({
+            area: section.title,
+            item: item.label,
+            ...state.items[item.id]
+          }))
+        );
+
+        const lines = [];
+        lines.push("Relatório QA - HipoZero");
+        lines.push(`QA: ${meta.name || "N/A"}`);
+        lines.push(`Data: ${meta.date || "N/A"}`);
+        lines.push(`Build: ${meta.build || "N/A"}`);
+        lines.push(`Ambiente: ${meta.env || "N/A"}`);
+        lines.push("");
+        lines.push("Resumo por item:");
+
+        itemsOutput.forEach((entry) => {
+          const status = entry.status || "not-tested";
+          const statusLabel = {
+            pass: "Passou",
+            warn: "Passou com ressalvas",
+            fail: "Falhou",
+            "not-tested": "Não testado"
+          }[status];
+          lines.push(`- [${statusLabel}] ${entry.area} > ${entry.item}`);
+          if (entry.notes) lines.push(`  Notas: ${entry.notes}`);
+          if (entry.errors) lines.push(`  Erros: ${entry.errors}`);
+          if (entry.evidence) lines.push(`  Evidências: ${entry.evidence}`);
+        });
+
+        output.textContent = lines.join("\n");
+      };
+
+      document.getElementById("generate").addEventListener("click", generatePrompt);
+      document.getElementById("copy").addEventListener("click", async () => {
+        if (!output.textContent.trim()) generatePrompt();
+        await navigator.clipboard.writeText(output.textContent);
+        alert("Resumo copiado!");
+      });
+      document.getElementById("download").addEventListener("click", () => {
+        const payload = {
+          meta: state.meta,
+          items: state.items
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {
+          type: "application/json"
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "hipozero-qa-checklist.json";
+        link.click();
+        URL.revokeObjectURL(url);
+      });
+      document.getElementById("reset").addEventListener("click", () => {
+        if (!confirm("Deseja limpar tudo?")) return;
+        localStorage.removeItem(storageKey);
+        window.location.reload();
+      });
+
+      renderSections();
+      bindMeta();
+      renderSummary();
+    </script>
+  </body>
+</html>

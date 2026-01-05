@@ -110,7 +110,7 @@ const LabResultsPage = () => {
         // Filtro por busca (nome do exame)
         if (searchTerm) {
             filtered = filtered.filter(lab =>
-                lab.test_name.toLowerCase().includes(searchTerm.toLowerCase())
+                (lab.test_name || '').toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
 
@@ -121,6 +121,8 @@ const LabResultsPage = () => {
 
         setFilteredResults(filtered);
     };
+
+    const hasManualValue = (value) => value !== null && value !== undefined && value !== '';
 
     const handleOpenModal = (lab = null) => {
         if (lab) {
@@ -203,7 +205,7 @@ const LabResultsPage = () => {
         }
 
         // Validação: pelo menos valores OU PDF
-        const hasManualValues = formData.test_value && formData.test_value.trim() !== '';
+        const hasManualValues = hasManualValue(formData.test_value?.toString().trim());
         const hasPdf = pdfFile || editingLab?.pdf_url;
 
         if (!hasManualValues && !hasPdf) {
@@ -216,7 +218,7 @@ const LabResultsPage = () => {
         }
 
         setSaving(true);
-        setUploading(true);
+        setUploading(!!pdfFile);
         try {
             let pdfUrl = editingLab?.pdf_url || null;
             let pdfFilename = editingLab?.pdf_filename || null;
@@ -242,7 +244,9 @@ const LabResultsPage = () => {
                 test_date: formData.test_date,
                 notes: formData.notes || null,
                 // Valores manuais (opcionais)
-                test_value: formData.test_value || null,
+                test_value: hasManualValue(formData.test_value?.toString().trim())
+                    ? formData.test_value
+                    : null,
                 test_unit: formData.test_unit || null,
                 reference_min: formData.reference_min ? parseFloat(formData.reference_min) : null,
                 reference_max: formData.reference_max ? parseFloat(formData.reference_max) : null,
@@ -322,7 +326,15 @@ const LabResultsPage = () => {
         return <Badge variant="outline" className={cn('text-xs', config.className)}>{config.label}</Badge>;
     };
 
-    return loading ? null : (
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-background">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    return (
         <div className="flex flex-col min-h-screen bg-background">
             <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6 md:py-8">
                 {/* Header */}
@@ -427,12 +439,12 @@ const LabResultsPage = () => {
                                                         PDF
                                                     </Badge>
                                                 )}
-                                                {lab.test_value && lab.status && getStatusBadge(lab.status)}
+                                                {hasManualValue(lab.test_value) && lab.status && getStatusBadge(lab.status)}
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
                                                 {/* Valores manuais */}
-                                                {lab.test_value && (
+                                                {hasManualValue(lab.test_value) && (
                                                     <>
                                                         <div>
                                                             <span className="text-muted-foreground">Valor:</span>{' '}
@@ -448,7 +460,7 @@ const LabResultsPage = () => {
                                                 )}
 
                                                 {/* PDF */}
-                                                {lab.pdf_url && !lab.test_value && (
+                                                {lab.pdf_url && !hasManualValue(lab.test_value) && (
                                                     <div className="flex items-center gap-1">
                                                         <FileText className="w-3 h-3 text-muted-foreground" />
                                                         <span className="text-muted-foreground truncate">
