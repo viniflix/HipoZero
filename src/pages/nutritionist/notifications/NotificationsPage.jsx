@@ -10,6 +10,7 @@ import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useChat } from '@/contexts/ChatContext';
+import { useToast } from '@/components/ui/use-toast';
 
 
 const NotificationCard = ({ notification, onMarkAsRead, user }) => {
@@ -108,11 +109,17 @@ const NotificationCard = ({ notification, onMarkAsRead, user }) => {
 
 const NotificationsPage = () => {
     const { user } = useAuth();
+    const { toast } = useToast();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [markingAll, setMarkingAll] = useState(false);
 
     const fetchNotifications = useCallback(async () => {
-        if (!user) return;
+        if (!user) {
+            setNotifications([]);
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         const { data, error } = await supabase
             .from('notifications')
@@ -123,11 +130,16 @@ const NotificationsPage = () => {
 
         if (error) {
             console.error(error);
+            toast({
+                title: 'Erro ao carregar notificações',
+                description: 'Não foi possível carregar suas notificações.',
+                variant: 'destructive'
+            });
         } else {
             setNotifications(data);
         }
         setLoading(false);
-    }, [user]);
+    }, [toast, user]);
 
     useEffect(() => {
         fetchNotifications();
@@ -153,13 +165,35 @@ const NotificationsPage = () => {
 
 
     const handleMarkAsRead = async (id) => {
-        await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+        const target = notifications.find(n => n.id === id);
+        if (!target || target.is_read) return;
+        const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+        if (error) {
+            toast({
+                title: 'Erro ao atualizar',
+                description: 'Não foi possível marcar a notificação como lida.',
+                variant: 'destructive'
+            });
+            return;
+        }
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
     };
 
     const handleMarkAllAsRead = async () => {
-        await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
+        if (!user || !notifications.some(n => !n.is_read)) return;
+        setMarkingAll(true);
+        const { error } = await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
+        if (error) {
+            toast({
+                title: 'Erro ao atualizar',
+                description: 'Não foi possível marcar todas as notificações como lidas.',
+                variant: 'destructive'
+            });
+            setMarkingAll(false);
+            return;
+        }
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        setMarkingAll(false);
     };
 
     return (
@@ -175,7 +209,7 @@ const NotificationsPage = () => {
                         <div className="flex justify-between items-center">
                             <CardTitle>Notificações</CardTitle>
                              {notifications.some(n => !n.is_read) && (
-                                <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>
+                                <Button variant="outline" size="sm" onClick={handleMarkAllAsRead} disabled={markingAll}>
                                     Marcar todas como lidas
                                 </Button>
                             )}
