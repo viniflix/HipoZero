@@ -278,9 +278,11 @@ export function AuthProvider({ children }) {
             if (currentPath === '/login' || currentPath === '/register') {
               const redirectPath = profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
               // Use setTimeout to ensure navigation happens after state update
+              // Small delay allows React to flush state updates before navigation
+              const STATE_UPDATE_DELAY_MS = 100;
               setTimeout(() => {
                 navigate(redirectPath, { replace: true });
-              }, 100);
+              }, STATE_UPDATE_DELAY_MS);
             }
           }
           // TOKEN_REFRESHED: Do nothing - user is already authenticated and on a valid route
@@ -288,7 +290,13 @@ export function AuthProvider({ children }) {
           setUser(null);
         }
       } catch (error) {
-        console.error('Error in onAuthStateChange:', error);
+        console.error('Error in onAuthStateChange:', {
+          error,
+          event,
+          hasSession: !!session,
+          userId: session?.user?.id,
+          message: error.message,
+        });
         setUser(null);
       } finally {
         // ALWAYS set loading to false to prevent infinite white screen
