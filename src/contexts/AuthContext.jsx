@@ -253,41 +253,47 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setLoading(true);
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-      
-      if (session?.user) {
-        const profile = await fetchOrCreateProfile(session.user);
-
-        if (!profile) {
-          console.error('Failed to fetch or create profile, signing out');
-          await signOut();
+      try {
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
           return;
         }
-
-        setUser({ ...session.user, profile });
         
-        // Auto-redirect ONLY on initial sign in (not on token refresh)
-        // Token refresh should NOT cause redirects - user is already on a valid route
-        if (event === 'SIGNED_IN') {
-          // Only redirect if user is on login page
-          const currentPath = window.location.pathname;
-          if (currentPath === '/login' || currentPath === '/register') {
-            const redirectPath = profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
-            // Use setTimeout to ensure navigation happens after state update
-            setTimeout(() => {
-              navigate(redirectPath, { replace: true });
-            }, 100);
+        if (session?.user) {
+          const profile = await fetchOrCreateProfile(session.user);
+
+          if (!profile) {
+            console.error('Failed to fetch or create profile, signing out');
+            await signOut();
+            return;
           }
+
+          setUser({ ...session.user, profile });
+          
+          // Auto-redirect ONLY on initial sign in (not on token refresh)
+          // Token refresh should NOT cause redirects - user is already on a valid route
+          if (event === 'SIGNED_IN') {
+            // Only redirect if user is on login page
+            const currentPath = window.location.pathname;
+            if (currentPath === '/login' || currentPath === '/register') {
+              const redirectPath = profile.user_type === 'nutritionist' ? '/nutritionist' : '/patient';
+              // Use setTimeout to ensure navigation happens after state update
+              setTimeout(() => {
+                navigate(redirectPath, { replace: true });
+              }, 100);
+            }
+          }
+          // TOKEN_REFRESHED: Do nothing - user is already authenticated and on a valid route
+        } else {
+          setUser(null);
         }
-        // TOKEN_REFRESHED: Do nothing - user is already authenticated and on a valid route
-      } else {
+      } catch (error) {
+        console.error('Error in onAuthStateChange:', error);
         setUser(null);
+      } finally {
+        // ALWAYS set loading to false to prevent infinite white screen
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => {
