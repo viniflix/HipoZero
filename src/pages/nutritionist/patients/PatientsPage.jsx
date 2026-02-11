@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Plus, Search, ChevronRight, User as UserIcon, Loader2, ListFilter } from 'lucide-react';
+import { Plus, Search, ChevronRight, User as UserIcon, Loader2, ListFilter, RefreshCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardHeader from '@/components/DashboardHeader';
 import { motion } from 'framer-motion';
 import AddPatientModal from '@/components/nutritionist/AddPatientModal';
+import { useToast } from '@/components/ui/use-toast';
 
 // Objeto de ordenação
 const sortOptions = {
@@ -19,8 +20,8 @@ const sortOptions = {
 };
 
 const PatientsPage = () => {
-    const { user, signOut } = useAuth();
-    const navigate = useNavigate();
+    const { user } = useAuth();
+    const { toast } = useToast();
     const [patients, setPatients] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
@@ -28,7 +29,10 @@ const PatientsPage = () => {
     const [showAddPatientModal, setShowAddPatientModal] = useState(false);
 
     const fetchPatients = useCallback(async () => {
-        if (!user?.id) return;
+        if (!user?.id) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         
         const { column, ascending } = sortOptions[sortOrder];
@@ -42,11 +46,16 @@ const PatientsPage = () => {
 
         if (error) {
             console.error("Erro ao buscar pacientes:", error);
+            toast({
+                title: 'Erro ao carregar pacientes',
+                description: 'Não foi possível carregar a lista de pacientes.',
+                variant: 'destructive'
+            });
         } else {
             setPatients(data || []);
         }
         setLoading(false);
-    }, [user?.id, sortOrder]); 
+    }, [toast, user?.id, sortOrder]); 
 
     useEffect(() => {
         fetchPatients();
@@ -88,13 +97,23 @@ const PatientsPage = () => {
                     </div>
 
                     <div className="flex-shrink-0 flex justify-center sm:justify-end">
-                        <Button
-                            onClick={() => setShowAddPatientModal(true)}
-                            className="bg-primary text-primary-foreground rounded-5px shadow-card font-semibold hover:bg-primary/90"
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Adicionar Paciente
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={fetchPatients}
+                                className="rounded-5px shadow-card font-semibold"
+                            >
+                                <RefreshCcw className="w-4 h-4 mr-2" />
+                                Atualizar
+                            </Button>
+                            <Button
+                                onClick={() => setShowAddPatientModal(true)}
+                                className="bg-primary text-primary-foreground rounded-5px shadow-card font-semibold hover:bg-primary/90"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Adicionar Paciente
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
