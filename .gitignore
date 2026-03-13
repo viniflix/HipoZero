@@ -41,3 +41,4 @@ dist-ssr/
 
 # Internal App Folders
 /supabase
+.env.example
