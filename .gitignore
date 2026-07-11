@@ -39,7 +39,6 @@ dist-ssr/
 .cursorrules
 .copilot
 
-# Internal App Folders
-/supabase
+# Supabase infrastructure is versioned; local state stays ignored by supabase/.gitignore.
 .env.example
 .env.example
