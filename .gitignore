@@ -39,6 +39,7 @@ dist-ssr/
 .cursorrules
 .copilot
 
-# Supabase infrastructure is versioned; local state stays ignored by supabase/.gitignore.
+# Supabase infrastructure and local state stay outside GitHub.
+/supabase/
 .env.example
 .env.example
