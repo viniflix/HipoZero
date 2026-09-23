@@ -2,7 +2,7 @@
 
 ## Fontes e limite da evidência
 
-O relatório `bug_analysis_report.md` fornecido pelo solicitante foi tratado como hipótese. A consulta direta, somente leitura, usou o proxy Sentry existente no Supabase e a API do PostHog pelo diagnóstico local. Os servidores MCP Sentry e PostHog constam habilitados em `.codex/config.toml`, mas não foram expostos nesta sessão; a conexão MCP Sentry ainda depende da configuração que o solicitante informou que fará. Supabase MCP está acessível. Vercel e GitHub foram operados pelo fluxo já existente de Git/Preview, sem assumir conexão MCP.
+O relatório `bug_analysis_report.md` fornecido pelo solicitante foi tratado como hipótese. A consulta direta, somente leitura, usou o proxy Sentry existente no Supabase e a API do PostHog pelo diagnóstico local. O PostHog MCP tornou-se disponível durante a triagem e confirmou acesso de leitura ao projeto 341310. Sentry MCP continua indisponível nesta sessão; a conexão depende da configuração que o solicitante informou que fará. Supabase MCP está acessível. O Vercel MCP aparece, mas a consulta ao projeto devolveu 403 por falta de autorização ao escopo `viniflix-projects`; o deploy e seu sucesso foram conferidos pelo status Vercel do commit no GitHub. GitHub MCP não apareceu.
 
 ## Achados
 
