@@ -201,6 +201,8 @@ As migrações `20260923040000_atomic_diet_template_import.sql` e `2026092304000
 
 **Validação e cascata:** o cron gerou duas sessões pendentes com snapshots e duas notificações; nova execução produziu zero duplicatas. Uma submissão autenticada simulada dentro de transação retornou 70% e foi revertida; uma segunda submissão da mesma sessão foi recusada. As duas sessões reais permanecem pendentes. A edição posterior do template não altera as perguntas já enviadas no novo cliente. A produção ainda usa o cliente anterior até o fechamento das ondas; por isso o caminho legado de submissão permaneceu compatível, com validação no banco. [Referência do Supabase Cron](https://supabase.com/docs/guides/cron).
 
+**Entrega:** commit `a93d457b` na `main` local; [Preview da onda 9](https://nello-ecih5sog6-viniflix-projects.vercel.app) com deploy Vercel concluído.
+
 ### Onda 10 — atomicidade de templates/refeições/receitas (I4)
 
 **Corrigir:** RPCs transacionais para create/update de refeição e receita, autorização e validação no banco, erro completo propagado; auditar definição real das RPCs de dieta.
@@ -208,6 +210,10 @@ As migrações `20260923040000_atomic_diet_template_import.sql` e `2026092304000
 **Cascata:** ordenação, referências por `food_id`, rascunhos, importação, concorrência entre abas e recuperação após queda de rede.
 
 **Saída:** injeção de falha entre delete/insert mantém estado anterior intacto; concorrência não mistura versões; testes de RLS. Commit de migração + cliente na main após gate.
+
+**Auditoria e correção da onda 10 (23/09/2026):** `create_diet_template` e `update_diet_template` já eram funções transacionais com checagem do autor e histórico de versões. Refeições e receitas ainda faziam gravação de pai e filhos em chamadas separadas; edições descartavam os erros de exclusão/inserção e exibiam sucesso. As migrações `20260923060000_atomic_template_saves.sql` e `20260923060001_validate_diet_template_food.sql` foram aplicadas ao banco. As novas RPCs gravam refeição ou receita e itens na mesma transação, validam usuário, alimento ativo e pertencimento de alimento privado, quantidade e unidade. A edição exige o `updated_at` carregado para impedir sobrescrita de uma aba desatualizada. Um gatilho bloqueia alimento indisponível também nas RPCs transacionais de dieta.
+
+**Validação e cascata:** teste SQL transacional criou refeição e receita com itens, forçou item inválido após a exclusão dos anteriores e confirmou que nome e itens permaneceram intactos; edição com versão antiga e por outro usuário foi recusada. Todo o teste foi revertido, sem registros artificiais persistidos. Não havia refeições padrão ou receitas reais no banco no momento da auditoria. `npm run verify`: 97 arquivos, 594 testes, build e orçamento de bundle aprovados; apenas o aviso preexistente `no-script-url`.
 
 ### Onda 11 — erros observáveis e recuperáveis (I5)
 
