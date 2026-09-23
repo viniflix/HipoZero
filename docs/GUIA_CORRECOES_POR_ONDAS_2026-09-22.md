@@ -187,6 +187,8 @@ As migrações `20260923040000_atomic_diet_template_import.sql` e `2026092304000
 
 **Cascata e dados antigos:** auditoria dos 34 cálculos energéticos no banco: nenhum VET nulo/não positivo; um registro VENTA histórico tem déficit de 1.540 kcal/dia, projeção superior a 0,91 kg/semana e VET inferior à TMB, sem confirmação documentada. O gatilho `trg_energy_calculations_immutable` recusou a atualização desse registro (`clinical_measurement_hard_delete_forbidden`), preservando a trilha clínica. Há um plano alimentar ativo para o mesmo paciente, com `daily_calories` de 122,87 kcal no banco; seu conteúdo exige inspeção clínica antes de concluir se o total representa prescrição completa ou rascunho inconsistente. `needs_energy_recalc` e `needs_meal_plan_review` foram ativados em `patient_module_sync_flags` para esse paciente. A aplicação agora mostra revisão pendente e não reutiliza automaticamente metas VENTA históricas sem confirmação no monitor do plano e na importação de template. É necessária uma nova avaliação autenticada do nutricionista para substituí-lo; não inventamos uma prescrição retrospectiva. As 97 suítes/590 testes, lint, build e orçamento do bundle passaram antes do commit.
 
+**Preview:** branch `codex/preview-wave-8`, publicada pela Vercel em ambiente `Preview`. `origin/main` e a produção permanecem no commit anterior às ondas.
+
 ### Onda 9 — geração e resposta dos check-ins (I3)
 
 **Corrigir se não houver produtor implantado:** criar agendamento idempotente para `checkin_schedules` com fuso horário, recorrência, expiração e chave única; checar RLS, notificação em app e página de resposta já existente.
