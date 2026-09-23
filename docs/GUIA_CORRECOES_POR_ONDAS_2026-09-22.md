@@ -215,6 +215,8 @@ As migrações `20260923040000_atomic_diet_template_import.sql` e `2026092304000
 
 **Validação e cascata:** teste SQL transacional criou refeição e receita com itens, forçou item inválido após a exclusão dos anteriores e confirmou que nome e itens permaneceram intactos; edição com versão antiga e por outro usuário foi recusada. Todo o teste foi revertido, sem registros artificiais persistidos. Não havia refeições padrão ou receitas reais no banco no momento da auditoria. `npm run verify`: 97 arquivos, 594 testes, build e orçamento de bundle aprovados; apenas o aviso preexistente `no-script-url`.
 
+**Entrega:** commit `7a35dfde` na `main` local; [Preview da onda 10](https://nello-49avr4och-viniflix-projects.vercel.app) com deploy Vercel concluído.
+
 ### Onda 11 — erros observáveis e recuperáveis (I5)
 
 **Corrigir:** revisar todos os `catch` e `{data,error}` do hub e do plano alimentar; estado de falha por seção, ação de tentar novamente, logging estruturado com código de correlação e mensagem compreensível. Instrumentar tempos de busca/plano por etapa; aplicar debounce, cancelamento/identificador da consulta mais recente e paginação no seletor de alimentos, corrigindo consultas/índices comprovadamente lentos.
@@ -222,6 +224,10 @@ As migrações `20260923040000_atomic_diet_template_import.sql` e `2026092304000
 **Cascata:** rede offline, sessão expirada, RLS, serviço indisponível, upload e falhas parciais, sem dados de saúde no log; digitação rápida, troca de filtro/fonte, mudança de paciente, múltiplas abas, cache e rede móvel lenta.
 
 **Saída:** nenhum erro de query vira lista vazia ou sucesso; usuário sabe o que fazer e suporte identifica a causa técnica. Busca exibe apenas resultados do termo/filtro mais recente e as latências P50/P95 de busca e abertura do plano são medidas antes/depois sob as mesmas condições, com metas de desempenho registradas. Commit na main.
+
+**Auditoria e correção da onda 11 (23/09/2026):** o Sentry tinha dez grupos abertos com eventos em produção nos últimos 30 dias. Os logs de autenticação do Supabase discriminaram 16 recusas por `email_not_confirmed`, uma por `invalid_credentials` e uma troca de senha recusada por `same_password`; os eventos Sentry não traziam o código, portanto pareciam falhas desconhecidas. O login agora oferece reenvio de confirmação e classifica recusas esperadas mesmo quando o código vem ausente; a troca da mesma senha mostra orientação em português sem gerar incidente operacional. O erro de renderização de tags como objeto no template foi corrigido. O diário alimentar confere os erros de cada consulta, exibe estado recuperável e ação de tentar novamente; o carregamento de alimento em edição não converte falha da consulta em macronutrientes zerados. O seletor de alimentos ganhou espera de 300 ms, descarte de respostas antigas, erro visível e nova tentativa. A consulta mantém limite de 50 itens, e as tabelas `reference_foods` e `nutritionist_foods` já possuem índices trigram de nome; não foi necessário criar índice.
+
+**Validação:** `npm run verify`: 97 arquivos, 595 testes, build e orçamento de bundle aprovados, com apenas aviso preexistente `no-script-url`. Os eventos `data_load_timing` registram duração em milissegundos de `food_search` e `meal_plan_open`, sem termo buscado ou identificador de paciente. A comparação P50/P95 antes/depois ainda depende de uma janela de uso real do Preview/produção; não havia uma série anterior com a mesma definição de evento. A integração PostHog respondeu às consultas iniciais de organização/projeto, mas deixou de ficar disponível nesta sessão durante o fechamento da onda. Os incidentes antigos no Sentry só podem ser confirmados como encerrados após implantação e novo tráfego; não os marquei como resolvidos apenas pelo patch.
 
 ## 6. Gates de entrega contínua
 
