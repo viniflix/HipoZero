@@ -88,6 +88,8 @@ CSV: 86 linhas incluindo cabeçalho, 12 colunas em três blocos paciente/duas co
 
 **Saída:** consulta de auditoria retorna zero B12 sem fonte rastreável em itens TACO; casos de null/zero e origem mista testados; migração reversível e amostragem clínica aprovada. Commit na main.
 
+**Auditoria da onda 2 (22/09/2026):** consulta direta ao banco vinculado encontrou 581 itens `reference_foods` TACO e zero valores não nulos em B12, D, E ou folato; a view `foods` confirma o mesmo. Foram encontrados 37 snapshots TACO em 5 planos, também sem B12/D. Portanto, o relato não foi reproduzido como valor de B12 atribuído a um alimento TACO no banco atual. A falha confirmada está na apresentação: o resumo de micronutrientes converte `NULL` em zero e exibe adequação calculada sobre cobertura incompleta. A [TACO 4ª edição da UNICAMP](https://nepa.unicamp.br/wp-content/uploads/sites/27/2023/10/taco_4_edicao_ampliada_e_revisada.pdf), quadro de vitaminas (p. 19), não inclui B12, D, E nem folato. Uma restrição no banco impede inserir esses valores em itens TACO sem alterar os 581 registros; a interface passa a identificar dado ausente e total parcial. Como os snapshots não continham esses valores e o plano não persiste totais de B12, não há recálculo numérico retroativo a aplicar. Revisão clínica de planos mistos continua recomendada antes de interpretar adequação.
+
 ### Onda 3 — Pollock 7 e composição corporal (U3)
 
 **Reproduzir:** caso real com sete dobras em mm, sexo, idade na data, peso, densidade e Siri manual; mudar somente idade manual e observar recálculo.
