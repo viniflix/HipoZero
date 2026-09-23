@@ -4,7 +4,7 @@
 
 **Base examinada:** `main` em `c53b5846` antes deste documento; código local, PDF e CSV `Nello Calculos - Calculos` fornecidos pelo solicitante.
 
-**Estado:** ondas 1 a 6 implementadas em commits locais da `main` e publicadas apenas como Preview; validação em aparelhos reais, conta de paciente e revisão clínica ainda pendentes. Produção não recebeu esses commits. As ondas 7 a 11 permanecem abertas.
+**Estado:** ondas 1 a 7 implementadas em commits locais da `main` e publicadas apenas como Preview; validação em aparelhos reais, conta de paciente e revisão clínica ainda pendentes. Produção não recebeu esses commits. As ondas 8 a 11 permanecem abertas.
 
 ## 1. Como usar este guia
 
@@ -168,6 +168,12 @@ O defeito de código confirmado era a aceitação silenciosa de ID de condição
 **Cascata:** totais, rascunho, plano confirmado, PDFs e alerta de revisão de planos afetados.
 
 **Saída:** alimento excluído/inativo, falha de rede, RLS e falha no segundo item nunca deixam plano anunciado como importado integralmente com macros zerados. Commit na main.
+
+**Auditoria e correção da onda 7 (23/09/2026):** a consulta `getFoodsMapByIds` devolvia `{}` quando o banco falhava; agora propaga a falha. O diálogo de refeições mostrava aviso sobre alimento ausente/inativo mas importava mesmo assim, emitia sucesso antes de salvar e fechava até na exceção. O formulário importava refeições em várias operações, ignorando retornos falsos. O diálogo de protocolo completo consultava `meal_plans` usando o ID UUID de `diet_templates`, logo podia exibir prévia vazia. Agora ambos usam o protocolo correto, mostram refeição, alimento/ID ou substituto indisponível, bloqueiam confirmação e reconsultam no clique. O sucesso só aparece após o resultado confirmado; falhas mantêm o diálogo aberto. A medida caseira conhecida entra no cálculo em gramas.
+
+As migrações `20260923040000_atomic_diet_template_import.sql` e `20260923040001_reject_inactive_prescription_food.sql` foram aplicadas ao banco vinculado. A primeira valida propriedade do protocolo e rascunho, IDs de refeições, existência/atividade dos alimentos e substitutos, quantidade e medida antes de inserir; copia as refeições selecionadas em uma única transação e atualiza totais. O clone completo usa a mesma rotina. A segunda rejeita no gatilho qualquer nova referência a alimento inativo, inclusive por outros fluxos de prescrição, fechando a lacuna entre a prévia e o salvamento. Ensaios transacionais com `ROLLBACK` confirmaram cópia válida e rejeição de alimento desativado sem inserir refeição; clone completo válido também foi executado em simulação.
+
+**Correção retroativa:** no banco atual existem 32 itens em protocolos de dieta e **zero** alimentos ausentes/inativos. Há **zero** planos com `source_snapshot.template_id` e **zero** linhas de plano com alimento ausente/inativo; portanto não havia plano desse defeito a recalcular. Três itens de protocolo usam unidade numérica: dois têm equivalência em gramas conhecida e são convertidos; o terceiro é água, com medida em ml sem equivalência em gramas e macros zero. Alterações clínicas antigas não foram inventadas. A importação em lote e a cópia completa ainda requerem teste manual com sessão de nutricionista no Preview. A cópia genérica de um plano para outro paciente, fora de protocolos, segue como auditoria de atomicidade da onda 10.
 
 ### Onda 8 — entradas finitas e VENTA viável (I2)
 
