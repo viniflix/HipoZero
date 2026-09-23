@@ -4,7 +4,7 @@
 
 **Base examinada:** `main` em `c53b5846` antes deste documento; código local, PDF e CSV `Nello Calculos - Calculos` fornecidos pelo solicitante.
 
-**Estado:** diagnóstico e plano. Nenhuma correção de produto ou validação em produção é declarada concluída aqui.
+**Estado:** ondas 1 e 2 implementadas em commits locais da `main` e publicadas apenas como Preview; validação em aparelhos reais, conta de paciente e revisão clínica ainda pendentes. Produção não recebeu esses commits. As demais ondas permanecem abertas.
 
 ## 1. Como usar este guia
 
@@ -15,6 +15,7 @@ Os relatos dos usuários têm prioridade sobre as hipóteses produzidas pela IA.
 ### Regra de aceitação numérica
 
 - Preservar valor bruto e unidade por 100 g, por porção, kcal/dia ou percentual; converter explicitamente antes de comparar.
+- Arredondar somente na apresentação, com no máximo duas casas quando a tela exigir essa precisão, e formatar em `pt-BR` (ex.: `2,33` e `1.234,56`). Não trocar o valor numérico persistido por uma string formatada; entradas brasileiras devem ser interpretadas sem ambiguidade.
 - Para um valor exibido sem casas, aceitar diferença atribuível ao arredondamento final (até 0,5 unidade; até 1 unidade se os próprios cálculos manuais arredondaram intermediários). Para valores com uma ou duas casas, aceitar apenas o intervalo compatível com a precisão exibida e da fonte. Não usar um limite absoluto único para micronutrientes, energia e percentual.
 - Qualquer divergência maior, valor não finito, `null` tratado como zero, fonte ausente apresentada como medida e valores entre os dois nutricionistas discordantes passam por investigação. Preservar as duas referências manuais; não calcular sua média como “verdade”.
 - Para cada caso energético, anexar peso, altura, idade na data do cálculo, sexo usado, protocolo/versão, massa magra quando exigida, fator de mobilidade, atividade, injúria, prazo e peso-alvo; exibir substituição numérica termo a termo, valor antes de arredondar e resultado persistido. Os anexos atuais não trazem todos esses insumos.
@@ -29,6 +30,9 @@ Os relatos dos usuários têm prioridade sobre as hipóteses produzidas pela IA.
 | U4 | Fator de injúria não bate em relatos. No CSV, os cenários FI de Harris dos três pacientes são próximos dos manuais. `A VERIFICAR` o caso divergente. | Motor atual só aplica injúria em Harris: `calculateEnergyPlan` força fator 1 nos demais protocolos. Harris usa `TMB × mobilidade (1,2 acamado/1,3 ambulante) × injúria`. Se o nutri aplica FA/ETA ou outra base, resultados diferem por convenção. Validar a regra clínica, não apenas a multiplicação. | 4 |
 | U5 | Harris-Benedict: paciente 3, CSV linha 36, 1665,7/1665,7 manual versus 1656 Nello (−9,7 kcal); pacientes 1 e 2 coincidem. `CONFIRMADO` divergência pontual, raiz `A VERIFICAR`. | Código usa coeficientes da versão original 1919 e converte altura em cm. Reconstituir cada termo com os insumos originais e verificar sexo, idade, peso, altura, arredondamento e valor salvo. Uma troca de convenção de fórmula ou dado capturado pode explicar 9,7; não assumir antes da reprodução. | 5 |
 | U6 | Divergências da planilha (seção 3). `CONFIRMADO` em micronutrientes e uma linha de Harris; EER 2005 do paciente 1 tem desacordo entre os dois manuais. | Verificar identificador e versão do alimento, fonte, unidade, medida caseira, conversão de quantidade, soma dos itens, snapshot do plano e protocolo energético. | 2, 5 e 6 |
+| U7 | Ao abrir os micronutrientes do plano, a área aparece vazia; após cerca de 2 s e aparente atualização da página, os valores surgem. `CONFIRMADO` como novo relato, causa temporal `A VERIFICAR`. | `getMealPlanById` transforma erro na consulta de itens em `foods: []` e retorna sucesso; `getActiveMealPlan` depende de várias consultas em sequência. Investigar waterfall, estado de carregamento, cache, refetch e se ocorre recarga real do navegador. | 6 e 11 |
+| U8 | Busca/seleção de alimentos mostra dízimas extensas e usa ponto decimal/separador fora de `pt-BR`. `CONFIRMADO` no código: `AddFoodToMealDialog` interpola macros e kcal brutos; `formatNutrient` limita duas casas mas devolve número sem localização, usado em `FoodSelector`. A tela exata do exemplo `2,33333333333` ainda deve ser reproduzida. | Padronizar formatação de **exibição** para kcal, macros e micro em busca, seleção, edição, resumo e PDFs, sem arredondar prematuramente os cálculos ou gravar texto localizado no banco. | 6 |
+| U9 | Buscas e telas demoram a carregar. `CONFIRMADO` como relato; latência por rota ainda não medida. | `FoodSelector` consulta a cada tecla, sem debounce/cancelamento, e ignora nova busca enquanto `loading` está ativo; isso pode deixar resultado antigo ou atrasado. Medir também consultas de plano, payload, renderização, rede e índices antes de atribuir toda a demora ao frontend. | 6 e 11 |
 
 ## 3. Reconciliação dos anexos
 
@@ -122,13 +126,13 @@ CSV: 86 linhas incluindo cabeçalho, 12 colunas em três blocos paciente/duas co
 
 ### Onda 6 — micronutrientes e EER discrepantes (U6)
 
-**Reproduzir:** P2/P3 micro linha a linha com `food_id`, fonte, valor/100 g, unidade, gramas convertidos e contribuição; reconciliar P1 EER 2005 com os dois nutricionistas e fonte oficial.
+**Reproduzir:** P2/P3 micro linha a linha com `food_id`, fonte, valor/100 g, unidade, gramas convertidos e contribuição; reconciliar P1 EER 2005 com os dois nutricionistas e fonte oficial. Abrir plano com cache frio/quente e alternar para micronutrientes antes/depois do carregamento; registrar rede, tempo, falhas, estado exibido e se houve `document` reload ou apenas refetch React Query. Reproduzir `2,33333333333` em cada superfície de busca/seleção, inclusive valores grandes e entrada `pt-BR`.
 
-**Corrigir:** conversão de medida sem heurística calórica, unidade e identidade do alimento, origem/forma de vitamina A, dados incorretos no banco; separar “não calculável” de zero. Corrigir EER apenas se reconstrução demonstrar erro do Nello.
+**Corrigir:** conversão de medida sem heurística calórica, unidade e identidade do alimento, origem/forma de vitamina A, dados incorretos no banco; separar “não calculável” de zero. Corrigir EER apenas se reconstrução demonstrar erro do Nello. Carregar os alimentos antes de declarar o painel de micro pronto; falha parcial deve mostrar erro/tentar novamente, jamais painel vazio anunciado como resultado. Criar formatação numérica `pt-BR` compartilhada, no máximo duas casas nas superfícies pedidas, preservando precisão interna e distinção `NULL`/zero.
 
-**Cascata:** totais diário/refeição, gráficos, adequação DRI, PDFs, clones de protocolo e planos existentes para revisão.
+**Cascata:** totais diário/refeição, gráficos, adequação DRI, PDFs, clones de protocolo e planos existentes para revisão; busca, escolha e troca de alimento, medidas caseiras, rascunho salvo, consulta com cache, navegação e tela do paciente.
 
-**Saída:** nove divergências >1 do quadro explicadas e validadas por nutris, EER 2005 documentado com insumos verificáveis; tolerâncias de arredondamento aprovadas. Commit na main.
+**Saída:** nove divergências >1 do quadro explicadas e validadas por nutris, EER 2005 documentado com insumos verificáveis; tolerâncias de arredondamento aprovadas. Em cache frio, lento e falha de rede, o painel de micro nunca informa falso vazio; valores aparecem sem F5 manual, com estado de carregamento/erro correto. `2,33333333333` aparece como `2,33` e milhar usa ponto em todas as superfícies de exibição auditadas; o valor bruto permanece íntegro no cálculo/salvamento. Commit na main.
 
 ### Onda 7 — importação íntegra de protocolos (I1)
 
@@ -164,11 +168,11 @@ CSV: 86 linhas incluindo cabeçalho, 12 colunas em três blocos paciente/duas co
 
 ### Onda 11 — erros observáveis e recuperáveis (I5)
 
-**Corrigir:** revisar todos os `catch` e `{data,error}` do hub; estado de falha por seção, ação de tentar novamente, logging estruturado com código de correlação e mensagem compreensível.
+**Corrigir:** revisar todos os `catch` e `{data,error}` do hub e do plano alimentar; estado de falha por seção, ação de tentar novamente, logging estruturado com código de correlação e mensagem compreensível. Instrumentar tempos de busca/plano por etapa; aplicar debounce, cancelamento/identificador da consulta mais recente e paginação no seletor de alimentos, corrigindo consultas/índices comprovadamente lentos.
 
-**Cascata:** rede offline, sessão expirada, RLS, serviço indisponível, upload e falhas parciais, sem dados de saúde no log.
+**Cascata:** rede offline, sessão expirada, RLS, serviço indisponível, upload e falhas parciais, sem dados de saúde no log; digitação rápida, troca de filtro/fonte, mudança de paciente, múltiplas abas, cache e rede móvel lenta.
 
-**Saída:** nenhum erro de query vira lista vazia ou sucesso; usuário sabe o que fazer e suporte identifica a causa técnica. Commit na main.
+**Saída:** nenhum erro de query vira lista vazia ou sucesso; usuário sabe o que fazer e suporte identifica a causa técnica. Busca exibe apenas resultados do termo/filtro mais recente e as latências P50/P95 de busca e abertura do plano são medidas antes/depois sob as mesmas condições, com metas de desempenho registradas. Commit na main.
 
 ## 6. Gates de entrega contínua
 
@@ -180,7 +184,7 @@ CSV: 86 linhas incluindo cabeçalho, 12 colunas em três blocos paciente/duas co
 
 ## 7. Referências e limites desta auditoria
 
-- Evidência de usuário: `C:\Users\vinic\Downloads\Nello Calculos - Calculos.csv` e `.pdf`; dados fornecidos pelo solicitante. Os anexos não contêm todos os insumos biométricos, IDs de alimentos, versão das fontes, capturas de celular nem acesso ao banco de produção.
+- Evidência de usuário: `C:\Users\vinic\Downloads\Nello Calculos - Calculos.csv` e `.pdf`, além do relato posterior de carregamento, dízimas e lentidão; dados fornecidos pelo solicitante. Os anexos não contêm todos os insumos biométricos, IDs de alimentos, versão das fontes ou capturas/traços de rede do defeito de carregamento. A auditoria da onda 2 obteve consulta ao banco vinculado; as demais reproduções clínicas continuam pendentes.
 - Fonte primária de composição: [NEPA/UNICAMP, TACO 4ª edição](https://nepa.unicamp.br/wp-content/uploads/sites/27/2023/10/taco_4_edicao_ampliada_e_revisada.pdf), seção de vitaminas e tabela centesimal. Ausência de B12 na TACO não prova que o alimento contenha zero B12.
 - Referência institucional de EER 2005: [Health Canada, equações e PA por sexo](https://www.canada.ca/en/health-canada/services/food-nutrition/food-nutrition-surveillance/health-nutrition-surveys/canadian-community-health-survey-cchs/reference-guide-understanding-using-data-2015.html). Outras equações e faixas de aplicabilidade devem ser validadas por nutricionista antes de alterar a implementação.
 - Principais arquivos rastreados: `src/components/anthropometry/AnthropometryForm.jsx`, `src/lib/utils/anthropometry-calculations.js`, `src/lib/utils/energy-calculations.js`, `src/lib/utils/energy-planning.js`, `src/lib/supabase/energy-queries.js`, `src/lib/constants/injury-factors.js`, `src/components/meal-plan/MicronutrientsCard.jsx`, `src/lib/supabase/meal-plan-queries.js`, `src/lib/supabase/template-queries.js`, `src/components/meal-plan/ImportMealFromProtocolDialog.jsx`, `src/components/meal-plan/MealPlanForm.jsx`, `src/hooks/useTemplateBuilder.js`, `src/hooks/useCheckins.js`, `src/pages/patient/CheckinResponsePage.jsx`, `src/pages/patient/PatientProgressPage.jsx`, `src/pages/patient/AddMealPage.jsx`, `src/pages/nutritionist/patients/FoodDiaryPage.jsx`.
