@@ -231,6 +231,14 @@ As migrações `20260923040000_atomic_diet_template_import.sql` e `2026092304000
 
 ## 6. Gates de entrega contínua
 
+### Auditoria de consolidação antes da produção — 23/09/2026
+
+As onze ondas estão implementadas na `main` local e foram verificadas como conjunto. A revisão final encontrou caminhos antigos do plano alimentar que ainda criavam ou copiavam prescrições por várias requisições, podendo deixar refeição sem alimentos ou desativar um plano válido antes de terminar o novo. A criação agora começa inativa; a cópia integral de plano e o salvamento como template usam RPCs transacionais. A ativação confere paciente, episódio de cuidado, conteúdo e confirmação pelo profissional na mesma transação, inclusive na promoção de rascunho. Cópias permanecem rascunhos para revisão. Falhas ao salvar substituições de alimentos deixaram de ser ignoradas. As migrações `20260923070000` a `20260923070003` foram aplicadas ao banco vinculado; ensaios autenticados com rollback comprovaram cópia completa, rejeição de ativação com paciente incorreto e rejeição de plano vazio, sem alterar os registros de teste.
+
+A auditoria de dados encontrou 17 planos ativos, sem pacientes com dois planos ativos. Dez planos ativos têm até duas refeições e foram sinalizados em `patient_module_sync_flags` para revisão; **não** se deduziu um alvo calórico de um plano possivelmente parcial nem se modificou prescrição antiga. Os três cálculos Harris históricos (IDs 20, 23 e 40), o VENTA discrepante e os planos sinalizados ainda precisam de revisão e confirmação autenticada do nutricionista. O solicitante informou que o nutricionista fará isso depois. Até lá, esses registros **não estão clinicamente revalidados**. A liberação do software não encerra essa pendência assistencial.
+
+Gate automatizado da versão consolidada: 97 arquivos/597 testes aprovados, lint sem erros (um aviso preexistente em teste), build e orçamento de bundle aprovados, `npm audit --omit=dev --audit-level=high` sem vulnerabilidades. O fluxo autenticado completo e as métricas P50/P95 pós implantação dependem de uso real; incidentes do Sentry precisam ser acompanhados após a publicação, sem baixa automática baseada apenas no código.
+
 1. Abrir registro da onda com caso reproduzível, IDs anonimizados, ambiente e evidência. Para dados clínicos, acesso mínimo; não copiar dados de paciente para fixtures públicas.
 2. Escrever teste de regressão **que falha no comportamento anterior** para causa confirmada; para responsividade, evidência visual/manual de rotas e viewports. Testar unidade, integração e fluxo conforme o risco, não apenas snapshots de implementação.
 3. Executar `npm run verify` e gates específicos de migração/segurança quando afetados. Comparar números independentes com insumos congelados, nunca apenas com o mesmo módulo usado para calcular no app.
