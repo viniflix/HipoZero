@@ -4,7 +4,7 @@
 
 **Base examinada:** `main` em `c53b5846` antes deste documento; código local, PDF e CSV `Nello Calculos - Calculos` fornecidos pelo solicitante.
 
-**Estado:** ondas 1 a 7 implementadas em commits locais da `main` e publicadas apenas como Preview; validação em aparelhos reais, conta de paciente e revisão clínica ainda pendentes. Produção não recebeu esses commits. As ondas 8 a 11 permanecem abertas.
+**Estado:** ondas 1 a 11 implementadas em commits locais da `main` e publicadas apenas como Preview. Validação em aparelhos reais, conta de paciente, revisão clínica dos registros antigos e acompanhamento dos incidentes após implantação ainda pendentes. Produção não recebeu esses commits.
 
 ## 1. Como usar este guia
 
