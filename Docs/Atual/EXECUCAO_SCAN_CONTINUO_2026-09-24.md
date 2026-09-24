@@ -23,6 +23,7 @@ Fonte: `../Auditoria_e_Seguranca/SCAN_CONTINUO_PLATAFORMA_2026-09-24.md`. Este r
 - Migrações e funções Edge foram conferidas no catálogo do Supabase; as políticas originais de `growth_records` permanecem ativas.
 - O monitor Sentry atual foi relido e está ativo/OK. A confirmação de HTTP 200 e de bundle **não** substitui QA autenticado.
 - Wrappers públicos `admin_*` e `get_nutritionist_detail` foram inspecionados: acesso anônimo revogado e guarda `private.is_admin()` presente; a guarda exige operador ativo em `private.admin_operators` e JWT AAL2. Isso não encerra a auditoria das demais funções privilegiadas.
+- As cinco funções `SECURITY DEFINER` públicas executáveis por `anon` são de anamnese por token (`attach`, `detach`, `get`, `submit`) e verificação de documento; não revogar sem romper esses fluxos. As funções públicas privilegiadas executáveis por `authenticated` inspecionadas têm `search_path` configurado; wrappers de plano, episódio e template delegam a helpers `private` com checagens de identidade. Falta análise de invariantes e matriz entre tenants por função.
 
 ## Outras pendências atuais em `Docs/Atual`
 
