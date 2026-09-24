@@ -8,7 +8,7 @@
 | Supabase Auth | Site URL `https://nellonutri.com.br`; allowlist inclui raiz, www, localhost e preview Vercel; não inclui o host anterior | Conferido no painel |
 | Emails de Auth | Seis templates principais sem a marca antiga; SMTP Resend habilitado com remetente `naoresponda@nellonutri.com.br` | Conferido no painel; falta teste de entrega real deste release |
 | Dados exibidos | Conquista de 500 refeições usava o nome antigo | Alterada para “Lenda do Nello” por migração SQL; leitura posterior confirmou |
-| Storage público | Cinco objetos em `IDV` tinham nomes antigos; nenhum campo de tabela consultado os referenciava | Renomeados para `archive-2025-*`; leitura posterior retornou zero nomes antigos em `IDV` |
+| Storage público | Cinco objetos em `IDV` tinham nomes antigos; nenhum campo de tabela consultado os referenciava | Renomeados, copiados para `brand-archive` privado com tamanhos conferidos e retirados de `IDV`; ali resta apenas `nello.png` |
 | Conta Auth ativa | Um login administrativo `ana@hipozero.com`, com entrada recente, identidade e perfil correspondentes | **Pendente:** criar/comprovar a caixa de destino e concluir mudança verificada; não retirar acesso antes disso |
 | Relatórios e auditoria históricos | 18 bug reports e eventos de Auth preservam o email e contexto registrados na época | Preservar como trilha histórica; não reescrever ocorrências |
 | Domínios HTTP | `nellonutri.com.br` responde 200; `www` redireciona 308; antigos `hipozero.com.br` e `www` retornam 404 na Vercel | Publicar apenas URLs Nello; links antigos exigem reenvio |
@@ -33,4 +33,4 @@ A resposta recebida permite `ana@nellonutri.com.br` **somente se a caixa já exi
 
 ## Limites
 
-Não foi feita entrega real de email nem login da conta Ana nesta reauditoria. O domínio antigo não redireciona mais; o retorno 404 é estado externo real. Os arquivos renomeados continuam em bucket público como material de arquivo, mas não possuem mais URL com nome antigo; seu conteúdo visual não foi refeito nem republicado como marca Nello.
+Não foi feita entrega real de email nem login da conta Ana nesta reauditoria. O domínio antigo não redireciona mais; o retorno 404 é estado externo real. Os cinco arquivos antigos foram preservados em bucket privado e em backup local ignorado pelo Git; seu conteúdo visual não foi refeito nem republicado como marca Nello. A tentativa de acessar uma cópia pública retirada retornou HTTP 400 do Storage.
