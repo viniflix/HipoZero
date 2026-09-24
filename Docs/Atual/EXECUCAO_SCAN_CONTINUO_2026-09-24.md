@@ -18,7 +18,7 @@ Fonte: `../Auditoria_e_Seguranca/SCAN_CONTINUO_PLATAFORMA_2026-09-24.md`. Este r
 
 ## Gate técnico executado
 
-- `npm run verify:release` passou após as mudanças de feed e novamente após progresso: 113 arquivos de teste, 671 testes, lint, build, orçamento de bundle e audit de produção sem vulnerabilidade alta.
+- `npm run verify:release` passou após as mudanças de feed, progresso e mensagem clínica: 113 arquivos de teste, 672 testes, lint, build, orçamento de bundle e audit de produção sem vulnerabilidade alta.
 - O bundle público de produção foi conferido para `PatientProgressPage` com `patient_progress_measurements` e paginação, para `ConfirmSignupPage` com cooldown persistido, e para modelos/autosave após seus pushes.
 - Migrações e funções Edge foram conferidas no catálogo do Supabase; as políticas originais de `growth_records` permanecem ativas.
 - O monitor Sentry atual foi relido e está ativo/OK. A confirmação de HTTP 200 e de bundle **não** substitui QA autenticado.
