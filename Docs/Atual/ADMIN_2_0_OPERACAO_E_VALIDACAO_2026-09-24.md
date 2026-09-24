@@ -26,7 +26,7 @@ Dashboard usa `user_profiles`, `activity_log`, `meals`, `meal_plans`, `appointme
 ## Pendências externas e limites
 
 - Os dois operadores devem cadastrar TOTP. Sem isso o novo painel não libera acesso, por projeto.
-- A conta `ana@hipozero.com` ainda é um login Auth ativo e recente. A aba Conta do nutricionista agora pode solicitar a troca de email via Auth; Supabase exige confirmação nas caixas antiga e nova. Migrar somente após comprovar que ambas recebem email ou executar recuperação administrativa da identidade. O perfil é sincronizado automaticamente quando Auth conclui a troca. Ver `Docs/Atual/MIGRACAO_DOMINIO_REAUDITORIA_2026-09-24.md`.
+- A conta `ana@hipozero.com` ainda é um login Auth ativo e recente. A aba Conta do nutricionista agora pode solicitar a troca de email via Auth; Supabase exige confirmação nas caixas antiga e nova. Em 24/09, o DNS de `nellonutri.com.br` não publicou MX, portanto a caixa Nello proposta precisa ser criada ou encaminhada e testada antes da troca. Migrar somente após comprovar que ambas recebem email ou executar recuperação administrativa da identidade. O perfil é sincronizado automaticamente quando Auth conclui a troca. Ver `Docs/Atual/MIGRACAO_DOMINIO_REAUDITORIA_2026-09-24.md`.
 - Não há integração de cobrança SaaS validada; receita, assinaturas e churn seguem sem instrumentação.
 - O acesso real de um operador no navegador e fluxos de TOTP precisam de teste com a própria conta, sem compartilhar código ou segredo.
 - A integração Vercel conectada nesta sessão devolveu 403 para listar deployments; os gates foram verificados por hash de artefato e HTTP 200 no domínio público.
