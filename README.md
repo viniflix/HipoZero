@@ -72,8 +72,10 @@ Estado externo conferido em 24/09/2026:
 Cuidados de operação:
 
 - Vercel: `nellonutri.com.br` é o domínio principal e `www` redireciona para a
-  raiz. Após publicar e validar o frontend, retirar da associação do projeto
-  todos os domínios da marca anterior.
+  raiz. Os três domínios da marca anterior foram desvinculados do projeto em
+  24/09/2026, após o deploy de produção ficar pronto.
+- GitHub: o repositório foi renomeado para `viniflix/nello`, e o remoto local
+  aponta para o novo endereço.
 - Supabase Auth: revalidar recuperação, confirmação e convite com emails reais
   após publicar o frontend. Links antigos para a origem removida deixam de ser
   suportados; usuários devem solicitar novos emails.
