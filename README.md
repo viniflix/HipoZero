@@ -87,6 +87,9 @@ Cuidados de operação:
   válidos no domínio novo. O registro operacional anterior em
   `docs/Referencias/Produto/MIGRACAO-NELLO.md` registra essas etapas como feitas
   em 22/09/2026; o estado remoto não é controlado por este repositório.
+- A reauditoria de 24/09/2026 está em `Docs/Atual/MIGRACAO_DOMINIO_REAUDITORIA_2026-09-24.md`.
+  Há uma conta administrativa com email antigo que exige confirmação das caixas
+  antes da troca; o painel Admin > Segurança acompanha a pendência.
 
 Sessões do navegador não migram entre domínios. Usuários precisam entrar
 novamente em `nellonutri.com.br`.

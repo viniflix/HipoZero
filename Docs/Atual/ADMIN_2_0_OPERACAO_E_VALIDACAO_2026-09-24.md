@@ -10,7 +10,7 @@ Operadores preexistentes foram migrados como `owner` e precisam cadastrar/verifi
 
 Concessões e revogações são operações de produção revisadas, executadas por migração SQL no Supabase; nunca por alteração de `is_admin` no cliente. Exigir identidade confirmada, motivo com pelo menos dez caracteres e registro da mudança. Para revogar, preencher `revoked_at=now()` na linha do operador; RPCs negam imediatamente mesmo com JWT AAL2 válido. Revogar sessões Auth globalmente quando houver suspeita de comprometimento. Se um operador perder TOTP, confirmar identidade por canal independente, remover o fator com procedimento administrativo do Supabase, preservar trilha do incidente e exigir novo cadastro no próximo acesso. Não desativar MFA como atalho.
 
-O painel de Segurança mostra operadores, MFA verificado e consultas ao portão de acesso agregadas por hora nos últimos sete dias. O log não contém IP, token, segredo TOTP ou dado clínico. Ele não cobre chamadas diretas negadas em outras RPCs; correlacionar com logs do Supabase/Sentry para incidentes. Limitar e alertar sobre abuso na camada de infraestrutura conforme volume real; não instalar honeypot que capture credenciais.
+O painel de Segurança mostra operadores, MFA verificado e consultas ao portão de acesso agregadas por hora nos últimos sete dias. Também mostra a migração da marca por contagens atuais de contas Auth legadas, arquivos públicos e conquistas exibidas; relatos históricos são apresentados separadamente e não reescritos. O log não contém IP, token, segredo TOTP ou dado clínico. Ele não cobre chamadas diretas negadas em outras RPCs; correlacionar com logs do Supabase/Sentry para incidentes. Limitar e alertar sobre abuso na camada de infraestrutura conforme volume real; não instalar honeypot que capture credenciais.
 
 ## Dados e privacidade
 
@@ -26,7 +26,7 @@ Dashboard usa `user_profiles`, `activity_log`, `meals`, `meal_plans`, `appointme
 ## Pendências externas e limites
 
 - Os dois operadores devem cadastrar TOTP. Sem isso o novo painel não libera acesso, por projeto.
-- A conta `ana@hipozero.com` ainda é um login Auth ativo e recente. Migrar por fluxo de troca de email com verificação, após confirmar a caixa de destino e dependências de recuperação.
+- A conta `ana@hipozero.com` ainda é um login Auth ativo e recente. A aba Conta do nutricionista agora pode solicitar a troca de email via Auth; Supabase exige confirmação nas caixas antiga e nova. Migrar somente após comprovar que ambas recebem email ou executar recuperação administrativa da identidade. O perfil é sincronizado automaticamente quando Auth conclui a troca. Ver `Docs/Atual/MIGRACAO_DOMINIO_REAUDITORIA_2026-09-24.md`.
 - Não há integração de cobrança SaaS validada; receita, assinaturas e churn seguem sem instrumentação.
 - O acesso real de um operador no navegador e fluxos de TOTP precisam de teste com a própria conta, sem compartilhar código ou segredo.
 - A integração Vercel conectada nesta sessão devolveu 403 para listar deployments; os gates foram verificados por hash de artefato e HTTP 200 no domínio público.
